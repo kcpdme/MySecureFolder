@@ -2,6 +2,7 @@ package com.kcpd.myfolder.ui.gallery
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -92,10 +94,18 @@ fun GalleryScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(mediaFiles) { mediaFile ->
+                items(mediaFiles.size) { index ->
+                    val mediaFile = mediaFiles[index]
                     MediaThumbnail(
                         mediaFile = mediaFile,
-                        onClick = { selectedFile = mediaFile }
+                        onClick = {
+                            // Navigate to full-screen viewer
+                            navController.navigate("media_viewer/$index")
+                        },
+                        onLongClick = {
+                            // Show detail dialog on long press
+                            selectedFile = mediaFile
+                        }
                     )
                 }
             }
@@ -133,12 +143,19 @@ fun GalleryScreen(
 @Composable
 fun MediaThumbnail(
     mediaFile: MediaFile,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = { onLongClick() },
+                    onTap = { onClick() }
+                )
+            }
     ) {
         when (mediaFile.mediaType) {
             MediaType.PHOTO -> {

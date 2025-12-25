@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.ui.camera.CameraScreen
 import com.kcpd.myfolder.ui.folder.FolderScreen
+import com.kcpd.myfolder.ui.gallery.MediaViewerScreen
 import com.kcpd.myfolder.ui.home.HomeScreen
 import com.kcpd.myfolder.ui.settings.S3ConfigScreen
 
@@ -55,6 +56,17 @@ fun MyFolderNavHost(
 
         composable("s3_config") {
             S3ConfigScreen(navController = navController)
+        }
+
+        composable(
+            route = "media_viewer/{index}",
+            arguments = listOf(navArgument("index") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val index = backStackEntry.arguments?.getInt("index") ?: 0
+            MediaViewerScreen(
+                navController = navController,
+                initialIndex = index
+            )
         }
     }
 }

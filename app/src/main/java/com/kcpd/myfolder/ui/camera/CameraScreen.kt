@@ -2,6 +2,7 @@ package com.kcpd.myfolder.ui.camera
 
 import android.Manifest
 import android.net.Uri
+import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -11,6 +12,7 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -20,6 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -32,6 +37,8 @@ import com.kcpd.myfolder.data.model.MediaType
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.max
+import kotlin.math.min
 
 enum class CaptureMode {
     PHOTO, VIDEO, AUDIO
@@ -207,8 +214,12 @@ fun CameraPreview(
     val imageCapture = remember { ImageCapture.Builder().build() }
     var recording: Recording? by remember { mutableStateOf(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+    var flashEnabled by remember { mutableStateOf(false) }
+    var zoomRatio by remember { mutableStateOf(1f) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(lensFacing) {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
@@ -217,16 +228,29 @@ fun CameraPreview(
                 setSurfaceProvider(previewView.surfaceProvider)
             }
 
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            val cameraSelector = CameraSelector.Builder()
+                .requireLensFacing(lensFacing)
+                .build()
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                val camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
                     preview,
                     imageCapture
                 )
+                cameraControl = camera.cameraControl
+
+                // Set initial zoom
+                camera.cameraControl.setZoomRatio(zoomRatio)
+
+                // Enable flash if needed
+                if (flashEnabled) {
+                    imageCapture.flashMode = ImageCapture.FLASH_MODE_ON
+                } else {
+                    imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -237,11 +261,122 @@ fun CameraPreview(
         }
     }
 
+    // Update flash mode when changed
+    LaunchedEffect(flashEnabled) {
+        imageCapture.flashMode = if (flashEnabled) {
+            ImageCapture.FLASH_MODE_ON
+        } else {
+            ImageCapture.FLASH_MODE_OFF
+        }
+    }
+
+    // Update zoom when changed
+    LaunchedEffect(zoomRatio) {
+        cameraControl?.setZoomRatio(zoomRatio)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { previewView },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, _, zoom, _ ->
+                        val newZoom = (zoomRatio * zoom).coerceIn(1f, 5f)
+                        zoomRatio = newZoom
+                    }
+                }
         )
+
+        // Top controls bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .align(Alignment.TopCenter),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Flash toggle
+            IconButton(
+                onClick = { flashEnabled = !flashEnabled },
+                modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = "Flash",
+                    tint = Color.White
+                )
+            }
+
+            // Camera flip
+            IconButton(
+                onClick = {
+                    lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        CameraSelector.LENS_FACING_FRONT
+                    } else {
+                        CameraSelector.LENS_FACING_BACK
+                    }
+                },
+                modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    Icons.Default.FlipCameraAndroid,
+                    contentDescription = "Flip Camera",
+                    tint = Color.White
+                )
+            }
+        }
+
+        // Zoom slider
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp)
+        ) {
+            Text(
+                text = "${String.format("%.1f", zoomRatio)}x",
+                color = Color.White,
+                modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Slider(
+                value = zoomRatio,
+                onValueChange = { zoomRatio = it },
+                valueRange = 1f..5f,
+                modifier = Modifier
+                    .width(200.dp)
+                    .graphicsLayer {
+                        rotationZ = 270f
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    }
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(
+                            androidx.compose.ui.unit.Constraints(
+                                minWidth = constraints.minHeight,
+                                maxWidth = constraints.maxHeight,
+                                minHeight = constraints.minWidth,
+                                maxHeight = constraints.maxWidth,
+                            )
+                        )
+                        layout(placeable.height, placeable.width) {
+                            placeable.place(-placeable.width, 0)
+                        }
+                    }
+            )
+        }
 
         FloatingActionButton(
             onClick = {
