@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -29,17 +30,36 @@ import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
+import com.kcpd.myfolder.data.repository.MediaRepository
+import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaViewerScreen(
     navController: NavController,
     initialIndex: Int = 0,
+    category: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
-    val mediaFiles by viewModel.mediaFiles.collectAsState()
+    val allMediaFiles by viewModel.mediaFiles.collectAsState()
+
+    // Filter media files by category if provided
+    val mediaFiles = remember(allMediaFiles, category) {
+        if (category != null) {
+            val folderCategory = FolderCategory.fromPath(category)
+            if (folderCategory != null) {
+                allMediaFiles.filter { it.mediaType == folderCategory.mediaType }
+            } else {
+                allMediaFiles
+            }
+        } else {
+            allMediaFiles
+        }
+    }
+
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (mediaFiles.size - 1).coerceAtLeast(0)),
         pageCount = { mediaFiles.size }
@@ -158,6 +178,7 @@ fun ZoomableImage(
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var imageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
 
     Box(
         modifier = Modifier
@@ -174,13 +195,24 @@ fun ZoomableImage(
             }
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    val newScale = (scale * zoom).coerceIn(1f, 5f)
 
-                    if (scale > 1f) {
-                        offset += pan
+                    if (newScale > 1f) {
+                        val newOffset = offset + pan
+
+                        // Calculate max offset to prevent showing black areas
+                        val maxX = (imageSize.width * (newScale - 1)) / 2f
+                        val maxY = (imageSize.height * (newScale - 1)) / 2f
+
+                        offset = Offset(
+                            newOffset.x.coerceIn(-maxX, maxX),
+                            newOffset.y.coerceIn(-maxY, maxY)
+                        )
                     } else {
                         offset = Offset.Zero
                     }
+
+                    scale = newScale
                 }
             }
     ) {
@@ -199,6 +231,16 @@ fun ZoomableImage(
                     translationX = offset.x,
                     translationY = offset.y
                 )
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    imageSize = androidx.compose.ui.geometry.Size(
+                        placeable.width.toFloat(),
+                        placeable.height.toFloat()
+                    )
+                    layout(placeable.width, placeable.height) {
+                        placeable.place(0, 0)
+                    }
+                }
         )
     }
 }

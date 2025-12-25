@@ -30,6 +30,10 @@ import com.kcpd.myfolder.data.model.MediaType
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class ViewMode {
+    GRID, LIST
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GalleryScreen(
@@ -37,10 +41,9 @@ fun GalleryScreen(
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     val mediaFiles by viewModel.mediaFiles.collectAsState()
-    var selectedFile by remember { mutableStateOf<MediaFile?>(null) }
-    var showS3Dialog by remember { mutableStateOf(false) }
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedFiles by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var viewMode by remember { mutableStateOf(ViewMode.GRID) }
 
     Scaffold(
         topBar = {
@@ -104,6 +107,14 @@ fun GalleryScreen(
                             )
                         }
                     } else {
+                        IconButton(onClick = {
+                            viewMode = if (viewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID
+                        }) {
+                            Icon(
+                                if (viewMode == ViewMode.GRID) Icons.Default.ViewList else Icons.Default.GridView,
+                                "Toggle View"
+                            )
+                        }
                         if (mediaFiles.isNotEmpty()) {
                             IconButton(onClick = {
                                 isMultiSelectMode = true
@@ -159,66 +170,73 @@ fun GalleryScreen(
                 }
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = padding,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(mediaFiles.size) { index ->
-                    val mediaFile = mediaFiles[index]
-                    MediaThumbnail(
-                        mediaFile = mediaFile,
-                        isSelected = selectedFiles.contains(mediaFile.id),
-                        isMultiSelectMode = isMultiSelectMode,
-                        onClick = {
-                            if (isMultiSelectMode) {
-                                selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
-                                    selectedFiles - mediaFile.id
+            if (viewMode == ViewMode.GRID) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = padding,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(mediaFiles.size) { index ->
+                        val mediaFile = mediaFiles[index]
+                        MediaThumbnail(
+                            mediaFile = mediaFile,
+                            isSelected = selectedFiles.contains(mediaFile.id),
+                            isMultiSelectMode = isMultiSelectMode,
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
+                                        selectedFiles - mediaFile.id
+                                    } else {
+                                        selectedFiles + mediaFile.id
+                                    }
                                 } else {
-                                    selectedFiles + mediaFile.id
+                                    navController.navigate("media_viewer/$index")
                                 }
-                            } else {
-                                navController.navigate("media_viewer/$index")
+                            },
+                            onLongClick = {
+                                if (!isMultiSelectMode) {
+                                    isMultiSelectMode = true
+                                    selectedFiles = setOf(mediaFile.id)
+                                }
                             }
-                        },
-                        onLongClick = {
-                            if (!isMultiSelectMode) {
-                                isMultiSelectMode = true
-                                selectedFiles = setOf(mediaFile.id)
+                        )
+                    }
+                }
+            } else {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    contentPadding = padding,
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(mediaFiles.size) { index ->
+                        val mediaFile = mediaFiles[index]
+                        MediaListItem(
+                            mediaFile = mediaFile,
+                            isSelected = selectedFiles.contains(mediaFile.id),
+                            isMultiSelectMode = isMultiSelectMode,
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
+                                        selectedFiles - mediaFile.id
+                                    } else {
+                                        selectedFiles + mediaFile.id
+                                    }
+                                } else {
+                                    navController.navigate("media_viewer/$index")
+                                }
+                            },
+                            onLongClick = {
+                                if (!isMultiSelectMode) {
+                                    isMultiSelectMode = true
+                                    selectedFiles = setOf(mediaFile.id)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
-        }
-
-        selectedFile?.let { file ->
-            MediaDetailDialog(
-                mediaFile = file,
-                onDismiss = { selectedFile = null },
-                onDelete = {
-                    viewModel.deleteMediaFile(it)
-                    selectedFile = null
-                },
-                onUpload = {
-                    showS3Dialog = true
-                },
-                onShare = { viewModel.shareMediaFile(it) }
-            )
-        }
-
-        if (showS3Dialog && selectedFile != null) {
-            UploadDialog(
-                mediaFile = selectedFile!!,
-                onDismiss = { showS3Dialog = false },
-                onUpload = { file ->
-                    viewModel.uploadToS3(file)
-                    showS3Dialog = false
-                    selectedFile = null
-                }
-            )
         }
     }
 }
@@ -358,20 +376,39 @@ fun MediaThumbnail(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MediaDetailDialog(
+fun MediaListItem(
     mediaFile: MediaFile,
-    onDismiss: () -> Unit,
-    onDelete: (MediaFile) -> Unit,
-    onUpload: (MediaFile) -> Unit,
-    onShare: (MediaFile) -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    isSelected: Boolean = false,
+    isMultiSelectMode: Boolean = false
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(mediaFile.fileName) },
-        text = {
-            Column {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = { onLongClick() },
+                    onTap = { onClick() }
+                )
+            },
+        color = if (isSelected)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        else
+            MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Thumbnail
+            Box(
+                modifier = Modifier.size(60.dp)
+            ) {
                 when (mediaFile.mediaType) {
                     MediaType.PHOTO -> {
                         AsyncImage(
@@ -380,35 +417,41 @@ fun MediaDetailDialog(
                                 .crossfade(true)
                                 .build(),
                             contentDescription = mediaFile.fileName,
-                            contentScale = ContentScale.Fit,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 300.dp)
+                                .fillMaxSize()
                                 .clip(RoundedCornerShape(8.dp))
                         )
                     }
                     MediaType.VIDEO -> {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
+                                .fillMaxSize()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color.Black),
                             contentAlignment = Alignment.Center
                         ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(mediaFile.filePath)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = mediaFile.fileName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                             Icon(
                                 Icons.Default.PlayCircle,
                                 contentDescription = "Video",
                                 tint = Color.White,
-                                modifier = Modifier.size(64.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
                     MediaType.AUDIO -> {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
+                                .fillMaxSize()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
@@ -417,15 +460,14 @@ fun MediaDetailDialog(
                                 Icons.Default.MusicNote,
                                 contentDescription = "Audio",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(64.dp)
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                     }
                     MediaType.NOTE -> {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
+                                .fillMaxSize()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.secondaryContainer),
                             contentAlignment = Alignment.Center
@@ -434,91 +476,78 @@ fun MediaDetailDialog(
                                 Icons.Default.Note,
                                 contentDescription = "Note",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(64.dp)
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    "Type: ${mediaFile.mediaType.name}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    "Size: ${formatFileSize(mediaFile.size)}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    "Created: ${formatDate(mediaFile.createdAt)}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (mediaFile.isUploaded && mediaFile.s3Url != null) {
-                    Text(
-                        "Status: Uploaded to S3",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
+                if (mediaFile.isUploaded) {
+                    Icon(
+                        Icons.Default.CloudDone,
+                        contentDescription = "Uploaded",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(16.dp)
+                            .align(Alignment.TopEnd)
+                            .background(
+                                Color.Black.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(2.dp)
                     )
                 }
             }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!mediaFile.isUploaded) {
-                    TextButton(onClick = { onUpload(mediaFile) }) {
-                        Icon(Icons.Default.CloudUpload, "Upload")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Upload")
-                    }
-                }
-                TextButton(onClick = { onShare(mediaFile) }) {
-                    Icon(Icons.Default.Share, "Share")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Share")
-                }
-                TextButton(
-                    onClick = { onDelete(mediaFile) },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+
+            // File info
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = mediaFile.fileName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Delete, "Delete")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Delete")
+                    Text(
+                        text = mediaFile.mediaType.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = formatFileSize(mediaFile.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
                 }
+                Text(
+                    text = formatDate(mediaFile.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
-        }
-    )
-}
 
-@Composable
-fun UploadDialog(
-    mediaFile: MediaFile,
-    onDismiss: () -> Unit,
-    onUpload: (MediaFile) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.CloudUpload, "Upload") },
-        title = { Text("Upload to S3/Minio") },
-        text = { Text("Upload ${mediaFile.fileName} to cloud storage?") },
-        confirmButton = {
-            TextButton(onClick = { onUpload(mediaFile) }) {
-                Text("Upload")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            // Selection indicator
+            if (isMultiSelectMode) {
+                Icon(
+                    if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    contentDescription = if (isSelected) "Selected" else "Not selected",
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
-    )
+    }
 }
 
 private fun formatFileSize(bytes: Long): String {

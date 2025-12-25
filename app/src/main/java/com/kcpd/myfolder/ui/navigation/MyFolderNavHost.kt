@@ -39,7 +39,8 @@ fun MyFolderNavHost(
         composable(
             route = "folder/{category}",
             arguments = listOf(navArgument("category") { type = NavType.StringType })
-        ) {
+        ) { backStackEntry ->
+            val category = backStackEntry.arguments?.getString("category")
             FolderScreen(
                 onBackClick = { navController.navigateUp() },
                 onAddClick = {
@@ -48,7 +49,7 @@ fun MyFolderNavHost(
                     navController.navigate("camera")
                 },
                 onMediaClick = { index ->
-                    navController.navigate("media_viewer/$index")
+                    navController.navigate("media_viewer/$index?category=$category")
                 }
             )
         }
@@ -62,13 +63,22 @@ fun MyFolderNavHost(
         }
 
         composable(
-            route = "media_viewer/{index}",
-            arguments = listOf(navArgument("index") { type = NavType.IntType })
+            route = "media_viewer/{index}?category={category}",
+            arguments = listOf(
+                navArgument("index") { type = NavType.IntType },
+                navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
         ) { backStackEntry ->
             val index = backStackEntry.arguments?.getInt("index") ?: 0
+            val category = backStackEntry.arguments?.getString("category")
             MediaViewerScreen(
                 navController = navController,
-                initialIndex = index
+                initialIndex = index,
+                category = category
             )
         }
     }

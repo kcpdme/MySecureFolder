@@ -29,6 +29,10 @@ import com.kcpd.myfolder.data.model.MediaType
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class FolderViewMode {
+    GRID, LIST
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderScreen(
@@ -42,6 +46,7 @@ fun FolderScreen(
     var showUploadDialog by remember { mutableStateOf(false) }
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedFiles by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var viewMode by remember { mutableStateOf(FolderViewMode.GRID) }
 
     Scaffold(
         topBar = {
@@ -107,6 +112,14 @@ fun FolderScreen(
                             )
                         }
                     } else {
+                        IconButton(onClick = {
+                            viewMode = if (viewMode == FolderViewMode.GRID) FolderViewMode.LIST else FolderViewMode.GRID
+                        }) {
+                            Icon(
+                                if (viewMode == FolderViewMode.GRID) Icons.Default.ViewList else Icons.Default.GridView,
+                                "Toggle View"
+                            )
+                        }
                         if (mediaFiles.isNotEmpty()) {
                             IconButton(onClick = {
                                 isMultiSelectMode = true
@@ -157,38 +170,73 @@ fun FolderScreen(
                 }
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = padding,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(mediaFiles.size) { index ->
-                    val mediaFile = mediaFiles[index]
-                    MediaThumbnail(
-                        mediaFile = mediaFile,
-                        isSelected = selectedFiles.contains(mediaFile.id),
-                        isMultiSelectMode = isMultiSelectMode,
-                        onClick = {
-                            if (isMultiSelectMode) {
-                                selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
-                                    selectedFiles - mediaFile.id
+            if (viewMode == FolderViewMode.GRID) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = padding,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(mediaFiles.size) { index ->
+                        val mediaFile = mediaFiles[index]
+                        MediaThumbnail(
+                            mediaFile = mediaFile,
+                            isSelected = selectedFiles.contains(mediaFile.id),
+                            isMultiSelectMode = isMultiSelectMode,
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
+                                        selectedFiles - mediaFile.id
+                                    } else {
+                                        selectedFiles + mediaFile.id
+                                    }
                                 } else {
-                                    selectedFiles + mediaFile.id
+                                    onMediaClick(index)
                                 }
-                            } else {
-                                onMediaClick(index)
+                            },
+                            onLongClick = {
+                                if (!isMultiSelectMode) {
+                                    isMultiSelectMode = true
+                                    selectedFiles = setOf(mediaFile.id)
+                                }
+                            },
+                            isUploading = viewModel.isUploading(mediaFile.id)
+                        )
+                    }
+                }
+            } else {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    contentPadding = padding,
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(mediaFiles.size) { index ->
+                        val mediaFile = mediaFiles[index]
+                        FolderMediaListItem(
+                            mediaFile = mediaFile,
+                            isSelected = selectedFiles.contains(mediaFile.id),
+                            isMultiSelectMode = isMultiSelectMode,
+                            isUploading = viewModel.isUploading(mediaFile.id),
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
+                                        selectedFiles - mediaFile.id
+                                    } else {
+                                        selectedFiles + mediaFile.id
+                                    }
+                                } else {
+                                    onMediaClick(index)
+                                }
+                            },
+                            onLongClick = {
+                                if (!isMultiSelectMode) {
+                                    isMultiSelectMode = true
+                                    selectedFiles = setOf(mediaFile.id)
+                                }
                             }
-                        },
-                        onLongClick = {
-                            if (!isMultiSelectMode) {
-                                isMultiSelectMode = true
-                                selectedFiles = setOf(mediaFile.id)
-                            }
-                        },
-                        isUploading = viewModel.isUploading(mediaFile.id)
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -554,6 +602,195 @@ private fun getEmptyStateMessage(category: FolderCategory): String {
         FolderCategory.VIDEOS -> "Tap + to record videos"
         FolderCategory.RECORDINGS -> "Tap + to record audio"
         FolderCategory.NOTES -> "Tap + to create a note"
+    }
+}
+
+@Composable
+private fun FolderMediaListItem(
+    mediaFile: MediaFile,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    isSelected: Boolean = false,
+    isMultiSelectMode: Boolean = false,
+    isUploading: Boolean = false
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = { onLongClick() },
+                    onTap = { onClick() }
+                )
+            },
+        color = if (isSelected)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        else
+            MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Thumbnail
+            Box(
+                modifier = Modifier.size(60.dp)
+            ) {
+                when (mediaFile.mediaType) {
+                    MediaType.PHOTO -> {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(mediaFile.filePath)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = mediaFile.fileName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    }
+                    MediaType.VIDEO -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(mediaFile.filePath)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = mediaFile.fileName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Icon(
+                                Icons.Default.PlayCircle,
+                                contentDescription = "Video",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    MediaType.AUDIO -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = "Audio",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    MediaType.NOTE -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Note,
+                                contentDescription = "Note",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (isUploading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                if (mediaFile.isUploaded) {
+                    Icon(
+                        Icons.Default.CloudDone,
+                        contentDescription = "Uploaded",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(16.dp)
+                            .align(Alignment.TopEnd)
+                            .background(
+                                Color.Black.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(2.dp)
+                    )
+                }
+            }
+
+            // File info
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = mediaFile.fileName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = mediaFile.mediaType.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = formatFileSize(mediaFile.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+                Text(
+                    text = formatDate(mediaFile.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+
+            // Selection indicator
+            if (isMultiSelectMode) {
+                Icon(
+                    if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    contentDescription = if (isSelected) "Selected" else "Not selected",
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
     }
 }
 
