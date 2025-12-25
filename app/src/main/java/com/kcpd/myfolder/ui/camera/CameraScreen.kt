@@ -282,7 +282,7 @@ fun CameraPreview(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTransformGestures { _, _, zoom, _ ->
-                        val newZoom = (zoomRatio * zoom).coerceIn(1f, 5f)
+                        val newZoom = (zoomRatio * zoom).coerceIn(0.5f, 5f)
                         zoomRatio = newZoom
                     }
                 }
@@ -335,47 +335,34 @@ fun CameraPreview(
             }
         }
 
-        // Zoom slider
-        Column(
+        // Zoom controls (horizontal, Samsung-style)
+        Row(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 180.dp)
+                .background(
+                    Color.Black.copy(alpha = 0.5f),
+                    shape = MaterialTheme.shapes.medium
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "${String.format("%.1f", zoomRatio)}x",
-                color = Color.White,
-                modifier = Modifier
-                    .background(
-                        Color.Black.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.small
+            val zoomLevels = listOf(0.5f, 1f, 2f, 5f)
+
+            zoomLevels.forEach { level ->
+                TextButton(
+                    onClick = { zoomRatio = level },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (zoomRatio == level) Color.Yellow else Color.White
                     )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Slider(
-                value = zoomRatio,
-                onValueChange = { zoomRatio = it },
-                valueRange = 1f..5f,
-                modifier = Modifier
-                    .width(200.dp)
-                    .graphicsLayer {
-                        rotationZ = 270f
-                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                    }
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(
-                            androidx.compose.ui.unit.Constraints(
-                                minWidth = constraints.minHeight,
-                                maxWidth = constraints.maxHeight,
-                                minHeight = constraints.minWidth,
-                                maxHeight = constraints.maxWidth,
-                            )
-                        )
-                        layout(placeable.height, placeable.width) {
-                            placeable.place(-placeable.width, 0)
-                        }
-                    }
-            )
+                ) {
+                    Text(
+                        text = if (level < 1f) "${level}x" else "${level.toInt()}x",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
 
         FloatingActionButton(

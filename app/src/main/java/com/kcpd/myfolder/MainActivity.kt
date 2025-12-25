@@ -5,8 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import com.kcpd.myfolder.ui.navigation.MyFolderNavHost
 import com.kcpd.myfolder.ui.theme.MyFolderTheme
@@ -19,9 +17,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyFolderTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MyFolderNavHost(modifier = Modifier.padding(innerPadding))
-                }
+                MyFolderNavHost(modifier = Modifier.fillMaxSize())
             }
         }
     }

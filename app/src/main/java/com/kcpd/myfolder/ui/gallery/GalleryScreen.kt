@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -38,16 +39,87 @@ fun GalleryScreen(
     val mediaFiles by viewModel.mediaFiles.collectAsState()
     var selectedFile by remember { mutableStateOf<MediaFile?>(null) }
     var showS3Dialog by remember { mutableStateOf(false) }
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    var selectedFiles by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Files") },
-                actions = {
-                    IconButton(onClick = { navController.navigate("s3_config") }) {
-                        Icon(Icons.Default.Settings, "S3 Settings")
+                title = {
+                    Text(
+                        if (isMultiSelectMode)
+                            "${selectedFiles.size} selected"
+                        else
+                            "My Files"
+                    )
+                },
+                navigationIcon = {
+                    if (isMultiSelectMode) {
+                        IconButton(onClick = {
+                            isMultiSelectMode = false
+                            selectedFiles = emptySet()
+                        }) {
+                            Icon(Icons.Default.Close, "Cancel")
+                        }
                     }
-                }
+                },
+                actions = {
+                    if (isMultiSelectMode) {
+                        IconButton(
+                            onClick = {
+                                if (selectedFiles.size == mediaFiles.size) {
+                                    selectedFiles = emptySet()
+                                } else {
+                                    selectedFiles = mediaFiles.map { it.id }.toSet()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                if (selectedFiles.size == mediaFiles.size)
+                                    Icons.Default.CheckBoxOutlineBlank
+                                else
+                                    Icons.Default.CheckBox,
+                                "Select All"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                selectedFiles.forEach { id ->
+                                    mediaFiles.find { it.id == id }?.let { file ->
+                                        viewModel.deleteMediaFile(file)
+                                    }
+                                }
+                                isMultiSelectMode = false
+                                selectedFiles = emptySet()
+                            },
+                            enabled = selectedFiles.isNotEmpty()
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                "Delete Selected",
+                                tint = if (selectedFiles.isNotEmpty())
+                                    MaterialTheme.colorScheme.error
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        }
+                    } else {
+                        if (mediaFiles.isNotEmpty()) {
+                            IconButton(onClick = {
+                                isMultiSelectMode = true
+                            }) {
+                                Icon(Icons.Default.CheckCircle, "Select")
+                            }
+                        }
+                        IconButton(onClick = { navController.navigate("s3_config") }) {
+                            Icon(Icons.Default.Settings, "S3 Settings")
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         floatingActionButton = {
@@ -98,13 +170,24 @@ fun GalleryScreen(
                     val mediaFile = mediaFiles[index]
                     MediaThumbnail(
                         mediaFile = mediaFile,
+                        isSelected = selectedFiles.contains(mediaFile.id),
+                        isMultiSelectMode = isMultiSelectMode,
                         onClick = {
-                            // Navigate to full-screen viewer
-                            navController.navigate("media_viewer/$index")
+                            if (isMultiSelectMode) {
+                                selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
+                                    selectedFiles - mediaFile.id
+                                } else {
+                                    selectedFiles + mediaFile.id
+                                }
+                            } else {
+                                navController.navigate("media_viewer/$index")
+                            }
                         },
                         onLongClick = {
-                            // Show detail dialog on long press
-                            selectedFile = mediaFile
+                            if (!isMultiSelectMode) {
+                                isMultiSelectMode = true
+                                selectedFiles = setOf(mediaFile.id)
+                            }
                         }
                     )
                 }
@@ -144,12 +227,13 @@ fun GalleryScreen(
 fun MediaThumbnail(
     mediaFile: MediaFile,
     onClick: () -> Unit,
-    onLongClick: () -> Unit = {}
+    onLongClick: () -> Unit = {},
+    isSelected: Boolean = false,
+    isMultiSelectMode: Boolean = false
 ) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clickable(onClick = onClick)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = { onLongClick() },
@@ -238,6 +322,35 @@ fun MediaThumbnail(
                     .background(
                         Color.Black.copy(alpha = 0.6f),
                         shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(2.dp)
+            )
+        }
+
+        // Multi-select overlay
+        if (isMultiSelectMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isSelected)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        else
+                            Color.Transparent
+                    )
+            )
+
+            Icon(
+                if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (isSelected) "Selected" else "Not selected",
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .size(24.dp)
+                    .align(Alignment.TopStart)
+                    .background(
+                        Color.Black.copy(alpha = 0.6f),
+                        shape = CircleShape
                     )
                     .padding(2.dp)
             )

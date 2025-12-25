@@ -2,6 +2,7 @@ package com.kcpd.myfolder.ui.folder
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -32,21 +34,92 @@ import java.util.*
 fun FolderScreen(
     onBackClick: () -> Unit,
     onAddClick: () -> Unit,
+    onMediaClick: (Int) -> Unit,
     viewModel: FolderViewModel = hiltViewModel()
 ) {
     val mediaFiles by viewModel.mediaFiles.collectAsState()
     var selectedFile by remember { mutableStateOf<MediaFile?>(null) }
     var showUploadDialog by remember { mutableStateOf(false) }
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    var selectedFiles by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(viewModel.category.displayName) },
+                title = {
+                    Text(
+                        if (isMultiSelectMode)
+                            "${selectedFiles.size} selected"
+                        else
+                            viewModel.category.displayName
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        if (isMultiSelectMode) {
+                            isMultiSelectMode = false
+                            selectedFiles = emptySet()
+                        } else {
+                            onBackClick()
+                        }
+                    }) {
                         Icon(Icons.Default.ArrowBack, "Back")
                     }
-                }
+                },
+                actions = {
+                    if (isMultiSelectMode) {
+                        IconButton(
+                            onClick = {
+                                if (selectedFiles.size == mediaFiles.size) {
+                                    selectedFiles = emptySet()
+                                } else {
+                                    selectedFiles = mediaFiles.map { it.id }.toSet()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                if (selectedFiles.size == mediaFiles.size)
+                                    Icons.Default.CheckBoxOutlineBlank
+                                else
+                                    Icons.Default.CheckBox,
+                                "Select All"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                selectedFiles.forEach { id ->
+                                    mediaFiles.find { it.id == id }?.let { file ->
+                                        viewModel.deleteFile(file)
+                                    }
+                                }
+                                isMultiSelectMode = false
+                                selectedFiles = emptySet()
+                            },
+                            enabled = selectedFiles.isNotEmpty()
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                "Delete Selected",
+                                tint = if (selectedFiles.isNotEmpty())
+                                    MaterialTheme.colorScheme.error
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        }
+                    } else {
+                        if (mediaFiles.isNotEmpty()) {
+                            IconButton(onClick = {
+                                isMultiSelectMode = true
+                            }) {
+                                Icon(Icons.Default.CheckCircle, "Select")
+                            }
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         floatingActionButton = {
@@ -91,10 +164,29 @@ fun FolderScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(mediaFiles) { mediaFile ->
+                items(mediaFiles.size) { index ->
+                    val mediaFile = mediaFiles[index]
                     MediaThumbnail(
                         mediaFile = mediaFile,
-                        onClick = { selectedFile = mediaFile },
+                        isSelected = selectedFiles.contains(mediaFile.id),
+                        isMultiSelectMode = isMultiSelectMode,
+                        onClick = {
+                            if (isMultiSelectMode) {
+                                selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
+                                    selectedFiles - mediaFile.id
+                                } else {
+                                    selectedFiles + mediaFile.id
+                                }
+                            } else {
+                                onMediaClick(index)
+                            }
+                        },
+                        onLongClick = {
+                            if (!isMultiSelectMode) {
+                                isMultiSelectMode = true
+                                selectedFiles = setOf(mediaFile.id)
+                            }
+                        },
                         isUploading = viewModel.isUploading(mediaFile.id)
                     )
                 }
@@ -133,12 +225,20 @@ fun FolderScreen(
 private fun MediaThumbnail(
     mediaFile: MediaFile,
     onClick: () -> Unit,
-    isUploading: Boolean
+    onLongClick: () -> Unit = {},
+    isUploading: Boolean,
+    isSelected: Boolean = false,
+    isMultiSelectMode: Boolean = false
 ) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = { onLongClick() },
+                    onTap = { onClick() }
+                )
+            }
     ) {
         when (mediaFile.mediaType) {
             MediaType.PHOTO -> {
@@ -250,6 +350,35 @@ private fun MediaThumbnail(
                     modifier = Modifier.size(32.dp)
                 )
             }
+        }
+
+        // Multi-select overlay
+        if (isMultiSelectMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isSelected)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        else
+                            Color.Transparent
+                    )
+            )
+
+            Icon(
+                if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (isSelected) "Selected" else "Not selected",
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .size(24.dp)
+                    .align(Alignment.TopStart)
+                    .background(
+                        Color.Black.copy(alpha = 0.6f),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+                    .padding(2.dp)
+            )
         }
     }
 }

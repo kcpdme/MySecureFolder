@@ -46,6 +46,9 @@ fun MyFolderNavHost(
                     // Navigate to appropriate capture/creation screen based on category
                     // For now, just navigate to camera - will be refined in later phases
                     navController.navigate("camera")
+                },
+                onMediaClick = { index ->
+                    navController.navigate("media_viewer/$index")
                 }
             )
         }

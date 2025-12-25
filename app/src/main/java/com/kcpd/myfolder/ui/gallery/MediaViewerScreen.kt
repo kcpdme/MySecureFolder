@@ -212,7 +212,7 @@ fun VideoPlayer(
 
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.parse(mediaFile.filePath))
+            val mediaItem = MediaItem.fromUri(Uri.fromFile(java.io.File(mediaFile.filePath)))
             setMediaItem(mediaItem)
             prepare()
             playWhenReady = true
@@ -220,7 +220,7 @@ fun VideoPlayer(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(mediaFile.filePath) {
         onDispose {
             exoPlayer.release()
         }
@@ -230,9 +230,6 @@ fun VideoPlayer(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onTap() })
-            }
     ) {
         AndroidView(
             factory = { ctx ->
@@ -240,6 +237,7 @@ fun VideoPlayer(
                     player = exoPlayer
                     useController = true
                     controllerAutoShow = true
+                    controllerShowTimeoutMs = 3000
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -259,7 +257,7 @@ fun AudioPlayer(
 
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.parse(mediaFile.filePath))
+            val mediaItem = MediaItem.fromUri(Uri.fromFile(java.io.File(mediaFile.filePath)))
             setMediaItem(mediaItem)
             prepare()
             addListener(object : Player.Listener {
@@ -283,7 +281,7 @@ fun AudioPlayer(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(mediaFile.filePath) {
         onDispose {
             exoPlayer.release()
         }
