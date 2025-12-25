@@ -5,7 +5,8 @@ import java.util.Date
 enum class MediaType {
     PHOTO,
     VIDEO,
-    AUDIO
+    AUDIO,
+    NOTE
 }
 
 data class MediaFile(
@@ -18,5 +19,6 @@ data class MediaFile(
     val size: Long,
     val createdAt: Date,
     val isUploaded: Boolean = false,
-    val s3Url: String? = null
+    val s3Url: String? = null,
+    val textContent: String? = null
 )

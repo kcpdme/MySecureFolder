@@ -1,12 +1,18 @@
 package com.kcpd.myfolder.data.repository
 
 import android.content.Context
+import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import java.io.File
 import java.util.Date
 import java.util.UUID
@@ -24,32 +30,77 @@ class MediaRepository @Inject constructor(
         get() = File(context.filesDir, "media").apply { mkdirs() }
 
     init {
+        migrateLegacyFiles()
         loadMediaFiles()
+    }
+
+    private fun migrateLegacyFiles() {
+        // Migrate old files from media/ to categorized subdirectories
+        val oldFiles = mediaDir.listFiles()?.filter { it.isFile } ?: return
+
+        oldFiles.forEach { file ->
+            val mediaType = getMediaTypeFromExtension(file.extension.lowercase())
+            if (mediaType != null) {
+                val category = FolderCategory.fromMediaType(mediaType)
+                val categoryDir = getCategoryDirectory(category)
+                val newFile = File(categoryDir, file.name)
+                if (!newFile.exists()) {
+                    file.renameTo(newFile)
+                }
+            }
+        }
     }
 
     private fun loadMediaFiles() {
         val files = mutableListOf<MediaFile>()
-        mediaDir.listFiles()?.forEach { file ->
-            if (file.isFile) {
-                val mediaType = when (file.extension.lowercase()) {
-                    "jpg", "jpeg", "png" -> MediaType.PHOTO
-                    "mp4", "mov" -> MediaType.VIDEO
-                    "mp3", "m4a", "aac" -> MediaType.AUDIO
-                    else -> return@forEach
+
+        // Load from all category subdirectories
+        FolderCategory.entries.forEach { category ->
+            val categoryDir = getCategoryDirectory(category)
+            categoryDir.listFiles()?.forEach { file ->
+                if (file.isFile) {
+                    val mediaType = getMediaTypeFromExtension(file.extension.lowercase())
+                    if (mediaType == category.mediaType) {
+                        files.add(
+                            MediaFile(
+                                id = file.nameWithoutExtension,
+                                fileName = file.name,
+                                filePath = file.absolutePath,
+                                mediaType = mediaType,
+                                size = file.length(),
+                                createdAt = Date(file.lastModified())
+                            )
+                        )
+                    }
                 }
-                files.add(
-                    MediaFile(
-                        id = file.nameWithoutExtension,
-                        fileName = file.name,
-                        filePath = file.absolutePath,
-                        mediaType = mediaType,
-                        size = file.length(),
-                        createdAt = Date(file.lastModified())
-                    )
-                )
             }
         }
+
         _mediaFiles.value = files.sortedByDescending { it.createdAt }
+    }
+
+    private fun getMediaTypeFromExtension(extension: String): MediaType? {
+        return when (extension) {
+            "jpg", "jpeg", "png" -> MediaType.PHOTO
+            "mp4", "mov" -> MediaType.VIDEO
+            "mp3", "m4a", "aac" -> MediaType.AUDIO
+            "txt" -> MediaType.NOTE
+            else -> null
+        }
+    }
+
+    fun getCategoryDirectory(category: FolderCategory): File {
+        return File(mediaDir, category.path).apply { mkdirs() }
+    }
+
+    fun getFilesForCategory(category: FolderCategory): StateFlow<List<MediaFile>> {
+        return mediaFiles.map { files ->
+            files.filter { it.mediaType == category.mediaType }
+        }.stateIn(
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default),
+            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
     }
 
     fun addMediaFile(file: File, mediaType: MediaType): MediaFile {
@@ -63,6 +114,33 @@ class MediaRepository @Inject constructor(
         )
         _mediaFiles.value = listOf(mediaFile) + _mediaFiles.value
         return mediaFile
+    }
+
+    fun saveNote(fileName: String, content: String): MediaFile {
+        val category = FolderCategory.NOTES
+        val categoryDir = getCategoryDirectory(category)
+        val file = File(categoryDir, fileName)
+        file.writeText(content)
+
+        val mediaFile = MediaFile(
+            id = UUID.randomUUID().toString(),
+            fileName = fileName,
+            filePath = file.absolutePath,
+            mediaType = MediaType.NOTE,
+            size = file.length(),
+            createdAt = Date(),
+            textContent = content
+        )
+        _mediaFiles.value = listOf(mediaFile) + _mediaFiles.value
+        return mediaFile
+    }
+
+    fun loadNoteContent(mediaFile: MediaFile): String {
+        return if (mediaFile.mediaType == MediaType.NOTE) {
+            File(mediaFile.filePath).readText()
+        } else {
+            ""
+        }
     }
 
     fun deleteMediaFile(mediaFile: MediaFile): Boolean {
@@ -81,4 +159,14 @@ class MediaRepository @Inject constructor(
     }
 
     fun getMediaDirectory(): File = mediaDir
+
+    fun getFileCountForCategory(category: FolderCategory): StateFlow<Int> {
+        return mediaFiles.map { files ->
+            files.count { it.mediaType == category.mediaType }
+        }.stateIn(
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default),
+            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+    }
 }

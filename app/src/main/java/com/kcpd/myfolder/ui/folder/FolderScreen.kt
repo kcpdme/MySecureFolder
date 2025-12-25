@@ -1,4 +1,4 @@
-package com.kcpd.myfolder.ui.gallery
+package com.kcpd.myfolder.ui.folder
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,9 +19,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
 import java.text.SimpleDateFormat
@@ -29,30 +29,29 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GalleryScreen(
-    navController: NavController,
-    viewModel: GalleryViewModel = hiltViewModel()
+fun FolderScreen(
+    onBackClick: () -> Unit,
+    onAddClick: () -> Unit,
+    viewModel: FolderViewModel = hiltViewModel()
 ) {
     val mediaFiles by viewModel.mediaFiles.collectAsState()
     var selectedFile by remember { mutableStateOf<MediaFile?>(null) }
-    var showS3Dialog by remember { mutableStateOf(false) }
+    var showUploadDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Files") },
-                actions = {
-                    IconButton(onClick = { navController.navigate("s3_config") }) {
-                        Icon(Icons.Default.Settings, "S3 Settings")
+                title = { Text(viewModel.category.displayName) },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.Default.ArrowBack, "Back")
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("camera") }
-            ) {
-                Icon(Icons.Default.Add, "Add Media")
+            FloatingActionButton(onClick = onAddClick) {
+                Icon(getActionIcon(viewModel.category), "Add ${viewModel.category.displayName}")
             }
         }
     ) { padding ->
@@ -65,20 +64,20 @@ fun GalleryScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        Icons.Default.PhotoLibrary,
+                        viewModel.category.icon,
                         contentDescription = null,
                         modifier = Modifier.size(120.dp),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "No files yet",
+                        "No ${viewModel.category.displayName.lowercase()} yet",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Tap + to capture photos, videos, or audio",
+                        getEmptyStateMessage(viewModel.category),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     )
@@ -95,7 +94,8 @@ fun GalleryScreen(
                 items(mediaFiles) { mediaFile ->
                     MediaThumbnail(
                         mediaFile = mediaFile,
-                        onClick = { selectedFile = mediaFile }
+                        onClick = { selectedFile = mediaFile },
+                        isUploading = viewModel.isUploading(mediaFile.id)
                     )
                 }
             }
@@ -106,23 +106,22 @@ fun GalleryScreen(
                 mediaFile = file,
                 onDismiss = { selectedFile = null },
                 onDelete = {
-                    viewModel.deleteMediaFile(it)
+                    viewModel.deleteFile(it)
                     selectedFile = null
                 },
                 onUpload = {
-                    showS3Dialog = true
-                },
-                onShare = { viewModel.shareMediaFile(it) }
+                    showUploadDialog = true
+                }
             )
         }
 
-        if (showS3Dialog && selectedFile != null) {
+        if (showUploadDialog && selectedFile != null) {
             UploadDialog(
                 mediaFile = selectedFile!!,
-                onDismiss = { showS3Dialog = false },
+                onDismiss = { showUploadDialog = false },
                 onUpload = { file ->
-                    viewModel.uploadToS3(file)
-                    showS3Dialog = false
+                    viewModel.uploadFile(file)
+                    showUploadDialog = false
                     selectedFile = null
                 }
             )
@@ -131,9 +130,10 @@ fun GalleryScreen(
 }
 
 @Composable
-fun MediaThumbnail(
+private fun MediaThumbnail(
     mediaFile: MediaFile,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isUploading: Boolean
 ) {
     Box(
         modifier = Modifier
@@ -199,12 +199,24 @@ fun MediaThumbnail(
                         .background(MaterialTheme.colorScheme.secondaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Note,
-                        contentDescription = "Note",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(64.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Note,
+                            contentDescription = "Note",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = mediaFile.fileName.removeSuffix(".txt"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 2
+                        )
+                    }
                 }
             }
         }
@@ -225,17 +237,30 @@ fun MediaThumbnail(
                     .padding(2.dp)
             )
         }
+
+        if (isUploading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MediaDetailDialog(
+private fun MediaDetailDialog(
     mediaFile: MediaFile,
     onDismiss: () -> Unit,
     onDelete: (MediaFile) -> Unit,
-    onUpload: (MediaFile) -> Unit,
-    onShare: (MediaFile) -> Unit
+    onUpload: (MediaFile) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -342,11 +367,6 @@ fun MediaDetailDialog(
                         Text("Upload")
                     }
                 }
-                TextButton(onClick = { onShare(mediaFile) }) {
-                    Icon(Icons.Default.Share, "Share")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Share")
-                }
                 TextButton(
                     onClick = { onDelete(mediaFile) },
                     colors = ButtonDefaults.textButtonColors(
@@ -368,7 +388,7 @@ fun MediaDetailDialog(
 }
 
 @Composable
-fun UploadDialog(
+private fun UploadDialog(
     mediaFile: MediaFile,
     onDismiss: () -> Unit,
     onUpload: (MediaFile) -> Unit
@@ -389,6 +409,23 @@ fun UploadDialog(
             }
         }
     )
+}
+
+@Composable
+private fun getActionIcon(category: FolderCategory) = when (category) {
+    FolderCategory.PHOTOS -> Icons.Default.CameraAlt
+    FolderCategory.VIDEOS -> Icons.Default.Videocam
+    FolderCategory.RECORDINGS -> Icons.Default.Mic
+    FolderCategory.NOTES -> Icons.Default.Edit
+}
+
+private fun getEmptyStateMessage(category: FolderCategory): String {
+    return when (category) {
+        FolderCategory.PHOTOS -> "Tap + to capture photos"
+        FolderCategory.VIDEOS -> "Tap + to record videos"
+        FolderCategory.RECORDINGS -> "Tap + to record audio"
+        FolderCategory.NOTES -> "Tap + to create a note"
+    }
 }
 
 private fun formatFileSize(bytes: Long): String {

@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.S3Config
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -73,7 +74,8 @@ class S3Repository @Inject constructor(
                 .build()
 
             val file = File(mediaFile.filePath)
-            val objectName = "${mediaFile.mediaType.name.lowercase()}/${mediaFile.fileName}"
+            val category = FolderCategory.fromMediaType(mediaFile.mediaType)
+            val objectName = "${category.path}/${mediaFile.fileName}"
 
             minioClient.putObject(
                 PutObjectArgs.builder()
@@ -102,6 +104,7 @@ class S3Repository @Inject constructor(
             "mp3" -> "audio/mpeg"
             "m4a" -> "audio/mp4"
             "aac" -> "audio/aac"
+            "txt" -> "text/plain"
             else -> "application/octet-stream"
         }
     }
