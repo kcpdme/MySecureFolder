@@ -31,5 +31,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Encrypted File Provider for streaming decryption -->
+        <provider
+            android:name="com.kcpd.myfolder.security.EncryptedFileProvider"
+            android:authorities="${applicationId}.encryptedfileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

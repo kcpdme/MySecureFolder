@@ -37,11 +37,20 @@ fun PhotoViewerScreen(
     category: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
+    android.util.Log.d("PhotoViewerScreen", "PhotoViewerScreen created: initialIndex=$initialIndex, category=$category")
+
     val allMediaFiles by viewModel.mediaFiles.collectAsState()
+
+    android.util.Log.d("PhotoViewerScreen", "All media files count: ${allMediaFiles.size}")
 
     // Filter to show only photos
     val photoFiles = remember(allMediaFiles) {
-        allMediaFiles.filter { it.mediaType == MediaType.PHOTO }
+        val filtered = allMediaFiles.filter { it.mediaType == MediaType.PHOTO }
+        android.util.Log.d("PhotoViewerScreen", "Filtered photo files count: ${filtered.size}")
+        filtered.forEachIndexed { index, file ->
+            android.util.Log.d("PhotoViewerScreen", "[$index] Photo: ${file.fileName}, path: ${file.filePath}")
+        }
+        filtered
     }
 
     val pagerState = rememberPagerState(
@@ -50,12 +59,16 @@ fun PhotoViewerScreen(
     )
     var showControls by remember { mutableStateOf(true) }
 
+    android.util.Log.d("PhotoViewerScreen", "PagerState: initialPage=${initialIndex.coerceIn(0, (photoFiles.size - 1).coerceAtLeast(0))}, pageCount=${photoFiles.size}")
+
     Box(modifier = Modifier.fillMaxSize()) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
+            android.util.Log.d("PhotoViewerScreen", "Rendering page: $page")
             val photoFile = photoFiles[page]
+            android.util.Log.d("PhotoViewerScreen", "Photo file for page $page: ${photoFile.fileName}")
             ZoomableImage(
                 mediaFile = photoFile,
                 onTap = { showControls = !showControls }
@@ -128,6 +141,8 @@ fun ZoomableImage(
     mediaFile: MediaFile,
     onTap: () -> Unit
 ) {
+    android.util.Log.d("ZoomableImage", "Rendering ZoomableImage for: ${mediaFile.fileName}")
+
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var imageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
@@ -170,8 +185,19 @@ fun ZoomableImage(
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(mediaFile.filePath)
+                .data(mediaFile)  // Pass MediaFile directly - custom fetcher will decrypt it
                 .crossfade(true)
+                .listener(
+                    onStart = {
+                        android.util.Log.d("ZoomableImage", "Image load started: ${mediaFile.fileName}")
+                    },
+                    onSuccess = { _, _ ->
+                        android.util.Log.d("ZoomableImage", "Image load SUCCESS: ${mediaFile.fileName}")
+                    },
+                    onError = { _, result ->
+                        android.util.Log.e("ZoomableImage", "Image load ERROR: ${mediaFile.fileName}, error: ${result.throwable.message}", result.throwable)
+                    }
+                )
                 .build(),
             contentDescription = mediaFile.fileName,
             contentScale = ContentScale.Fit,

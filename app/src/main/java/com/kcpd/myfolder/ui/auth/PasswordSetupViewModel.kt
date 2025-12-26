@@ -19,6 +19,16 @@ class PasswordSetupViewModel @Inject constructor(
         return passwordManager.setupPassword(password)
     }
 
+    fun changePassword(currentPassword: String, newPassword: String): Boolean {
+        // Verify current password
+        if (!passwordManager.verifyPassword(currentPassword)) {
+            return false
+        }
+
+        // Change to new password
+        return passwordManager.setupPassword(newPassword)
+    }
+
     fun getPasswordStrength(password: String): PasswordStrength {
         return passwordManager.validatePasswordStrength(password)
     }

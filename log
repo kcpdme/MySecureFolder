@@ -1,0 +1,29 @@
+
+2025-12-26 14:35:17.793 24303-24303 VRI[MainAc...y]@d2884c9 com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2025-12-26 14:35:17.885 24303-24303 AndroidRuntime          com.kcpd.myfolder                    E  FATAL EXCEPTION: main (Ask Gemini)
+                                                                                                    Process: com.kcpd.myfolder, PID: 24303
+                                                                                                    java.io.FileNotFoundException: /data/user/0/com.kcpd.myfolder/files/media/yes.txt: open failed: ENOENT (No such file or directory)
+                                                                                                    	at libcore.io.IoBridge.open(IoBridge.java:574)
+                                                                                                    	at java.io.FileInputStream.<init>(FileInputStream.java:179)
+                                                                                                    	at com.kcpd.myfolder.data.repository.MediaRepository.calculateHash(MediaRepository.kt:293)
+                                                                                                    	at com.kcpd.myfolder.data.repository.MediaRepository.addMediaFile(MediaRepository.kt:130)
+                                                                                                    	at com.kcpd.myfolder.data.repository.MediaRepository$addMediaFile$1.invokeSuspend(Unknown Source:15)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at android.os.Handler.handleCallback(Handler.java:995)
+                                                                                                    	at android.os.Handler.dispatchMessage(Handler.java:103)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:273)
+                                                                                                    	at android.os.Looper.loop(Looper.java:363)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:10060)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:632)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:975)
+                                                                                                    	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [StandaloneCoroutine{Cancelling}@e026d1, Dispatchers.Main.immediate]
+                                                                                                    Caused by: android.system.ErrnoException: open failed: ENOENT (No such file or directory)
+                                                                                                    	at libcore.io.Linux.open(Native Method)
+                                                                                                    	at libcore.io.ForwardingOs.open(ForwardingOs.java:568)
+                                                                                                    	at libcore.io.BlockGuardOs.open(BlockGuardOs.java:274)
+                                                                                                    	at libcore.io.ForwardingOs.open(ForwardingOs.java:568)
+                                                                                                    	at android.app.ActivityThread$AndroidOs.open(ActivityThread.java:9904)
+                                                                                                    	at libcore.io.IoBridge.open(IoBridge.java:560)
+                                                                                                    	... 14 more

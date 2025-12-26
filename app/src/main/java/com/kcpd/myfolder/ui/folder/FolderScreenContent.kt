@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.UserFolder
-import com.kcpd.myfolder.ui.gallery.MediaThumbnail
+
 
 @Composable
 fun FolderScreenContent(

@@ -1,7 +1,13 @@
 package com.kcpd.myfolder.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -9,6 +15,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kcpd.myfolder.data.model.FolderCategory
+import com.kcpd.myfolder.security.PasswordManager
+import com.kcpd.myfolder.security.SecurityManager
+import com.kcpd.myfolder.ui.auth.PasswordChangeScreen
+import com.kcpd.myfolder.ui.auth.PasswordSetupScreen
 import com.kcpd.myfolder.ui.camera.AudioRecorderScreen
 import com.kcpd.myfolder.ui.camera.CameraScreen
 import com.kcpd.myfolder.ui.camera.PhotoCameraScreen
@@ -18,6 +28,7 @@ import com.kcpd.myfolder.ui.gallery.MediaViewerScreen
 import com.kcpd.myfolder.ui.home.HomeScreen
 import com.kcpd.myfolder.ui.note.NoteEditorScreen
 import com.kcpd.myfolder.ui.settings.S3ConfigScreen
+import com.kcpd.myfolder.ui.settings.SettingsScreen
 import com.kcpd.myfolder.ui.viewer.AudioViewerScreen
 import com.kcpd.myfolder.ui.viewer.NoteViewerScreen
 import com.kcpd.myfolder.ui.viewer.PhotoViewerScreen
@@ -28,11 +39,37 @@ fun MyFolderNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController()
 ) {
+    val context = LocalContext.current
+    var startDestination by remember { mutableStateOf<String?>(null) }
+
+    // Check if password is set to determine start destination
+    LaunchedEffect(Unit) {
+        val securityManager = SecurityManager(context)
+        val passwordManager = PasswordManager(context, securityManager)
+        startDestination = if (passwordManager.isPasswordSet()) {
+            "home"
+        } else {
+            "password_setup"
+        }
+    }
+
+    // Wait for start destination to be determined
+    if (startDestination == null) return
+
     NavHost(
         navController = navController,
-        startDestination = "home",
+        startDestination = startDestination!!,
         modifier = modifier
     ) {
+        composable("password_setup") {
+            PasswordSetupScreen(
+                onPasswordSet = {
+                    navController.navigate("home") {
+                        popUpTo("password_setup") { inclusive = true }
+                    }
+                }
+            )
+        }
         composable("home") {
             HomeScreen(
                 onFolderClick = { category ->
@@ -40,7 +77,7 @@ fun MyFolderNavHost(
                     navController.navigate("folder/${category.path}")
                 },
                 onSettingsClick = {
-                    navController.navigate("s3_config")
+                    navController.navigate("settings")
                 }
             )
         }
@@ -79,16 +116,33 @@ fun MyFolderNavHost(
                 },
                 onMediaClick = { index ->
                     // Navigate to the appropriate viewer based on media type
+                    android.util.Log.d("Navigation", "onMediaClick called: index=$index, category=$category, mediaType=${folderCategory?.mediaType}")
                     when (folderCategory?.mediaType) {
-                        com.kcpd.myfolder.data.model.MediaType.PHOTO ->
-                            navController.navigate("photo_viewer/$index?category=$category")
-                        com.kcpd.myfolder.data.model.MediaType.VIDEO ->
-                            navController.navigate("video_viewer/$index?category=$category")
-                        com.kcpd.myfolder.data.model.MediaType.AUDIO ->
-                            navController.navigate("audio_viewer/$index?category=$category")
-                        com.kcpd.myfolder.data.model.MediaType.NOTE ->
-                            navController.navigate("note_viewer/$index?category=$category")
-                        null -> navController.navigate("media_viewer/$index?category=$category")
+                        com.kcpd.myfolder.data.model.MediaType.PHOTO -> {
+                            val route = "photo_viewer/$index?category=$category"
+                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            navController.navigate(route)
+                        }
+                        com.kcpd.myfolder.data.model.MediaType.VIDEO -> {
+                            val route = "video_viewer/$index?category=$category"
+                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            navController.navigate(route)
+                        }
+                        com.kcpd.myfolder.data.model.MediaType.AUDIO -> {
+                            val route = "audio_viewer/$index?category=$category"
+                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            navController.navigate(route)
+                        }
+                        com.kcpd.myfolder.data.model.MediaType.NOTE -> {
+                            val route = "note_viewer/$index?category=$category"
+                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            navController.navigate(route)
+                        }
+                        null -> {
+                            val route = "media_viewer/$index?category=$category"
+                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            navController.navigate(route)
+                        }
                     }
                 }
             )
@@ -162,6 +216,14 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val folderId = backStackEntry.arguments?.getString("folderId")
             NoteEditorScreen(navController = navController, folderId = folderId)
+        }
+
+        composable("settings") {
+            SettingsScreen(navController = navController)
+        }
+
+        composable("password_change") {
+            PasswordChangeScreen(navController = navController)
         }
 
         composable("s3_config") {

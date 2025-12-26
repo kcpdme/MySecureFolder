@@ -107,8 +107,19 @@ class MediaRepository @Inject constructor(
      * Adds a new media file with encryption.
      */
     suspend fun addMediaFile(file: File, mediaType: MediaType, folderId: String? = null): MediaFile {
+        // Check if file exists
+        if (!file.exists()) {
+            throw IllegalArgumentException("File does not exist: ${file.absolutePath}")
+        }
+
         val category = FolderCategory.fromMediaType(mediaType)
         val secureDir = File(secureFileManager.getSecureStorageDir(), category.path).apply { mkdirs() }
+
+        // Calculate hash and size BEFORE encryption
+        val originalSize = file.length()
+        val verificationHash = calculateHash(file)
+        val fileName = file.name
+        val mimeType = getMimeType(file.extension)
 
         // Encrypt the file
         val encryptedFile = secureFileManager.encryptFile(file, secureDir)
@@ -116,7 +127,7 @@ class MediaRepository @Inject constructor(
         // Create database entry
         val entity = MediaFileEntity(
             id = UUID.randomUUID().toString(),
-            originalFileName = file.name,
+            originalFileName = fileName,
             encryptedFileName = encryptedFile.name,
             encryptedFilePath = encryptedFile.absolutePath,
             mediaType = mediaType.name,
@@ -127,9 +138,9 @@ class MediaRepository @Inject constructor(
             isUploaded = false,
             s3Url = null,
             folderId = folderId,
-            verificationHash = calculateHash(file),
-            originalSize = file.length(),
-            mimeType = getMimeType(file.extension)
+            verificationHash = verificationHash,
+            originalSize = originalSize,
+            mimeType = mimeType
         )
 
         mediaFileDao.insertFile(entity)
@@ -148,6 +159,10 @@ class MediaRepository @Inject constructor(
         tempFile.writeText(content)
 
         try {
+            // Calculate hash and size BEFORE encryption
+            val originalSize = tempFile.length()
+            val verificationHash = calculateHash(tempFile)
+
             // Encrypt the note
             val encryptedFile = secureFileManager.encryptFile(tempFile, secureDir)
 
@@ -165,8 +180,8 @@ class MediaRepository @Inject constructor(
                 isUploaded = false,
                 s3Url = null,
                 folderId = folderId,
-                verificationHash = calculateHash(tempFile),
-                originalSize = tempFile.length(),
+                verificationHash = verificationHash,
+                originalSize = originalSize,
                 mimeType = "text/plain"
             )
 
@@ -334,7 +349,8 @@ class MediaRepository @Inject constructor(
             isUploaded = isUploaded,
             s3Url = s3Url,
             folderId = folderId,
-            textContent = null // Lazy loaded
+            textContent = null, // Lazy loaded
+            mimeType = mimeType
         )
     }
 }

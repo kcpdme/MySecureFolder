@@ -48,6 +48,13 @@ fun FolderScreen(
     val currentFolder by viewModel.currentFolder.collectAsState()
     val currentFolderId by viewModel.currentFolderId.collectAsState()
 
+    // Log media files data
+    android.util.Log.d("FolderScreen", "Category: ${viewModel.category}")
+    android.util.Log.d("FolderScreen", "MediaFiles count: ${mediaFiles.size}")
+    mediaFiles.forEachIndexed { index, file ->
+        android.util.Log.d("FolderScreen", "[$index] File: ${file.fileName}, Type: ${file.mediaType}, Path: ${file.filePath}")
+    }
+
     var selectedFile by remember { mutableStateOf<MediaFile?>(null) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var isMultiSelectMode by remember { mutableStateOf(false) }
@@ -331,6 +338,7 @@ fun FolderScreen(
                     // Then media files
                     items(mediaFiles.size) { index ->
                         val mediaFile = mediaFiles[index]
+                        android.util.Log.d("FolderScreen_Grid", "Rendering grid item [$index]: ${mediaFile.fileName}")
                         MediaThumbnail(
                             mediaFile = mediaFile,
                             isSelected = selectedFiles.contains(mediaFile.id),
@@ -343,6 +351,7 @@ fun FolderScreen(
                                         selectedFiles + mediaFile.id
                                     }
                                 } else {
+                                    android.util.Log.d("FolderScreen_Grid", "Grid item clicked: index=$index, file=${mediaFile.fileName}")
                                     onMediaClick(index)
                                 }
                             },
@@ -392,6 +401,7 @@ fun FolderScreen(
                     // Then media files
                     items(mediaFiles.size) { index ->
                         val mediaFile = mediaFiles[index]
+                        android.util.Log.d("FolderScreen_List", "Rendering list item [$index]: ${mediaFile.fileName}")
                         FolderMediaListItem(
                             mediaFile = mediaFile,
                             isSelected = selectedFiles.contains(mediaFile.id),
@@ -405,6 +415,7 @@ fun FolderScreen(
                                         selectedFiles + mediaFile.id
                                     }
                                 } else {
+                                    android.util.Log.d("FolderScreen_List", "List item clicked: index=$index, file=${mediaFile.fileName}")
                                     onMediaClick(index)
                                 }
                             },
@@ -486,22 +497,42 @@ internal fun MediaThumbnail(
     isSelected: Boolean = false,
     isMultiSelectMode: Boolean = false
 ) {
+    android.util.Log.d("MediaThumbnail", "Rendering thumbnail for: ${mediaFile.fileName}, type: ${mediaFile.mediaType}")
+
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .pointerInput(mediaFile.id) {
                 detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() }
+                    onTap = {
+                        android.util.Log.d("MediaThumbnail", "Thumbnail tapped: ${mediaFile.fileName}")
+                        onClick()
+                    },
+                    onLongPress = {
+                        android.util.Log.d("MediaThumbnail", "Thumbnail long pressed: ${mediaFile.fileName}")
+                        onLongClick()
+                    }
                 )
             }
     ) {
         when (mediaFile.mediaType) {
             MediaType.PHOTO -> {
+                android.util.Log.d("MediaThumbnail", "Loading photo: ${mediaFile.fileName}, path: ${mediaFile.filePath}")
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(mediaFile.filePath)
+                        .data(mediaFile)  // Pass MediaFile directly for decryption
                         .crossfade(true)
+                        .listener(
+                            onStart = {
+                                android.util.Log.d("MediaThumbnail", "Image load started: ${mediaFile.fileName}")
+                            },
+                            onSuccess = { _, _ ->
+                                android.util.Log.d("MediaThumbnail", "Image load SUCCESS: ${mediaFile.fileName}")
+                            },
+                            onError = { _, result ->
+                                android.util.Log.e("MediaThumbnail", "Image load ERROR: ${mediaFile.fileName}, error: ${result.throwable.message}", result.throwable)
+                            }
+                        )
                         .build(),
                     contentDescription = mediaFile.fileName,
                     contentScale = ContentScale.Crop,
@@ -516,7 +547,7 @@ internal fun MediaThumbnail(
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(mediaFile.filePath)
+                            .data(mediaFile)  // Pass MediaFile directly for decryption
                             .crossfade(true)
                             .build(),
                         contentDescription = mediaFile.fileName,
@@ -662,7 +693,7 @@ private fun MediaDetailDialog(
                     MediaType.PHOTO -> {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(mediaFile.filePath)
+                                .data(mediaFile)  // Pass MediaFile directly for decryption
                                 .crossfade(true)
                                 .build(),
                             contentDescription = mediaFile.fileName,
@@ -857,7 +888,7 @@ internal fun FolderMediaListItem(
                     MediaType.PHOTO -> {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(mediaFile.filePath)
+                                .data(mediaFile)  // Pass MediaFile directly for decryption
                                 .crossfade(true)
                                 .build(),
                             contentDescription = mediaFile.fileName,
@@ -877,7 +908,7 @@ internal fun FolderMediaListItem(
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(mediaFile.filePath)
+                                    .data(mediaFile)  // Pass MediaFile directly for decryption
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = mediaFile.fileName,

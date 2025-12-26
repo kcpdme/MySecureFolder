@@ -41,7 +41,13 @@ class FolderViewModel @Inject constructor(
         mediaRepository.getFilesForCategory(category),
         _currentFolderId
     ) { files, folderId ->
-        files.filter { it.folderId == folderId }
+        val filtered = files.filter { it.folderId == folderId }
+        android.util.Log.d("FolderViewModel", "Category: ${category.displayName}, FolderId: $folderId")
+        android.util.Log.d("FolderViewModel", "Total files for category: ${files.size}, Filtered for folder: ${filtered.size}")
+        filtered.forEachIndexed { index, file ->
+            android.util.Log.d("FolderViewModel", "[$index] ${file.fileName} - Type: ${file.mediaType}, FolderId: ${file.folderId}")
+        }
+        filtered
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
     val folders: StateFlow<List<UserFolder>> = combine(
