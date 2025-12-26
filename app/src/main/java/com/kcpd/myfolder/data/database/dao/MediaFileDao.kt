@@ -13,6 +13,9 @@ interface MediaFileDao {
     @Query("SELECT * FROM media_files ORDER BY createdAt DESC")
     fun getAllFiles(): Flow<List<MediaFileEntity>>
 
+    @Query("SELECT * FROM media_files ORDER BY createdAt DESC")
+    suspend fun getAllFilesOnce(): List<MediaFileEntity>
+
     @Query("SELECT * FROM media_files WHERE mediaType = :mediaType ORDER BY createdAt DESC")
     fun getFilesByType(mediaType: String): Flow<List<MediaFileEntity>>
 

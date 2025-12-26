@@ -517,10 +517,11 @@ internal fun MediaThumbnail(
     ) {
         when (mediaFile.mediaType) {
             MediaType.PHOTO -> {
-                android.util.Log.d("MediaThumbnail", "Loading photo: ${mediaFile.fileName}, path: ${mediaFile.filePath}")
+                android.util.Log.d("MediaThumbnail", "Loading photo: ${mediaFile.fileName}, has thumbnail: ${mediaFile.thumbnail != null}")
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(mediaFile)  // Pass MediaFile directly for decryption
+                        // Use thumbnail if available (fast, no decryption), otherwise fall back to full file
+                        .data(mediaFile.thumbnail ?: mediaFile)
                         .crossfade(true)
                         .listener(
                             onStart = {
@@ -547,7 +548,8 @@ internal fun MediaThumbnail(
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(mediaFile)  // Pass MediaFile directly for decryption
+                            // Use thumbnail if available (fast, no decryption), otherwise fall back to full file
+                            .data(mediaFile.thumbnail ?: mediaFile)
                             .crossfade(true)
                             .build(),
                         contentDescription = mediaFile.fileName,
@@ -888,7 +890,8 @@ internal fun FolderMediaListItem(
                     MediaType.PHOTO -> {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(mediaFile)  // Pass MediaFile directly for decryption
+                                // Use thumbnail if available, otherwise fall back to full file
+                                .data(mediaFile.thumbnail ?: mediaFile)
                                 .crossfade(true)
                                 .build(),
                             contentDescription = mediaFile.fileName,
@@ -908,7 +911,8 @@ internal fun FolderMediaListItem(
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(mediaFile)  // Pass MediaFile directly for decryption
+                                    // Use thumbnail if available, otherwise fall back to full file
+                                    .data(mediaFile.thumbnail ?: mediaFile)
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = mediaFile.fileName,

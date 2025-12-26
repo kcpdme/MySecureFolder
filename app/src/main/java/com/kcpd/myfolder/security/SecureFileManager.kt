@@ -1,9 +1,14 @@
 package com.kcpd.myfolder.security
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.media.ThumbnailUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -24,6 +29,8 @@ class SecureFileManager @Inject constructor(
         private const val ENCRYPTED_FILE_EXTENSION = ".enc"
         private const val BUFFER_SIZE = 8192
         private const val SECURE_DELETE_PASSES = 3 // DoD 5220.22-M standard
+        private const val THUMBNAIL_SIZE = 200 // Thumbnail size in pixels (like Tella's 1/10 approach)
+        private const val THUMBNAIL_QUALITY = 85 // JPEG compression quality
     }
 
     /**
@@ -357,5 +364,134 @@ class SecureFileManager @Inject constructor(
      */
     fun getOriginalFileName(encryptedFile: File): String {
         return encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)
+    }
+
+    /**
+     * Generates a thumbnail byte array from an encrypted image file.
+     * The thumbnail is NOT encrypted - it's stored as a plain JPEG in the database.
+     * This allows fast grid loading without decrypting full images.
+     *
+     * @param encryptedFile The encrypted image file
+     * @return Thumbnail as JPEG byte array, or null if generation fails
+     */
+    suspend fun generateImageThumbnail(encryptedFile: File): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            // Decrypt the image
+            val encryptedData = encryptedFile.readBytes()
+            val plainData = securityManager.decrypt(encryptedData)
+
+            // Decode to bitmap with efficient sampling
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeByteArray(plainData, 0, plainData.size, options)
+
+            // Calculate sample size for efficient memory usage
+            options.inSampleSize = calculateInSampleSize(options, THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+            options.inJustDecodeBounds = false
+
+            // Decode the sampled bitmap
+            val bitmap = BitmapFactory.decodeByteArray(plainData, 0, plainData.size, options)
+                ?: return@withContext null
+
+            // Extract thumbnail at target size
+            val thumbnail = ThumbnailUtils.extractThumbnail(
+                bitmap,
+                THUMBNAIL_SIZE,
+                THUMBNAIL_SIZE,
+                ThumbnailUtils.OPTIONS_RECYCLE_INPUT
+            )
+
+            // Compress to JPEG byte array
+            val outputStream = ByteArrayOutputStream()
+            thumbnail.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, outputStream)
+            val thumbnailBytes = outputStream.toByteArray()
+
+            // Clean up
+            if (thumbnail != bitmap) {
+                thumbnail.recycle()
+            }
+
+            thumbnailBytes
+        } catch (e: Exception) {
+            android.util.Log.e("SecureFileManager", "Failed to generate thumbnail", e)
+            null
+        }
+    }
+
+    /**
+     * Generates a thumbnail byte array from an encrypted video file.
+     * Extracts a frame from the video and creates a thumbnail.
+     *
+     * @param encryptedFile The encrypted video file
+     * @return Thumbnail as JPEG byte array, or null if generation fails
+     */
+    suspend fun generateVideoThumbnail(encryptedFile: File): ByteArray? = withContext(Dispatchers.IO) {
+        var tempFile: File? = null
+        try {
+            // Decrypt video to temp file (MediaMetadataRetriever needs a file path)
+            tempFile = decryptFile(encryptedFile)
+
+            // Extract frame from video
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(tempFile.absolutePath)
+
+            // Get frame at 1 second (or first frame if shorter)
+            val bitmap = retriever.getFrameAtTime(1_000_000) // 1 second in microseconds
+                ?: retriever.frameAtTime // Fallback to first frame
+                ?: return@withContext null
+
+            retriever.release()
+
+            // Create thumbnail
+            val thumbnail = ThumbnailUtils.extractThumbnail(
+                bitmap,
+                THUMBNAIL_SIZE,
+                THUMBNAIL_SIZE,
+                ThumbnailUtils.OPTIONS_RECYCLE_INPUT
+            )
+
+            // Compress to JPEG byte array
+            val outputStream = ByteArrayOutputStream()
+            thumbnail.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, outputStream)
+            val thumbnailBytes = outputStream.toByteArray()
+
+            // Clean up
+            if (thumbnail != bitmap) {
+                thumbnail.recycle()
+            }
+
+            thumbnailBytes
+        } catch (e: Exception) {
+            android.util.Log.e("SecureFileManager", "Failed to generate video thumbnail", e)
+            null
+        } finally {
+            // Securely delete temp file
+            tempFile?.let { secureDelete(it) }
+        }
+    }
+
+    /**
+     * Calculates sample size for efficient bitmap decoding.
+     * Based on Android's official sample code.
+     */
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Int {
+        val (height: Int, width: Int) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+
+        return inSampleSize
     }
 }

@@ -42,8 +42,11 @@ data class MediaFileEntity(
     /** Media type: PHOTO, VIDEO, AUDIO, NOTE */
     val mediaType: String,
 
-    /** Path to encrypted thumbnail (if applicable) */
+    /** Path to encrypted thumbnail (if applicable) - DEPRECATED, use thumbnail instead */
     val encryptedThumbnailPath: String?,
+
+    /** Thumbnail as byte array (for photos/videos) - stored directly in DB for fast grid loading */
+    val thumbnail: ByteArray?,
 
     /** Duration in milliseconds (for audio/video) */
     val duration: Long?,

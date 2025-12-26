@@ -49,6 +49,9 @@ class MediaRepository @Inject constructor(
             // Migrate legacy unencrypted files
             migrateLegacyFiles()
 
+            // Generate thumbnails for existing files that don't have them
+            generateMissingThumbnails()
+
             // Load from database
             mediaFileDao.getAllFiles().collect { entities ->
                 _mediaFiles.value = entities.map { it.toMediaFile() }
@@ -75,6 +78,13 @@ class MediaRepository @Inject constructor(
                         val categorySecureDir = File(secureDir, category.path).apply { mkdirs() }
                         val encryptedFile = secureFileManager.encryptFile(file, categorySecureDir)
 
+                        // Generate thumbnail if applicable
+                        val thumbnail = when (category.mediaType) {
+                            MediaType.PHOTO -> secureFileManager.generateImageThumbnail(encryptedFile)
+                            MediaType.VIDEO -> secureFileManager.generateVideoThumbnail(encryptedFile)
+                            else -> null
+                        }
+
                         // Create database entry
                         val entity = MediaFileEntity(
                             id = UUID.randomUUID().toString(),
@@ -83,6 +93,7 @@ class MediaRepository @Inject constructor(
                             encryptedFilePath = encryptedFile.absolutePath,
                             mediaType = category.mediaType.name,
                             encryptedThumbnailPath = null,
+                            thumbnail = thumbnail,
                             duration = null,
                             size = encryptedFile.length(),
                             createdAt = file.lastModified(),
@@ -100,6 +111,61 @@ class MediaRepository @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Generates thumbnails for existing media files that don't have them.
+     * This runs once at startup to fix files imported before the thumbnail feature was added.
+     */
+    private suspend fun generateMissingThumbnails() {
+        try {
+            android.util.Log.d("MediaRepository", "Checking for files without thumbnails...")
+
+            // Get all files from database
+            val allFiles = mediaFileDao.getAllFilesOnce()
+            val filesNeedingThumbnails = allFiles.filter { entity ->
+                entity.thumbnail == null && (entity.mediaType == MediaType.PHOTO.name || entity.mediaType == MediaType.VIDEO.name)
+            }
+
+            if (filesNeedingThumbnails.isEmpty()) {
+                android.util.Log.d("MediaRepository", "All files already have thumbnails")
+                return
+            }
+
+            android.util.Log.d("MediaRepository", "Generating thumbnails for ${filesNeedingThumbnails.size} files...")
+
+            filesNeedingThumbnails.forEach { entity ->
+                try {
+                    val encryptedFile = File(entity.encryptedFilePath)
+                    if (!encryptedFile.exists()) {
+                        android.util.Log.w("MediaRepository", "Skipping ${entity.originalFileName}: encrypted file not found")
+                        return@forEach
+                    }
+
+                    // Generate thumbnail based on type
+                    val thumbnail = when (MediaType.valueOf(entity.mediaType)) {
+                        MediaType.PHOTO -> secureFileManager.generateImageThumbnail(encryptedFile)
+                        MediaType.VIDEO -> secureFileManager.generateVideoThumbnail(encryptedFile)
+                        else -> null
+                    }
+
+                    if (thumbnail != null) {
+                        // Update entity with thumbnail
+                        val updated = entity.copy(thumbnail = thumbnail)
+                        mediaFileDao.updateFile(updated)
+                        android.util.Log.d("MediaRepository", "Generated thumbnail for ${entity.originalFileName} (${thumbnail.size} bytes)")
+                    } else {
+                        android.util.Log.w("MediaRepository", "Failed to generate thumbnail for ${entity.originalFileName}")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MediaRepository", "Error generating thumbnail for ${entity.originalFileName}", e)
+                }
+            }
+
+            android.util.Log.d("MediaRepository", "Thumbnail generation complete")
+        } catch (e: Exception) {
+            android.util.Log.e("MediaRepository", "Error in generateMissingThumbnails", e)
         }
     }
 
@@ -124,6 +190,13 @@ class MediaRepository @Inject constructor(
         // Encrypt the file
         val encryptedFile = secureFileManager.encryptFile(file, secureDir)
 
+        // Generate thumbnail for photos and videos
+        val thumbnail = when (mediaType) {
+            MediaType.PHOTO -> secureFileManager.generateImageThumbnail(encryptedFile)
+            MediaType.VIDEO -> secureFileManager.generateVideoThumbnail(encryptedFile)
+            else -> null
+        }
+
         // Create database entry
         val entity = MediaFileEntity(
             id = UUID.randomUUID().toString(),
@@ -132,6 +205,7 @@ class MediaRepository @Inject constructor(
             encryptedFilePath = encryptedFile.absolutePath,
             mediaType = mediaType.name,
             encryptedThumbnailPath = null,
+            thumbnail = thumbnail,
             duration = null, // TODO: Extract duration for audio/video
             size = encryptedFile.length(),
             createdAt = System.currentTimeMillis(),
@@ -174,6 +248,7 @@ class MediaRepository @Inject constructor(
                 encryptedFilePath = encryptedFile.absolutePath,
                 mediaType = MediaType.NOTE.name,
                 encryptedThumbnailPath = null,
+                thumbnail = null, // Notes don't have thumbnails
                 duration = null,
                 size = encryptedFile.length(),
                 createdAt = System.currentTimeMillis(),
@@ -343,6 +418,7 @@ class MediaRepository @Inject constructor(
             filePath = encryptedFilePath,
             mediaType = MediaType.valueOf(mediaType),
             thumbnailPath = encryptedThumbnailPath,
+            thumbnail = thumbnail,
             duration = duration,
             size = size,
             createdAt = Date(createdAt),

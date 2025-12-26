@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import com.kcpd.myfolder.data.database.dao.FolderDao
 import com.kcpd.myfolder.data.database.dao.MediaFileDao
 import com.kcpd.myfolder.data.database.entity.FolderEntity
@@ -21,7 +22,7 @@ import net.sqlcipher.database.SupportFactory
         MediaFileEntity::class,
         FolderEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +35,15 @@ abstract class AppDatabase : RoomDatabase() {
 
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        /**
+         * Migration from version 1 to 2: Add thumbnail column
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE media_files ADD COLUMN thumbnail BLOB")
+            }
+        }
 
         /**
          * Gets the encrypted database instance.
@@ -56,6 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .openHelperFactory(factory)
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration() // For development - remove in production
                 .build()
         }
