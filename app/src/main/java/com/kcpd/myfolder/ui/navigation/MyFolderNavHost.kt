@@ -30,6 +30,7 @@ import com.kcpd.myfolder.ui.folder.FolderScreen
 import com.kcpd.myfolder.ui.gallery.MediaViewerScreen
 import com.kcpd.myfolder.ui.home.HomeScreen
 import com.kcpd.myfolder.ui.note.NoteEditorScreen
+import com.kcpd.myfolder.ui.scanner.DocumentScannerScreen
 import com.kcpd.myfolder.ui.settings.S3ConfigScreen
 import com.kcpd.myfolder.ui.settings.SettingsScreen
 import com.kcpd.myfolder.ui.viewer.AudioViewerScreen
@@ -142,7 +143,7 @@ fun MyFolderNavHost(
                         com.kcpd.myfolder.data.model.MediaType.NOTE ->
                             navController.navigate("note_editor$folderParam")
                         com.kcpd.myfolder.data.model.MediaType.PDF ->
-                            navController.navigate("camera$folderParam")  // TODO: Implement PDF import
+                            navController.navigate("document_scanner$folderParam")
                         null -> navController.navigate("camera$folderParam")
                     }
                 },
@@ -253,6 +254,20 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val folderId = backStackEntry.arguments?.getString("folderId")
             NoteEditorScreen(navController = navController, folderId = folderId)
+        }
+
+        composable(
+            route = "document_scanner?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId")
+            DocumentScannerScreen(navController = navController, folderId = folderId)
         }
 
         composable("settings") {

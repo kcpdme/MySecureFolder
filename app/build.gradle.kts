@@ -139,6 +139,12 @@ dependencies {
     // Biometric authentication (Latest)
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
 
+    // Google Play Services base (required for ML Kit)
+    implementation("com.google.android.gms:play-services-base:18.5.0")
+
+    // ML Kit Document Scanner (Latest)
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+
     // Testing (Latest)
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")

@@ -64,6 +64,9 @@ fun FolderScreen(
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showFabMenu by remember { mutableStateOf(false) }
+    var importErrorMessage by remember { mutableStateOf<String?>(null) }
+    var isImporting by remember { mutableStateOf(false) }
+    var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) } // current/total
 
     val hasContent = folders.isNotEmpty() || mediaFiles.isNotEmpty()
     val selectedCount = selectedFiles.size + selectedFolders.size
@@ -76,7 +79,20 @@ fun FolderScreen(
     }
     var viewMode by remember { mutableStateOf(defaultViewMode) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show error snackbar when import error occurs
+    LaunchedEffect(importErrorMessage) {
+        importErrorMessage?.let { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -245,15 +261,52 @@ fun FolderScreen(
                             contract = androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()
                         ) { uris ->
                             if (uris.isNotEmpty()) {
+                                android.util.Log.d("Import", "Selected ${uris.size} files to import")
+                                isImporting = true
+                                importErrorMessage = null
                                 scope.launch {
-                                    viewModel.importFiles(uris).collect { progress ->
-                                        android.util.Log.d("Import", "Progress: $progress")
+                                    try {
+                                        viewModel.importFiles(uris).collect { progress ->
+                                            android.util.Log.d("Import", "Progress: $progress")
+                                            when (progress) {
+                                                is com.kcpd.myfolder.domain.usecase.ImportProgress.Importing -> {
+                                                    importProgress = Pair(progress.currentFile, progress.totalFiles)
+                                                }
+                                                is com.kcpd.myfolder.domain.usecase.ImportProgress.FileImported -> {
+                                                    android.util.Log.d("Import", "Imported: ${progress.mediaFile.fileName}")
+                                                }
+                                                is com.kcpd.myfolder.domain.usecase.ImportProgress.Error -> {
+                                                    android.util.Log.e("Import", "Error importing ${progress.fileName}: ${progress.error.message}", progress.error)
+                                                    importErrorMessage = "Error importing ${progress.fileName}: ${progress.error.message}"
+                                                }
+                                                is com.kcpd.myfolder.domain.usecase.ImportProgress.Completed -> {
+                                                    android.util.Log.d("Import", "Import completed: ${progress.totalImported} files")
+                                                    isImporting = false
+                                                    importProgress = null
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("Import", "Import failed", e)
+                                        importErrorMessage = "Import failed: ${e.message}"
+                                        isImporting = false
+                                        importProgress = null
                                     }
                                 }
                             }
                         }
-                        IconButton(onClick = { importFileLauncher.launch("*/*") }) {
-                            Icon(Icons.Default.FileUpload, "Import Files")
+                        IconButton(
+                            onClick = { importFileLauncher.launch("*/*") },
+                            enabled = !isImporting
+                        ) {
+                            if (isImporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.FileUpload, "Import Files")
+                            }
                         }
                         IconButton(onClick = { showCreateFolderDialog = true }) {
                             Icon(Icons.Default.CreateNewFolder, "Create Folder")
@@ -500,6 +553,42 @@ fun FolderScreen(
                     selectedFolders = emptySet()
                 }
             )
+        }
+
+        // Import progress overlay
+        if (isImporting && importProgress != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier.padding(32.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Text(
+                            text = "Importing files...",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "${importProgress?.first} / ${importProgress?.second}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -889,7 +978,7 @@ private fun getActionIcon(category: FolderCategory) = when (category) {
     FolderCategory.VIDEOS -> Icons.Default.Videocam
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
-    FolderCategory.PDFS -> Icons.Default.FileUpload
+    FolderCategory.PDFS -> Icons.Default.Scanner
 }
 
 private fun getEmptyStateMessage(category: FolderCategory): String {
@@ -898,7 +987,7 @@ private fun getEmptyStateMessage(category: FolderCategory): String {
         FolderCategory.VIDEOS -> "Tap + to record videos"
         FolderCategory.RECORDINGS -> "Tap + to record audio"
         FolderCategory.NOTES -> "Tap + to create a note"
-        FolderCategory.PDFS -> "Tap import to add PDFs"
+        FolderCategory.PDFS -> "Tap + to scan documents or import PDFs"
     }
 }
 

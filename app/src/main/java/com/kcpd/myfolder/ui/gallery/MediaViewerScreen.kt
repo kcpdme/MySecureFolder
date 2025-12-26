@@ -108,19 +108,10 @@ fun MediaViewerScreen(
                     }
                 }
                 MediaType.PDF -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.PictureAsPdf,
-                            contentDescription = "PDF",
-                            modifier = Modifier.size(120.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
+                    PdfViewer(
+                        mediaFile = mediaFile,
+                        onTap = { showControls = !showControls }
+                    )
                 }
             }
         }
@@ -433,6 +424,234 @@ fun AudioPlayer(
                         Icons.Default.Forward10,
                         contentDescription = "Forward",
                         modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PdfViewer(
+    mediaFile: MediaFile,
+    onTap: () -> Unit,
+    viewModel: GalleryViewModel = hiltViewModel()
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var currentPage by remember { mutableStateOf(0) }
+    var pageCount by remember { mutableStateOf(0) }
+    var pdfBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
+
+    // Decrypt PDF file on first load
+    LaunchedEffect(mediaFile.filePath) {
+        try {
+            android.util.Log.d("PdfViewer", "╔═══════════════════════════════════════╗")
+            android.util.Log.d("PdfViewer", "║  PDF VIEWER INITIALIZING              ║")
+            android.util.Log.d("PdfViewer", "╚═══════════════════════════════════════╝")
+            android.util.Log.d("PdfViewer", "Encrypted PDF: ${mediaFile.filePath}")
+            android.util.Log.d("PdfViewer", "Decrypting PDF for viewing...")
+
+            val file = viewModel.decryptForPlayback(mediaFile)
+            decryptedFile = file
+            android.util.Log.d("PdfViewer", "✓ PDF decrypted to: ${file.absolutePath}")
+            android.util.Log.d("PdfViewer", "  Decrypted size: ${file.length()} bytes")
+        } catch (e: Exception) {
+            android.util.Log.e("PdfViewer", "✗ Failed to decrypt PDF", e)
+            errorMessage = "Failed to decrypt PDF: ${e.message}"
+        }
+    }
+
+    // Clean up decrypted file on dispose
+    DisposableEffect(mediaFile.filePath) {
+        onDispose {
+            decryptedFile?.let { file ->
+                if (file.exists()) {
+                    android.util.Log.d("PdfViewer", "Cleaning up decrypted PDF...")
+                    file.delete()
+                    android.util.Log.d("PdfViewer", "✓ Temp file deleted")
+                }
+            }
+        }
+    }
+
+    // Load PDF page
+    LaunchedEffect(decryptedFile, currentPage) {
+        val file = decryptedFile ?: return@LaunchedEffect
+
+        try {
+            android.util.Log.d("PdfViewer", "Loading PDF page $currentPage...")
+
+            if (!file.exists()) {
+                android.util.Log.e("PdfViewer", "File does not exist: ${file.absolutePath}")
+                errorMessage = "PDF file not found"
+                return@LaunchedEffect
+            }
+
+            android.util.Log.d("PdfViewer", "Opening PDF renderer...")
+            val pdfRenderer = android.graphics.pdf.PdfRenderer(
+                android.os.ParcelFileDescriptor.open(
+                    file,
+                    android.os.ParcelFileDescriptor.MODE_READ_ONLY
+                )
+            )
+
+            pageCount = pdfRenderer.pageCount
+            android.util.Log.d("PdfViewer", "PDF has $pageCount pages")
+
+            if (currentPage >= pageCount) {
+                currentPage = pageCount - 1
+            }
+
+            android.util.Log.d("PdfViewer", "Rendering page ${currentPage + 1}/$pageCount...")
+            val page = pdfRenderer.openPage(currentPage)
+
+            // Create bitmap with good quality (2x scale for crisp rendering)
+            val bitmap = android.graphics.Bitmap.createBitmap(
+                page.width * 2,
+                page.height * 2,
+                android.graphics.Bitmap.Config.ARGB_8888
+            )
+
+            // Render page to bitmap with white background
+            val canvas = android.graphics.Canvas(bitmap)
+            canvas.drawColor(android.graphics.Color.WHITE)
+            canvas.drawBitmap(bitmap, 0f, 0f, null)
+
+            page.render(
+                bitmap,
+                null,
+                null,
+                android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+            )
+
+            pdfBitmap = bitmap
+            android.util.Log.d("PdfViewer", "Page rendered successfully")
+
+            page.close()
+            pdfRenderer.close()
+        } catch (e: Exception) {
+            android.util.Log.e("PdfViewer", "Failed to render PDF", e)
+            errorMessage = "Failed to load PDF: ${e.message}"
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        scale = if (scale > 1f) 1f else 2f
+                        offset = Offset.Zero
+                    },
+                    onTap = { onTap() }
+                )
+            }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    val newScale = (scale * zoom).coerceIn(1f, 5f)
+
+                    if (newScale > 1f) {
+                        offset = offset + pan
+                    } else {
+                        offset = Offset.Zero
+                    }
+
+                    scale = newScale
+                }
+            }
+    ) {
+        when {
+            errorMessage != null -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Error,
+                        contentDescription = "Error",
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = errorMessage!!,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            pdfBitmap != null -> {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(pdfBitmap)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "PDF Page ${currentPage + 1}",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y
+                        )
+                )
+            }
+            else -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.White
+                )
+            }
+        }
+
+        // Page navigation controls
+        if (pageCount > 1 && pdfBitmap != null) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.6f),
+                        shape = MaterialTheme.shapes.medium
+                    )
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { if (currentPage > 0) currentPage-- },
+                    enabled = currentPage > 0
+                ) {
+                    Icon(
+                        Icons.Default.NavigateBefore,
+                        contentDescription = "Previous page",
+                        tint = Color.White
+                    )
+                }
+
+                Text(
+                    text = "${currentPage + 1} / $pageCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                IconButton(
+                    onClick = { if (currentPage < pageCount - 1) currentPage++ },
+                    enabled = currentPage < pageCount - 1
+                ) {
+                    Icon(
+                        Icons.Default.NavigateNext,
+                        contentDescription = "Next page",
+                        tint = Color.White
                     )
                 }
             }

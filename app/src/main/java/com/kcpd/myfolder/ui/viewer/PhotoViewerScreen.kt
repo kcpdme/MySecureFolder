@@ -145,8 +145,6 @@ fun ZoomableImage(
     mediaFile: MediaFile,
     onTap: () -> Unit
 ) {
-    android.util.Log.d("ZoomableImage", "Rendering ZoomableImage for: ${mediaFile.fileName}")
-
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
@@ -154,6 +152,7 @@ fun ZoomableImage(
     // Stable model key to prevent re-loading on recomposition
     val context = LocalContext.current
     val imageModel = remember(mediaFile.id) {
+        android.util.Log.d("ZoomableImage", "Creating image model for: ${mediaFile.fileName}")
         ImageRequest.Builder(context)
             .data(mediaFile)
             .memoryCacheKey(mediaFile.id)  // Cache by file ID
@@ -162,76 +161,83 @@ fun ZoomableImage(
             .build()
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                containerSize = androidx.compose.ui.geometry.Size(
-                    placeable.width.toFloat(),
-                    placeable.height.toFloat()
-                )
-                layout(placeable.width, placeable.height) {
-                    placeable.place(0, 0)
-                }
+    // Separate modifier chains based on zoom state to allow HorizontalPager to receive swipes when not zoomed
+    val baseModifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)
+        .layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            containerSize = androidx.compose.ui.geometry.Size(
+                placeable.width.toFloat(),
+                placeable.height.toFloat()
+            )
+            layout(placeable.width, placeable.height) {
+                placeable.place(0, 0)
             }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        if (scale > 1f) {
-                            scale = 1f
-                            offset = Offset.Zero
-                        } else {
-                            scale = 2.5f
-                            offset = Offset.Zero
-                        }
-                    },
-                    onTap = { onTap() }
-                )
-            }
-            .pointerInput(containerSize) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val oldScale = scale
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-
-                    // Apply zoom
-                    scale = newScale
-
-                    // Calculate new offset
-                    if (newScale > 1f) {
-                        // Adjust offset for zoom around centroid
-                        val newOffset = if (oldScale != newScale) {
-                            // Zooming - keep centroid point fixed
-                            val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
-                            val zoomChange = newScale / oldScale
-                            offset * zoomChange + (centroid - containerCenter) * (zoomChange - 1f)
-                        } else {
-                            // Panning - just add pan delta
-                            offset + pan
-                        }
-
-                        // Calculate bounds - with ContentScale.Fit, the image is centered and scaled to fit
-                        // Maximum translation is when scaled image edge reaches container edge
-                        val scaledWidth = containerSize.width * newScale
-                        val scaledHeight = containerSize.height * newScale
-
-                        // Max offset is half the difference between scaled size and container size
-                        val maxX = ((scaledWidth - containerSize.width) / 2f).coerceAtLeast(0f)
-                        val maxY = ((scaledHeight - containerSize.height) / 2f).coerceAtLeast(0f)
-
-                        // Constrain offset to prevent black areas
-                        offset = Offset(
-                            x = newOffset.x.coerceIn(-maxX, maxX),
-                            y = newOffset.y.coerceIn(-maxY, maxY)
-                        )
+        }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onDoubleTap = {
+                    if (scale > 1f) {
+                        scale = 1f
+                        offset = Offset.Zero
                     } else {
-                        // Scale is 1f - reset offset
+                        scale = 2.5f
                         offset = Offset.Zero
                     }
+                },
+                onTap = { onTap() }
+            )
+        }
+
+    // Only add transform gestures when zoomed - otherwise let HorizontalPager handle swipes
+    val gestureModifier = if (scale > 1f) {
+        Modifier.pointerInput(scale, containerSize) {
+            detectTransformGestures { centroid, pan, zoom, _ ->
+                val oldScale = scale
+                val newScale = (scale * zoom).coerceIn(1f, 5f)
+
+                // Apply zoom
+                scale = newScale
+
+                // Calculate new offset
+                if (newScale > 1f) {
+                    // Adjust offset for zoom around centroid
+                    val newOffset = if (oldScale != newScale) {
+                        // Zooming - keep centroid point fixed
+                        val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                        val zoomChange = newScale / oldScale
+                        offset * zoomChange + (centroid - containerCenter) * (zoomChange - 1f)
+                    } else {
+                        // Panning - just add pan delta
+                        offset + pan
+                    }
+
+                    // Calculate bounds - with ContentScale.Fit, the image is centered and scaled to fit
+                    // Maximum translation is when scaled image edge reaches container edge
+                    val scaledWidth = containerSize.width * newScale
+                    val scaledHeight = containerSize.height * newScale
+
+                    // Max offset is half the difference between scaled size and container size
+                    val maxX = ((scaledWidth - containerSize.width) / 2f).coerceAtLeast(0f)
+                    val maxY = ((scaledHeight - containerSize.height) / 2f).coerceAtLeast(0f)
+
+                    // Constrain offset to prevent black areas
+                    offset = Offset(
+                        x = newOffset.x.coerceIn(-maxX, maxX),
+                        y = newOffset.y.coerceIn(-maxY, maxY)
+                    )
+                } else {
+                    // Scale is 1f - reset offset
+                    offset = Offset.Zero
                 }
             }
-    ) {
+        }
+    } else {
+        Modifier  // No gesture interception when not zoomed - allows HorizontalPager to swipe
+    }
+
+    Box(modifier = baseModifier.then(gestureModifier)) {
         AsyncImage(
             model = imageModel,  // Use stable remembered model
             contentDescription = mediaFile.fileName,
