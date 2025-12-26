@@ -36,7 +36,14 @@ fun MyFolderNavHost(
         composable("home") {
             HomeScreen(
                 onFolderClick = { category ->
-                    navController.navigate("folder/${category.path}")
+                    // Use category-specific route names for clarity
+                    when (category.path) {
+                        "photos" -> navController.navigate("photos")
+                        "videos" -> navController.navigate("videos")
+                        "notes" -> navController.navigate("notes")
+                        "recordings" -> navController.navigate("recordings")
+                        else -> navController.navigate("folder/${category.path}")
+                    }
                 },
                 onSettingsClick = {
                     navController.navigate("s3_config")
@@ -44,6 +51,111 @@ fun MyFolderNavHost(
             )
         }
 
+        // Photos Screen (clearer naming instead of folder/photos)
+        composable(
+            route = "photos?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val category = "photos"
+            val folderCategory = FolderCategory.fromPath(category)
+
+            FolderScreen(
+                onBackClick = { navController.navigateUp() },
+                onAddClick = { currentFolderId ->
+                    val folderParam = currentFolderId?.let { "?folderId=$it" } ?: ""
+                    navController.navigate("photo_camera$folderParam")
+                },
+                onMediaClick = { index ->
+                    navController.navigate("photo_viewer/$index?category=$category")
+                }
+            )
+        }
+
+        // Videos Screen (clearer naming instead of folder/videos)
+        composable(
+            route = "videos?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val category = "videos"
+            val folderCategory = FolderCategory.fromPath(category)
+
+            FolderScreen(
+                onBackClick = { navController.navigateUp() },
+                onAddClick = { currentFolderId ->
+                    val folderParam = currentFolderId?.let { "?folderId=$it" } ?: ""
+                    navController.navigate("video_recorder$folderParam")
+                },
+                onMediaClick = { index ->
+                    navController.navigate("video_viewer/$index?category=$category")
+                }
+            )
+        }
+
+        // Notes Screen (clearer naming instead of folder/notes)
+        composable(
+            route = "notes?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val category = "notes"
+            val folderCategory = FolderCategory.fromPath(category)
+
+            FolderScreen(
+                onBackClick = { navController.navigateUp() },
+                onAddClick = { currentFolderId ->
+                    val folderParam = currentFolderId?.let { "?folderId=$it" } ?: ""
+                    navController.navigate("note_editor$folderParam")
+                },
+                onMediaClick = { index ->
+                    navController.navigate("note_viewer/$index?category=$category")
+                }
+            )
+        }
+
+        // Recordings Screen (clearer naming instead of folder/recordings)
+        composable(
+            route = "recordings?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val category = "recordings"
+            val folderCategory = FolderCategory.fromPath(category)
+
+            FolderScreen(
+                onBackClick = { navController.navigateUp() },
+                onAddClick = { currentFolderId ->
+                    val folderParam = currentFolderId?.let { "?folderId=$it" } ?: ""
+                    navController.navigate("audio_recorder$folderParam")
+                },
+                onMediaClick = { index ->
+                    navController.navigate("audio_viewer/$index?category=$category")
+                }
+            )
+        }
+
+        // Legacy fallback route for backward compatibility
         composable(
             route = "folder/{category}?folderId={folderId}",
             arguments = listOf(

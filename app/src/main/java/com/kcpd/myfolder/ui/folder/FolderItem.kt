@@ -1,6 +1,8 @@
 package com.kcpd.myfolder.ui.folder
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -9,9 +11,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -25,9 +29,16 @@ fun FolderThumbnail(
     isSelected: Boolean = false,
     isMultiSelectMode: Boolean = false
 ) {
+    val borderWidth by animateDpAsState(
+        targetValue = if (isSelected) 3.dp else 0.dp,
+        label = "border"
+    )
+    val scale = if (isSelected) 0.95f else 1f
+
     Box(
         modifier = Modifier
             .aspectRatio(1f)
+            .scale(scale)
             .pointerInput(folder.id) {
                 detectTapGestures(
                     onTap = { onClick() },
@@ -38,9 +49,14 @@ fun FolderThumbnail(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .border(
+                    width = borderWidth,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                )
                 .background(
                     Color(android.graphics.Color.parseColor(folder.color.colorHex)).copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -64,33 +80,26 @@ fun FolderThumbnail(
             }
         }
 
-        // Multi-select overlay
-        if (isMultiSelectMode) {
+        // Modern selection indicator - small pill badge
+        if (isMultiSelectMode && isSelected) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        if (isSelected)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        else
-                            Color.Transparent
-                    )
-            )
-
-            Icon(
-                if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                contentDescription = if (isSelected) "Selected" else "Not selected",
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
-                modifier = Modifier
+                    .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .size(24.dp)
-                    .align(Alignment.TopStart)
+                    .size(28.dp)
                     .background(
-                        Color.Black.copy(alpha = 0.6f),
+                        MaterialTheme.colorScheme.primary,
                         shape = CircleShape
-                    )
-                    .padding(2.dp)
-            )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Done,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -159,12 +168,34 @@ fun FolderListItem(
 
             // Selection indicator or arrow
             if (isMultiSelectMode) {
-                Icon(
-                    if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = if (isSelected) "Selected" else "Not selected",
-                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Done,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .border(
+                                width = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                shape = CircleShape
+                            )
+                    )
+                }
             } else {
                 Icon(
                     Icons.Default.ChevronRight,

@@ -1,6 +1,7 @@
 package com.kcpd.myfolder.ui.folder
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -97,7 +98,7 @@ fun FolderScreen(
                 },
                 actions = {
                     if (isMultiSelectMode) {
-                        // Select All checkbox
+                        // Select All button - modern circular design
                         IconButton(
                             onClick = {
                                 if (selectedCount == totalCount && selectedCount > 0) {
@@ -111,14 +112,58 @@ fun FolderScreen(
                                 }
                             }
                         ) {
-                            Icon(
-                                imageVector = when {
-                                    selectedCount == 0 -> Icons.Default.CheckBoxOutlineBlank
-                                    selectedCount == totalCount -> Icons.Default.CheckBox
-                                    else -> Icons.Default.IndeterminateCheckBox
-                                },
-                                contentDescription = "Select All"
-                            )
+                            when {
+                                selectedCount == totalCount && selectedCount > 0 -> {
+                                    // All selected - filled circle with checkmark
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primary,
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Done,
+                                            contentDescription = "Deselect All",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                selectedCount > 0 -> {
+                                    // Some selected - filled circle with minus
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Remove,
+                                            contentDescription = "Select All",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    // None selected - empty circle
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .border(
+                                                width = 2.dp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            )
+                                    )
+                                }
+                            }
                         }
 
                         // Move button - always visible in multi-select mode
@@ -563,32 +608,38 @@ internal fun MediaThumbnail(
             }
         }
 
-        // Multi-select overlay
-        if (isMultiSelectMode) {
+        // Modern selection indicator - small circular badge
+        if (isMultiSelectMode && isSelected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Done,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        // Border animation for selection
+        if (isSelected) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        if (isSelected)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        else
-                            Color.Transparent
+                    .border(
+                        width = 3.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(0.dp)
                     )
-            )
-
-            Icon(
-                if (isSelected) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                contentDescription = if (isSelected) "Selected" else "Not selected",
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
-                modifier = Modifier
-                    .padding(8.dp)
-                    .size(24.dp)
-                    .align(Alignment.TopStart)
-                    .background(
-                        Color.Black.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(4.dp)
-                    )
-                    .padding(2.dp)
             )
         }
     }
@@ -944,14 +995,36 @@ internal fun FolderMediaListItem(
                 )
             }
 
-            // Selection indicator
+            // Selection indicator - modern circular design
             if (isMultiSelectMode) {
-                Icon(
-                    if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = if (isSelected) "Selected" else "Not selected",
-                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Done,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .border(
+                                width = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                    )
+                }
             }
         }
     }
