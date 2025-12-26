@@ -217,26 +217,74 @@ fun RestoreBackupDialog(
     var backupCode by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isRestoring by remember { mutableStateOf(false) }
+
+    // Validate backup code format (should be base64)
+    val isValidBackupCodeFormat = backupCode.isBlank() || backupCode.matches(Regex("^[A-Za-z0-9+/=]+$"))
+    val backupCodeError = when {
+        backupCode.isNotBlank() && !isValidBackupCodeFormat -> "Invalid recovery code format"
+        backupCode.isNotBlank() && backupCode.length < 20 -> "Recovery code seems too short"
+        else -> null
+    }
+
+    val passwordError = when {
+        password.isNotEmpty() && password.length < 8 -> "Password must be at least 8 characters"
+        else -> null
+    }
+
+    val canRestore = backupCode.isNotBlank() &&
+                     password.length >= 8 &&
+                     isValidBackupCodeFormat &&
+                     !isRestoring
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = if (!isRestoring) onDismiss else { {} },
         title = { Text("Restore from Backup") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Enter your recovery code and password to restore access.")
-                
+                Text(
+                    "Enter your recovery code and password to restore access.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                if (errorMessage != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = errorMessage!!,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = backupCode,
-                    onValueChange = { backupCode = it },
+                    onValueChange = {
+                        backupCode = it
+                        errorMessage = null
+                    },
                     label = { Text("Recovery Code") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = false,
-                    maxLines = 3
+                    maxLines = 3,
+                    isError = backupCodeError != null,
+                    supportingText = backupCodeError?.let { { Text(it) } },
+                    enabled = !isRestoring
                 )
-                
+
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = {
+                        password = it
+                        errorMessage = null
+                    },
                     label = { Text("Password") },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -248,20 +296,48 @@ fun RestoreBackupDialog(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = passwordError != null,
+                    supportingText = passwordError?.let { { Text(it) } },
+                    enabled = !isRestoring
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = { onRestore(backupCode, password) },
-                enabled = backupCode.isNotBlank() && password.length >= 8
+                onClick = {
+                    isRestoring = true
+                    errorMessage = null
+                    // Validate and provide specific error feedback
+                    if (backupCode.length < 20) {
+                        errorMessage = "Recovery code is too short. Please enter the full code from settings."
+                        isRestoring = false
+                    } else if (!isValidBackupCodeFormat) {
+                        errorMessage = "Invalid recovery code format. Code should contain only letters, numbers, and +/= characters."
+                        isRestoring = false
+                    } else {
+                        onRestore(backupCode, password)
+                        isRestoring = false
+                    }
+                },
+                enabled = canRestore
             ) {
+                if (isRestoring) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
                 Text("Restore")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isRestoring
+            ) {
                 Text("Cancel")
             }
         }

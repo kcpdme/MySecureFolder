@@ -39,6 +39,14 @@ class GalleryViewModel @Inject constructor(
         return mediaRepository.loadNoteContent(mediaFile)
     }
 
+    /**
+     * Decrypts media file to temporary location for playback.
+     * Caller is responsible for cleanup.
+     */
+    suspend fun decryptForPlayback(mediaFile: MediaFile): File {
+        return mediaRepository.decryptForViewing(mediaFile)
+    }
+
     fun uploadToS3(mediaFile: MediaFile) {
         viewModelScope.launch {
             Toast.makeText(getApplication(), "Uploading ${mediaFile.fileName}...", Toast.LENGTH_SHORT).show()

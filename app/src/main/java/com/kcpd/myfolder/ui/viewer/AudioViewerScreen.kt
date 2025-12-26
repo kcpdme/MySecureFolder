@@ -131,46 +131,80 @@ fun AudioPlayer(
     isCurrentPage: Boolean
 ) {
     val context = LocalContext.current
+    val viewModel: GalleryViewModel = hiltViewModel()
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0L) }
     var duration by remember { mutableStateOf(0L) }
+    var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.fromFile(java.io.File(mediaFile.filePath)))
-            setMediaItem(mediaItem)
-            prepare()
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        duration = this@apply.duration
+    // Decrypt file on first composition
+    LaunchedEffect(mediaFile.id) {
+        isLoading = true
+        error = null
+        try {
+            decryptedFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                viewModel.decryptForPlayback(mediaFile)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AudioPlayer", "Decryption failed", e)
+            error = "Failed to load audio: ${e.message}"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val exoPlayer = remember(decryptedFile) {
+        decryptedFile?.let { file ->
+            ExoPlayer.Builder(context).build().apply {
+                val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
+                setMediaItem(mediaItem)
+                prepare()
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            duration = this@apply.duration
+                        }
                     }
-                }
 
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    isPlaying = playing
-                }
-            })
+                    override fun onIsPlayingChanged(playing: Boolean) {
+                        isPlaying = playing
+                    }
+                })
+            }
         }
     }
 
     // Pause when not current page
     LaunchedEffect(isCurrentPage) {
         if (!isCurrentPage) {
-            exoPlayer.pause()
+            exoPlayer?.pause()
         }
     }
 
     LaunchedEffect(exoPlayer) {
-        while (true) {
-            currentPosition = exoPlayer.currentPosition
-            kotlinx.coroutines.delay(100)
+        if (exoPlayer != null) {
+            while (true) {
+                currentPosition = exoPlayer.currentPosition
+                kotlinx.coroutines.delay(100)
+            }
         }
     }
 
     DisposableEffect(mediaFile.filePath) {
         onDispose {
-            exoPlayer.release()
+            exoPlayer?.release()
+            // Clean up temp file
+            decryptedFile?.let { file ->
+                try {
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("AudioPlayer", "Failed to delete temp file", e)
+                }
+            }
         }
     }
 
@@ -183,87 +217,105 @@ fun AudioPlayer(
             },
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Icon(
-                Icons.Default.MusicNote,
-                contentDescription = "Audio",
-                modifier = Modifier.size(120.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-
-            Text(
-                text = mediaFile.fileName,
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            // Progress slider
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Slider(
-                    value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                    onValueChange = {
-                        exoPlayer.seekTo((it * duration).toLong())
-                    },
-                    modifier = Modifier.fillMaxWidth()
+        when {
+            isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatDuration(currentPosition),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = formatDuration(duration),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
             }
-
-            // Playback controls
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    exoPlayer.seekTo((currentPosition - 10000).coerceAtLeast(0))
-                }) {
+            error != null -> {
+                Text(
+                    text = error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
+                )
+            }
+            exoPlayer != null -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    modifier = Modifier.padding(32.dp)
+                ) {
                     Icon(
-                        Icons.Default.Replay10,
-                        contentDescription = "Rewind",
-                        modifier = Modifier.size(32.dp)
+                        Icons.Default.MusicNote,
+                        contentDescription = "Audio",
+                        modifier = Modifier.size(120.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
-                }
 
-                FloatingActionButton(
-                    onClick = {
-                        if (isPlaying) {
-                            exoPlayer.pause()
-                        } else {
-                            exoPlayer.play()
+                    Text(
+                        text = mediaFile.fileName,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+
+                    // Progress slider
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Slider(
+                            value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                            onValueChange = {
+                                exoPlayer.seekTo((it * duration).toLong())
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatDuration(currentPosition),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = formatDuration(duration),
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
-                ) {
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
 
-                IconButton(onClick = {
-                    exoPlayer.seekTo((currentPosition + 10000).coerceAtMost(duration))
-                }) {
-                    Icon(
-                        Icons.Default.Forward10,
-                        contentDescription = "Forward",
-                        modifier = Modifier.size(32.dp)
-                    )
+                    // Playback controls
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            exoPlayer.seekTo((currentPosition - 10000).coerceAtLeast(0))
+                        }) {
+                            Icon(
+                                Icons.Default.Replay10,
+                                contentDescription = "Rewind",
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        FloatingActionButton(
+                            onClick = {
+                                if (isPlaying) {
+                                    exoPlayer.pause()
+                                } else {
+                                    exoPlayer.play()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        IconButton(onClick = {
+                            exoPlayer.seekTo((currentPosition + 10000).coerceAtMost(duration))
+                        }) {
+                            Icon(
+                                Icons.Default.Forward10,
+                                contentDescription = "Forward",
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

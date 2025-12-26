@@ -129,27 +129,59 @@ fun VideoPlayer(
     isCurrentPage: Boolean
 ) {
     val context = LocalContext.current
+    val viewModel: GalleryViewModel = hiltViewModel()
+    var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.fromFile(java.io.File(mediaFile.filePath)))
-            setMediaItem(mediaItem)
-            prepare()
-            playWhenReady = true
-            repeatMode = Player.REPEAT_MODE_OFF
+    // Decrypt file on first composition
+    LaunchedEffect(mediaFile.id) {
+        isLoading = true
+        error = null
+        try {
+            decryptedFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                viewModel.decryptForPlayback(mediaFile)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("VideoPlayer", "Decryption failed", e)
+            error = "Failed to load video: ${e.message}"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val exoPlayer = remember(decryptedFile) {
+        decryptedFile?.let { file ->
+            ExoPlayer.Builder(context).build().apply {
+                val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
+                setMediaItem(mediaItem)
+                prepare()
+                playWhenReady = true
+                repeatMode = Player.REPEAT_MODE_OFF
+            }
         }
     }
 
     // Pause when not current page
     LaunchedEffect(isCurrentPage) {
         if (!isCurrentPage) {
-            exoPlayer.pause()
+            exoPlayer?.pause()
         }
     }
 
     DisposableEffect(mediaFile.filePath) {
         onDispose {
-            exoPlayer.release()
+            exoPlayer?.release()
+            // Clean up temp file securely
+            decryptedFile?.let { file ->
+                try {
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoPlayer", "Failed to delete temp file", e)
+                }
+            }
         }
     }
 
@@ -158,16 +190,35 @@ fun VideoPlayer(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = true
-                    controllerAutoShow = true
-                    controllerShowTimeoutMs = 3000
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+        when {
+            isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.White
+                )
+            }
+            error != null -> {
+                Text(
+                    text = error!!,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
+                )
+            }
+            exoPlayer != null -> {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = exoPlayer
+                            useController = true
+                            controllerAutoShow = true
+                            controllerShowTimeoutMs = 3000
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }

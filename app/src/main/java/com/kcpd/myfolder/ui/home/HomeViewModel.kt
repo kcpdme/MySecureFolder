@@ -25,12 +25,16 @@ class HomeViewModel @Inject constructor(
     val notesCount: StateFlow<Int> =
         mediaRepository.getFileCountForCategory(FolderCategory.NOTES)
 
+    val pdfsCount: StateFlow<Int> =
+        mediaRepository.getFileCountForCategory(FolderCategory.PDFS)
+
     fun getCountForCategory(category: FolderCategory): StateFlow<Int> {
         return when (category) {
             FolderCategory.PHOTOS -> photosCount
             FolderCategory.VIDEOS -> videosCount
             FolderCategory.RECORDINGS -> recordingsCount
             FolderCategory.NOTES -> notesCount
+            FolderCategory.PDFS -> pdfsCount
         }
     }
 }

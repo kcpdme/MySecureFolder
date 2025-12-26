@@ -27,6 +27,7 @@ import coil.request.ImageRequest
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -239,6 +240,21 @@ fun FolderScreen(
                             )
                         }
                     } else {
+                        val scope = rememberCoroutineScope()
+                        val importFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                            contract = androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()
+                        ) { uris ->
+                            if (uris.isNotEmpty()) {
+                                scope.launch {
+                                    viewModel.importFiles(uris).collect { progress ->
+                                        android.util.Log.d("Import", "Progress: $progress")
+                                    }
+                                }
+                            }
+                        }
+                        IconButton(onClick = { importFileLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.FileUpload, "Import Files")
+                        }
                         IconButton(onClick = { showCreateFolderDialog = true }) {
                             Icon(Icons.Default.CreateNewFolder, "Create Folder")
                         }
@@ -873,6 +889,7 @@ private fun getActionIcon(category: FolderCategory) = when (category) {
     FolderCategory.VIDEOS -> Icons.Default.Videocam
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
+    FolderCategory.PDFS -> Icons.Default.FileUpload
 }
 
 private fun getEmptyStateMessage(category: FolderCategory): String {
@@ -881,6 +898,7 @@ private fun getEmptyStateMessage(category: FolderCategory): String {
         FolderCategory.VIDEOS -> "Tap + to record videos"
         FolderCategory.RECORDINGS -> "Tap + to record audio"
         FolderCategory.NOTES -> "Tap + to create a note"
+        FolderCategory.PDFS -> "Tap import to add PDFs"
     }
 }
 

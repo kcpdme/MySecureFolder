@@ -26,6 +26,7 @@ fun HomeScreen(
     val videosCount by viewModel.videosCount.collectAsState()
     val recordingsCount by viewModel.recordingsCount.collectAsState()
     val notesCount by viewModel.notesCount.collectAsState()
+    val pdfsCount by viewModel.pdfsCount.collectAsState()
 
     Scaffold(
         topBar = {
@@ -86,6 +87,21 @@ fun HomeScreen(
                     onClick = { onFolderClick(FolderCategory.NOTES) },
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Third row: PDFs (centered)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                FolderCard(
+                    category = FolderCategory.PDFS,
+                    count = pdfsCount,
+                    onClick = { onFolderClick(FolderCategory.PDFS) },
+                    modifier = Modifier.weight(1f)
+                )
+                // Empty space to maintain layout
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
@@ -166,4 +182,5 @@ private fun getActionIcon(category: FolderCategory) = when (category) {
     FolderCategory.VIDEOS -> Icons.Default.Videocam
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
+    FolderCategory.PDFS -> Icons.Default.FileUpload
 }

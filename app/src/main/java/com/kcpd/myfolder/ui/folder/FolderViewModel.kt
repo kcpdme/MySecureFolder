@@ -24,6 +24,7 @@ class FolderViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val folderRepository: FolderRepository,
     private val s3Repository: S3Repository,
+    private val importMediaUseCase: com.kcpd.myfolder.domain.usecase.ImportMediaUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -129,4 +130,10 @@ class FolderViewModel @Inject constructor(
     fun shareMediaFile(mediaFile: MediaFile) {
         // This will be handled by FolderScreen using FolderActions
     }
+
+    /**
+     * Import files from device storage.
+     * Returns a flow of import progress.
+     */
+    suspend fun importFiles(uris: List<android.net.Uri>) = importMediaUseCase.importFiles(uris, _currentFolderId.value)
 }
