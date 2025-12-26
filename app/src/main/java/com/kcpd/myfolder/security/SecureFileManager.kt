@@ -386,19 +386,23 @@ class SecureFileManager @Inject constructor(
             }
             BitmapFactory.decodeByteArray(plainData, 0, plainData.size, options)
 
+            // Tella's adaptive sizing: 1/10 of original dimensions for photos
+            val targetWidth = options.outWidth / 10
+            val targetHeight = options.outHeight / 10
+
             // Calculate sample size for efficient memory usage
-            options.inSampleSize = calculateInSampleSize(options, THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+            options.inSampleSize = calculateInSampleSize(options, targetWidth, targetHeight)
             options.inJustDecodeBounds = false
 
             // Decode the sampled bitmap
             val bitmap = BitmapFactory.decodeByteArray(plainData, 0, plainData.size, options)
                 ?: return@withContext null
 
-            // Extract thumbnail at target size
+            // Extract thumbnail at 1/10 size (adaptive to original image)
             val thumbnail = ThumbnailUtils.extractThumbnail(
                 bitmap,
-                THUMBNAIL_SIZE,
-                THUMBNAIL_SIZE,
+                targetWidth,
+                targetHeight,
                 ThumbnailUtils.OPTIONS_RECYCLE_INPUT
             )
 
@@ -443,11 +447,15 @@ class SecureFileManager @Inject constructor(
 
             retriever.release()
 
-            // Create thumbnail
+            // Tella's adaptive sizing: 1/4 of original dimensions for videos
+            val targetWidth = bitmap.width / 4
+            val targetHeight = bitmap.height / 4
+
+            // Create thumbnail at 1/4 size
             val thumbnail = ThumbnailUtils.extractThumbnail(
                 bitmap,
-                THUMBNAIL_SIZE,
-                THUMBNAIL_SIZE,
+                targetWidth,
+                targetHeight,
                 ThumbnailUtils.OPTIONS_RECYCLE_INPUT
             )
 

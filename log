@@ -1,1 +1,77 @@
-/bin/bash: line 1: ./gradlew: No such file or directory
+2025-12-26 21:32:01.372 17867-17867 VRI[MainAc...y]@28d76ef com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2025-12-26 21:32:01.379 17867-17867 VRI[MainAc...y]@28d76ef com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@28d76ef
+2025-12-26 21:32:01.403 17867-17877 InputTransport          com.kcpd.myfolder                    D  Input channel destroyed: 'ClientS', fd=146
+2025-12-26 21:32:01.417 17867-17867 VRI[MainAc...y]@28d76ef com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2025-12-26 21:32:01.435 17867-17867 WindowOnBackDispatcher  com.kcpd.myfolder                    W  OnBackInvokedCallback is not enabled for the application.
+                                                                                                    Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+2025-12-26 21:32:01.452 17867-17867 FolderScreen            com.kcpd.myfolder                    D  Category: PHOTOS
+2025-12-26 21:32:01.453 17867-17867 FolderScreen            com.kcpd.myfolder                    D  MediaFiles count: 0
+2025-12-26 21:32:01.492 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  Category: Photos, FolderId: null
+2025-12-26 21:32:01.492 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  Total files for category: 0, Filtered for folder: 0
+2025-12-26 21:32:01.507 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  Category: Photos, FolderId: null
+2025-12-26 21:32:01.507 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  Total files for category: 4, Filtered for folder: 4
+2025-12-26 21:32:01.507 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  [0] MEDIA_20251226_201112.jpg - Type: PHOTO, FolderId: null
+2025-12-26 21:32:01.507 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  [1] MEDIA_20251226_174817.jpg - Type: PHOTO, FolderId: null
+2025-12-26 21:32:01.507 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  [2] MEDIA_20251226_165207.jpg - Type: PHOTO, FolderId: null
+2025-12-26 21:32:01.507 17867-17867 FolderViewModel         com.kcpd.myfolder                    D  [3] MEDIA_20251226_160118.jpg - Type: PHOTO, FolderId: null
+2025-12-26 21:32:01.509 17867-17867 FolderScreen            com.kcpd.myfolder                    D  Category: PHOTOS
+2025-12-26 21:32:01.509 17867-17867 FolderScreen            com.kcpd.myfolder                    D  MediaFiles count: 4
+2025-12-26 21:32:01.510 17867-17867 FolderScreen            com.kcpd.myfolder                    D  [0] File: MEDIA_20251226_201112.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_201112.jpg.enc
+2025-12-26 21:32:01.510 17867-17867 FolderScreen            com.kcpd.myfolder                    D  [1] File: MEDIA_20251226_174817.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_174817.jpg.enc
+2025-12-26 21:32:01.510 17867-17867 FolderScreen            com.kcpd.myfolder                    D  [2] File: MEDIA_20251226_165207.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_165207.jpg.enc
+2025-12-26 21:32:01.510 17867-17867 FolderScreen            com.kcpd.myfolder                    D  [3] File: MEDIA_20251226_160118.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_160118.jpg.enc
+2025-12-26 21:32:01.530 17867-17867 FolderScreen_Grid       com.kcpd.myfolder                    D  Rendering grid item [0]: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:01.531 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Rendering thumbnail for: MEDIA_20251226_201112.jpg, type: PHOTO
+2025-12-26 21:32:01.531 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Loading photo: MEDIA_20251226_201112.jpg, has thumbnail: true
+2025-12-26 21:32:01.535 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load started: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:01.538 17867-17867 FolderScreen_Grid       com.kcpd.myfolder                    D  Rendering grid item [1]: MEDIA_20251226_174817.jpg
+2025-12-26 21:32:01.538 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Rendering thumbnail for: MEDIA_20251226_174817.jpg, type: PHOTO
+2025-12-26 21:32:01.538 17867-17936 ConnectivityManager     com.kcpd.myfolder                    D  StackLog: [android.net.ConnectivityManager.sendRequestForNetwork(ConnectivityManager.java:4736)] [android.net.ConnectivityManager.sendRequestForNetwork(ConnectivityManager.java:4904)] [android.net.ConnectivityManager.registerNetworkCallback(ConnectivityManager.java:5321)] [android.net.ConnectivityManager.registerNetworkCallback(ConnectivityManager.java:5291)] [coil.network.RealNetworkObserver.<init>(NetworkObserver.kt:88)] [coil.network.NetworkObserverKt.NetworkObserver(NetworkObserver.kt:33)] [coil.util.SystemCallbacks.registerNetworkObserver(SystemCallbacks.kt:52)] [coil.util.SystemCallbacks.isOnline(SystemCallbacks.kt:34)] [coil.request.RequestService.updateOptionsOnWorkerThread(RequestService.kt:130)] [coil.intercept.EngineInterceptor.execute(EngineInterceptor.kt:116)] [coil.intercept.EngineInterceptor.access$execute(EngineInterceptor.kt:42)] [coil.intercept.EngineInterceptor$intercept$2.invokeSuspend(EngineInterceptor.kt:77)] [kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)] [kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)] [kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:113)] [kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)] [kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)] [kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)] [kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)] [kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)]
+2025-12-26 21:32:01.538 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Loading photo: MEDIA_20251226_174817.jpg, has thumbnail: true
+2025-12-26 21:32:01.539 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load started: MEDIA_20251226_174817.jpg
+2025-12-26 21:32:01.542 17867-17867 FolderScreen_Grid       com.kcpd.myfolder                    D  Rendering grid item [2]: MEDIA_20251226_165207.jpg
+2025-12-26 21:32:01.542 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Rendering thumbnail for: MEDIA_20251226_165207.jpg, type: PHOTO
+2025-12-26 21:32:01.542 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Loading photo: MEDIA_20251226_165207.jpg, has thumbnail: true
+2025-12-26 21:32:01.543 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load started: MEDIA_20251226_165207.jpg
+2025-12-26 21:32:01.546 17867-17867 FolderScreen_Grid       com.kcpd.myfolder                    D  Rendering grid item [3]: MEDIA_20251226_160118.jpg
+2025-12-26 21:32:01.546 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Rendering thumbnail for: MEDIA_20251226_160118.jpg, type: PHOTO
+2025-12-26 21:32:01.546 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Loading photo: MEDIA_20251226_160118.jpg, has thumbnail: true
+2025-12-26 21:32:01.546 17867-17936 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.546 17867-17943 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.546 17867-17939 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.547 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load started: MEDIA_20251226_160118.jpg
+2025-12-26 21:32:01.549 17867-17941 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.552 17867-17941 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.552 17867-17936 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.552 17867-17939 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.553 17867-17943 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:01.575 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load SUCCESS: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:01.576 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load SUCCESS: MEDIA_20251226_165207.jpg
+2025-12-26 21:32:01.576 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load SUCCESS: MEDIA_20251226_160118.jpg
+2025-12-26 21:32:01.576 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Image load SUCCESS: MEDIA_20251226_174817.jpg
+2025-12-26 21:32:03.662 17867-17867 VRI[MainAc...y]@28d76ef com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2025-12-26 21:32:03.710 17867-17867 VRI[MainAc...y]@28d76ef com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2025-12-26 21:32:03.714 17867-17867 MediaThumbnail          com.kcpd.myfolder                    D  Thumbnail tapped: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.714 17867-17867 FolderScreen_Grid       com.kcpd.myfolder                    D  Grid item clicked: index=0, file=MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.714 17867-17867 Navigation              com.kcpd.myfolder                    D  onMediaClick called: index=0, category=photos, mediaType=PHOTO
+2025-12-26 21:32:03.714 17867-17867 Navigation              com.kcpd.myfolder                    D  Navigating to: photo_viewer/0?category=photos
+2025-12-26 21:32:03.743 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  PhotoViewerScreen created: initialIndex=0, category=photos
+2025-12-26 21:32:03.743 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  All media files count: 7
+2025-12-26 21:32:03.744 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  Filtered photo files count: 4
+2025-12-26 21:32:03.744 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  [0] Photo: MEDIA_20251226_201112.jpg, path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_201112.jpg.enc
+2025-12-26 21:32:03.744 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  [1] Photo: MEDIA_20251226_174817.jpg, path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_174817.jpg.enc
+2025-12-26 21:32:03.744 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  [2] Photo: MEDIA_20251226_165207.jpg, path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_165207.jpg.enc
+2025-12-26 21:32:03.744 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  [3] Photo: MEDIA_20251226_160118.jpg, path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_160118.jpg.enc
+2025-12-26 21:32:03.746 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  PagerState: initialPage=0, pageCount=4
+2025-12-26 21:32:03.773 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  Rendering page: 0
+2025-12-26 21:32:03.773 17867-17867 PhotoViewerScreen       com.kcpd.myfolder                    D  Photo file for page 0: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.773 17867-17867 ZoomableImage           com.kcpd.myfolder                    D  Rendering ZoomableImage for: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.776 17867-17946 EncryptedFileFetcher    com.kcpd.myfolder                    D  Fetching: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.776 17867-17946 EncryptedFileFetcher    com.kcpd.myfolder                    D  Encrypted path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/MEDIA_20251226_201112.jpg.enc
+2025-12-26 21:32:03.776 17867-17946 EncryptedFileFetcher    com.kcpd.myfolder                    D  Encrypted file exists, size: 2667470 bytes
+2025-12-26 21:32:03.777 17867-17946 EncryptedFileFetcher    com.kcpd.myfolder                    D  Streaming decryption started for: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.799 17867-17867 ZoomableImage           com.kcpd.myfolder                    D  Rendering ZoomableImage for: MEDIA_20251226_201112.jpg
+2025-12-26 21:32:03.897 17867-17946 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:03.899 17867-17946 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:03.987 17867-17946 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2025-12-26 21:32:06.724 17867-17867 VRI[MainAc...y]@28d76ef com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@28d76ef
