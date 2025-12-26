@@ -78,6 +78,7 @@ class BiometricManager @Inject constructor(
         onError: (errorMessage: String) -> Unit,
         onCancel: () -> Unit = {}
     ) {
+        android.util.Log.d("BiometricManager", "authenticate() called for activity: ${activity.javaClass.simpleName}")
         val executor = ContextCompat.getMainExecutor(activity)
 
         val biometricPrompt = BiometricPrompt(
@@ -86,19 +87,23 @@ class BiometricManager @Inject constructor(
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
+                    android.util.Log.d("BiometricManager", "Authentication succeeded")
                     onSuccess()
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
+                    android.util.Log.e("BiometricManager", "Authentication error: code=$errorCode, message=$errString")
 
                     when (errorCode) {
                         BiometricPrompt.ERROR_NEGATIVE_BUTTON,
                         BiometricPrompt.ERROR_USER_CANCELED,
                         BiometricPrompt.ERROR_CANCELED -> {
+                            android.util.Log.d("BiometricManager", "User cancelled authentication")
                             onCancel()
                         }
                         else -> {
+                            android.util.Log.e("BiometricManager", "Authentication failed with error")
                             onError(errString.toString())
                         }
                     }
@@ -106,6 +111,7 @@ class BiometricManager @Inject constructor(
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
+                    android.util.Log.w("BiometricManager", "Authentication failed (retry opportunity)")
                     // Don't call onError here - this is just a retry opportunity
                     // The prompt stays open for the user to try again
                 }
@@ -122,7 +128,9 @@ class BiometricManager @Inject constructor(
             .setAllowedAuthenticators(AndroidBiometricManager.Authenticators.BIOMETRIC_STRONG)
             .build()
 
+        android.util.Log.d("BiometricManager", "Showing biometric prompt...")
         biometricPrompt.authenticate(promptInfo)
+        android.util.Log.d("BiometricManager", "Biometric prompt shown")
     }
 
     /**
