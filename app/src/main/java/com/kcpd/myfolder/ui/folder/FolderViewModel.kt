@@ -119,4 +119,8 @@ class FolderViewModel @Inject constructor(
     fun isUploading(fileId: String): Boolean {
         return _uploadingFiles.value.contains(fileId)
     }
+
+    fun shareMediaFile(mediaFile: MediaFile) {
+        // This will be handled by FolderScreen using FolderActions
+    }
 }

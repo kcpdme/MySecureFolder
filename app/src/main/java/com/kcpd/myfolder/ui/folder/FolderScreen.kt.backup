@@ -83,11 +83,6 @@ fun FolderScreen(
                         if (isMultiSelectMode) {
                             isMultiSelectMode = false
                             selectedFiles = emptySet()
-                            selectedFolders = emptySet()
-                        } else if (currentFolderId != null) {
-                            // Navigate up from folder
-                            val parentId = currentFolder?.parentFolderId
-                            viewModel.navigateToFolder(parentId)
                         } else {
                             onBackClick()
                         }
@@ -99,43 +94,21 @@ fun FolderScreen(
                     if (isMultiSelectMode) {
                         IconButton(
                             onClick = {
-                                if (selectedCount == totalCount) {
+                                if (selectedFiles.size == mediaFiles.size) {
                                     selectedFiles = emptySet()
-                                    selectedFolders = emptySet()
                                 } else {
                                     selectedFiles = mediaFiles.map { it.id }.toSet()
-                                    selectedFolders = folders.map { it.id }.toSet()
                                 }
                             }
                         ) {
                             Icon(
-                                if (selectedCount == totalCount)
+                                if (selectedFiles.size == mediaFiles.size)
                                     Icons.Default.CheckBoxOutlineBlank
                                 else
                                     Icons.Default.CheckBox,
                                 "Select All"
                             )
                         }
-
-                        if (selectedCount > 0) {
-                            IconButton(onClick = { showMoveDialog = true }) {
-                                Icon(Icons.Default.DriveFileMove, "Move")
-                            }
-
-                            IconButton(onClick = {
-                                val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
-                                if (selectedMediaFiles.isNotEmpty()) {
-                                    if (selectedMediaFiles.size == 1) {
-                                        viewModel.shareMediaFile(selectedMediaFiles[0])
-                                    } else {
-                                        FolderActions.shareMultipleFiles(context, selectedMediaFiles)
-                                    }
-                                }
-                            }) {
-                                Icon(Icons.Default.Share, "Share")
-                            }
-                        }
-
                         IconButton(
                             onClick = {
                                 selectedFiles.forEach { id ->
@@ -143,28 +116,21 @@ fun FolderScreen(
                                         viewModel.deleteFile(file)
                                     }
                                 }
-                                selectedFolders.forEach { id ->
-                                    viewModel.deleteFolder(id)
-                                }
                                 isMultiSelectMode = false
                                 selectedFiles = emptySet()
-                                selectedFolders = emptySet()
                             },
-                            enabled = selectedCount > 0
+                            enabled = selectedFiles.isNotEmpty()
                         ) {
                             Icon(
                                 Icons.Default.Delete,
                                 "Delete Selected",
-                                tint = if (selectedCount > 0)
+                                tint = if (selectedFiles.isNotEmpty())
                                     MaterialTheme.colorScheme.error
                                 else
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                             )
                         }
                     } else {
-                        IconButton(onClick = { showCreateFolderDialog = true }) {
-                            Icon(Icons.Default.CreateNewFolder, "Create Folder")
-                        }
                         IconButton(onClick = {
                             viewMode = if (viewMode == FolderViewMode.GRID) FolderViewMode.LIST else FolderViewMode.GRID
                         }) {
@@ -173,7 +139,7 @@ fun FolderScreen(
                                 "Toggle View"
                             )
                         }
-                        if (hasContent) {
+                        if (mediaFiles.isNotEmpty()) {
                             IconButton(onClick = {
                                 isMultiSelectMode = true
                             }) {
@@ -194,7 +160,7 @@ fun FolderScreen(
             }
         }
     ) { padding ->
-        if (!hasContent) {
+        if (mediaFiles.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -231,34 +197,6 @@ fun FolderScreen(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Folders first
-                    items(folders.size) { index ->
-                        val folder = folders[index]
-                        FolderThumbnail(
-                            folder = folder,
-                            onClick = {
-                                if (isMultiSelectMode) {
-                                    selectedFolders = if (selectedFolders.contains(folder.id)) {
-                                        selectedFolders - folder.id
-                                    } else {
-                                        selectedFolders + folder.id
-                                    }
-                                } else {
-                                    viewModel.navigateToFolder(folder.id)
-                                }
-                            },
-                            onLongClick = {
-                                if (!isMultiSelectMode) {
-                                    isMultiSelectMode = true
-                                    selectedFolders = setOf(folder.id)
-                                }
-                            },
-                            isSelected = selectedFolders.contains(folder.id),
-                            isMultiSelectMode = isMultiSelectMode
-                        )
-                    }
-
-                    // Then media files
                     items(mediaFiles.size) { index ->
                         val mediaFile = mediaFiles[index]
                         MediaThumbnail(
@@ -292,34 +230,6 @@ fun FolderScreen(
                     verticalArrangement = Arrangement.spacedBy(1.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Folders first
-                    items(folders.size) { index ->
-                        val folder = folders[index]
-                        FolderListItem(
-                            folder = folder,
-                            onClick = {
-                                if (isMultiSelectMode) {
-                                    selectedFolders = if (selectedFolders.contains(folder.id)) {
-                                        selectedFolders - folder.id
-                                    } else {
-                                        selectedFolders + folder.id
-                                    }
-                                } else {
-                                    viewModel.navigateToFolder(folder.id)
-                                }
-                            },
-                            onLongClick = {
-                                if (!isMultiSelectMode) {
-                                    isMultiSelectMode = true
-                                    selectedFolders = setOf(folder.id)
-                                }
-                            },
-                            isSelected = selectedFolders.contains(folder.id),
-                            isMultiSelectMode = isMultiSelectMode
-                        )
-                    }
-
-                    // Then media files
                     items(mediaFiles.size) { index ->
                         val mediaFile = mediaFiles[index]
                         FolderMediaListItem(
@@ -375,40 +285,11 @@ fun FolderScreen(
                 }
             )
         }
-
-        if (showCreateFolderDialog) {
-            CreateFolderDialog(
-                onDismiss = { showCreateFolderDialog = false },
-                onConfirm = { name, color ->
-                    viewModel.createFolder(name, color)
-                    showCreateFolderDialog = false
-                }
-            )
-        }
-
-        if (showMoveDialog) {
-            MoveToFolderDialog(
-                folders = folders,
-                currentFolderId = currentFolderId,
-                onDismiss = { showMoveDialog = false },
-                onConfirm = { targetFolderId ->
-                    selectedFiles.forEach { fileId ->
-                        mediaFiles.find { it.id == fileId }?.let { file ->
-                            viewModel.moveToFolder(file, targetFolderId)
-                        }
-                    }
-                    showMoveDialog = false
-                    isMultiSelectMode = false
-                    selectedFiles = emptySet()
-                    selectedFolders = emptySet()
-                }
-            )
-        }
     }
 }
 
 @Composable
-internal fun MediaThumbnail(
+private fun MediaThumbnail(
     mediaFile: MediaFile,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
@@ -744,7 +625,7 @@ private fun getEmptyStateMessage(category: FolderCategory): String {
 }
 
 @Composable
-internal fun FolderMediaListItem(
+private fun FolderMediaListItem(
     mediaFile: MediaFile,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
