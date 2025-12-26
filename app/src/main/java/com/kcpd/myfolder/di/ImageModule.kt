@@ -37,12 +37,10 @@ object ImageModule {
                     .strongReferencesEnabled(true)  // Keep strong refs for better caching
                     .build()
             }
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(context.cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.05)  // Increased from 2% to 5% for better caching
-                    .build()
-            }
+            // Disk cache DISABLED for maximum security
+            // Decrypted images should never be written to disk cache
+            // This prevents forensic recovery of decrypted data
+            .diskCache(null)
             .respectCacheHeaders(false)
             .crossfade(false)  // Disable crossfade globally to reduce recomposition
             .build()

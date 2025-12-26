@@ -24,6 +24,7 @@ import androidx.navigation.NavController
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
 import com.kcpd.myfolder.ui.gallery.GalleryViewModel
+import com.kcpd.myfolder.ui.util.ScreenSecureEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +34,9 @@ fun VideoViewerScreen(
     category: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
+    // Prevent screenshots and screen recording for security
+    ScreenSecureEffect()
+
     val allMediaFiles by viewModel.mediaFiles.collectAsState()
 
     // Filter to show only videos

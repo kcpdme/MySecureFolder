@@ -28,6 +28,7 @@ import coil.request.ImageRequest
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
 import com.kcpd.myfolder.ui.gallery.GalleryViewModel
+import com.kcpd.myfolder.ui.util.ScreenSecureEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +38,9 @@ fun PhotoViewerScreen(
     category: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
+    // Prevent screenshots and screen recording for security
+    ScreenSecureEffect()
+
     android.util.Log.d("PhotoViewerScreen", "PhotoViewerScreen created: initialIndex=$initialIndex, category=$category")
 
     val allMediaFiles by viewModel.mediaFiles.collectAsState()

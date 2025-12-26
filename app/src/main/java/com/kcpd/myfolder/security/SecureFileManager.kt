@@ -109,51 +109,50 @@ class SecureFileManager @Inject constructor(
      * Gets a streaming decrypted InputStream from an encrypted file.
      * This is the most memory-efficient method - decrypts on-the-fly as data is read.
      *
-     * Uses a PipedInputStream/PipedOutputStream pair to stream decrypted data.
-     * Decryption happens in a background thread, feeding the pipe as data is consumed.
+     * Uses CipherInputStream for true chunk-by-chunk decryption without loading
+     * the entire file into memory.
      *
      * This approach:
-     * - Minimizes memory usage (only buffers small chunks)
+     * - Minimizes memory usage (only buffers 8KB chunks)
      * - Reduces battery consumption (streaming vs batch processing)
      * - Improves UI responsiveness (progressive loading)
      * - Never materializes full decrypted file in memory or disk
+     * - Supports files of ANY size without OutOfMemoryError
      */
     fun getStreamingDecryptedInputStream(encryptedFile: File): java.io.InputStream {
         require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
 
-        val pipeInput = java.io.PipedInputStream(BUFFER_SIZE)
-        val pipeOutput = java.io.PipedOutputStream(pipeInput)
+        val fileInputStream = FileInputStream(encryptedFile)
 
-        // Start background thread to decrypt and feed the pipe
-        Thread {
-            try {
-                pipeOutput.use { output ->
-                    FileInputStream(encryptedFile).use { input ->
-                        // Read the encrypted file and decrypt it in chunks
-                        val encryptedData = input.readBytes()
-                        val decryptedData = securityManager.decrypt(encryptedData)
-
-                        // Write decrypted data to pipe in chunks
-                        var offset = 0
-                        while (offset < decryptedData.size) {
-                            val chunkSize = minOf(BUFFER_SIZE, decryptedData.size - offset)
-                            output.write(decryptedData, offset, chunkSize)
-                            offset += chunkSize
-                        }
-                        output.flush()
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // Close the pipe on error
-                try {
-                    pipeOutput.close()
-                } catch (_: Exception) {
-                }
+        try {
+            // Read IV from the first 12 bytes
+            val iv = ByteArray(12)
+            val bytesRead = fileInputStream.read(iv)
+            if (bytesRead != 12) {
+                fileInputStream.close()
+                throw IllegalStateException("Failed to read IV from encrypted file")
             }
-        }.start()
 
-        return pipeInput
+            // Get encryption key from keystore
+            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            val key = keyStore.getKey("myfolder_master_key", null) as javax.crypto.SecretKey
+
+            // Initialize cipher for decryption
+            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+            val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, gcmSpec)
+
+            // Return CipherInputStream that decrypts chunks on-the-fly
+            return javax.crypto.CipherInputStream(fileInputStream, cipher)
+        } catch (e: Exception) {
+            // Clean up on error
+            try {
+                fileInputStream.close()
+            } catch (_: Exception) {
+            }
+            throw e
+        }
     }
 
     /**
@@ -162,38 +161,58 @@ class SecureFileManager @Inject constructor(
      *
      * This is memory-efficient for large files - encrypts chunks as they're written
      * rather than buffering the entire file in memory.
+     *
+     * Uses CipherOutputStream for true chunk-by-chunk encryption.
      */
     fun getStreamingEncryptionOutputStream(targetFile: File): java.io.OutputStream {
         targetFile.parentFile?.mkdirs()
 
-        val pipeInput = java.io.PipedInputStream(BUFFER_SIZE)
-        val pipeOutput = java.io.PipedOutputStream(pipeInput)
+        val fileOutputStream = FileOutputStream(targetFile)
 
-        // Start background thread to read from pipe, encrypt, and write to file
-        Thread {
-            try {
-                pipeInput.use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        // Read all data from pipe first
-                        val plainData = input.readBytes()
-
-                        // Encrypt the data
-                        val encryptedData = securityManager.encrypt(plainData)
-
-                        // Write encrypted data to file
-                        output.write(encryptedData)
-                        output.flush()
-                        output.fd.sync() // Ensure data is written to disk
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // Clean up target file on error
-                targetFile.delete()
+        try {
+            // Get encryption key from keystore
+            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            val key = if (keyStore.containsAlias("myfolder_master_key")) {
+                keyStore.getKey("myfolder_master_key", null) as javax.crypto.SecretKey
+            } else {
+                // Generate key if it doesn't exist (shouldn't happen in normal flow)
+                val keyGenerator = javax.crypto.KeyGenerator.getInstance(
+                    android.security.keystore.KeyProperties.KEY_ALGORITHM_AES,
+                    "AndroidKeyStore"
+                )
+                val keyGenSpec = android.security.keystore.KeyGenParameterSpec.Builder(
+                    "myfolder_master_key",
+                    android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT
+                )
+                    .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .build()
+                keyGenerator.init(keyGenSpec)
+                keyGenerator.generateKey()
             }
-        }.start()
 
-        return pipeOutput
+            // Initialize cipher for encryption
+            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
+
+            // Write IV to file first (12 bytes for GCM)
+            val iv = cipher.iv
+            fileOutputStream.write(iv)
+            fileOutputStream.flush()
+
+            // Return CipherOutputStream that encrypts chunks on-the-fly
+            return javax.crypto.CipherOutputStream(fileOutputStream, cipher)
+        } catch (e: Exception) {
+            // Clean up on error
+            try {
+                fileOutputStream.close()
+                targetFile.delete()
+            } catch (_: Exception) {
+            }
+            throw e
+        }
     }
 
     /**

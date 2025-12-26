@@ -67,7 +67,8 @@ abstract class AppDatabase : RoomDatabase() {
             )
                 .openHelperFactory(factory)
                 .addMigrations(MIGRATION_1_2)
-                .fallbackToDestructiveMigration() // For development - remove in production
+                // REMOVED: fallbackToDestructiveMigration() - prevents data loss on schema changes
+                // All future migrations must be properly implemented to preserve user data
                 .build()
         }
 
