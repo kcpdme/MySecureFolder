@@ -6,7 +6,8 @@ enum class MediaType {
     PHOTO,
     VIDEO,
     AUDIO,
-    NOTE
+    NOTE,
+    PDF  // PDF documents support
 }
 
 data class MediaFile(

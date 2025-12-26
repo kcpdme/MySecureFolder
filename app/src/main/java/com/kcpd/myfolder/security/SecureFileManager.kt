@@ -31,6 +31,18 @@ class SecureFileManager @Inject constructor(
         private const val SECURE_DELETE_PASSES = 3 // DoD 5220.22-M standard
         private const val THUMBNAIL_SIZE = 200 // Thumbnail size in pixels (like Tella's 1/10 approach)
         private const val THUMBNAIL_QUALITY = 85 // JPEG compression quality
+        private const val KEY_ALIAS = "myfolder_master_key"
+    }
+
+    /**
+     * Cached encryption key from Android Keystore.
+     * Accessing keystore is expensive (~50-200ms), so we cache it.
+     * This dramatically improves image loading performance.
+     */
+    private val encryptionKey: javax.crypto.SecretKey by lazy {
+        val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        keyStore.getKey(KEY_ALIAS, null) as javax.crypto.SecretKey
     }
 
     /**
@@ -133,10 +145,8 @@ class SecureFileManager @Inject constructor(
                 throw IllegalStateException("Failed to read IV from encrypted file")
             }
 
-            // Get encryption key from keystore
-            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
-            keyStore.load(null)
-            val key = keyStore.getKey("myfolder_master_key", null) as javax.crypto.SecretKey
+            // Use cached encryption key (avoid expensive keystore access on every image load)
+            val key = encryptionKey
 
             // Initialize cipher for decryption
             val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
@@ -170,28 +180,8 @@ class SecureFileManager @Inject constructor(
         val fileOutputStream = FileOutputStream(targetFile)
 
         try {
-            // Get encryption key from keystore
-            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
-            keyStore.load(null)
-            val key = if (keyStore.containsAlias("myfolder_master_key")) {
-                keyStore.getKey("myfolder_master_key", null) as javax.crypto.SecretKey
-            } else {
-                // Generate key if it doesn't exist (shouldn't happen in normal flow)
-                val keyGenerator = javax.crypto.KeyGenerator.getInstance(
-                    android.security.keystore.KeyProperties.KEY_ALGORITHM_AES,
-                    "AndroidKeyStore"
-                )
-                val keyGenSpec = android.security.keystore.KeyGenParameterSpec.Builder(
-                    "myfolder_master_key",
-                    android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT
-                )
-                    .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .build()
-                keyGenerator.init(keyGenSpec)
-                keyGenerator.generateKey()
-            }
+            // Use cached encryption key (avoid expensive keystore access)
+            val key = encryptionKey
 
             // Initialize cipher for encryption
             val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")

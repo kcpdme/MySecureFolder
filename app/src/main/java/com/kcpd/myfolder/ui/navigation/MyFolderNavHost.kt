@@ -141,6 +141,8 @@ fun MyFolderNavHost(
                             navController.navigate("audio_recorder$folderParam")
                         com.kcpd.myfolder.data.model.MediaType.NOTE ->
                             navController.navigate("note_editor$folderParam")
+                        com.kcpd.myfolder.data.model.MediaType.PDF ->
+                            navController.navigate("camera$folderParam")  // TODO: Implement PDF import
                         null -> navController.navigate("camera$folderParam")
                     }
                 },
@@ -167,6 +169,11 @@ fun MyFolderNavHost(
                             val route = "note_viewer/$index?category=$category"
                             android.util.Log.d("Navigation", "Navigating to: $route")
                             navController.navigate(route)
+                        }
+                        com.kcpd.myfolder.data.model.MediaType.PDF -> {
+                            val route = "media_viewer/$index?category=$category"
+                            android.util.Log.d("Navigation", "Navigating to PDF viewer: $route")
+                            navController.navigate(route)  // TODO: Implement dedicated PDF viewer
                         }
                         null -> {
                             val route = "media_viewer/$index?category=$category"

@@ -608,6 +608,21 @@ internal fun MediaThumbnail(
                     }
                 }
             }
+            MediaType.PDF -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.tertiaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.PictureAsPdf,
+                        contentDescription = "PDF",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(64.dp)
+                    )
+                }
+            }
         }
 
         if (mediaFile.isUploaded) {
@@ -753,6 +768,23 @@ private fun MediaDetailDialog(
                                 Icons.Default.Note,
                                 contentDescription = "Note",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(64.dp)
+                            )
+                        }
+                    }
+                    MediaType.PDF -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = "PDF",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(64.dp)
                             )
                         }
@@ -955,6 +987,22 @@ internal fun FolderMediaListItem(
                                 Icons.Default.Note,
                                 contentDescription = "Note",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    MediaType.PDF -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = "PDF",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(32.dp)
                             )
                         }
