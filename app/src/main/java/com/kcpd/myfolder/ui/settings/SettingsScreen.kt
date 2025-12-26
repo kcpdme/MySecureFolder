@@ -13,6 +13,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
+import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val vaultManager: VaultManager
+    private val vaultManager: VaultManager,
+    private val passwordManager: PasswordManager
 ) : ViewModel() {
 
     private val _lockTimeout = MutableStateFlow(vaultManager.getLockTimeout())
@@ -43,6 +45,10 @@ class SettingsViewModel @Inject constructor(
     fun getLockTimeoutPreset(): VaultManager.LockTimeoutPreset {
         return VaultManager.LockTimeoutPreset.fromMilliseconds(_lockTimeout.value)
     }
+
+    fun getBackupCode(): String? {
+        return passwordManager.getBackupCode()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +58,10 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
+    var showBackupDialog by remember { mutableStateOf(false) }
     val lockTimeout by viewModel.lockTimeout.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -108,6 +117,24 @@ fun SettingsScreen(
                     navController.navigate("vault_unlock") {
                         popUpTo(0) { inclusive = true }
                     }
+                }
+            )
+
+            HorizontalDivider()
+
+            // Backup & Recovery
+            Text(
+                text = "Backup & Recovery",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+
+            SettingsItem(
+                icon = Icons.Default.Key,
+                title = "Recovery Code",
+                description = "View backup code for device migration",
+                onClick = {
+                    showBackupDialog = true
                 }
             )
 
@@ -182,6 +209,58 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showLockTimeoutDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Backup Code Dialog
+    if (showBackupDialog) {
+        val backupCode = viewModel.getBackupCode()
+        AlertDialog(
+            onDismissRequest = { showBackupDialog = false },
+            title = { Text("Recovery Code") },
+            text = {
+                Column {
+                    Text(
+                        text = "Save this code securely. You will need it to recover your data if you lose your device or reinstall the app.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    if (backupCode != null) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = backupCode,
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    } else {
+                        Text("Error: Could not generate backup code. Is password set?")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBackupDialog = false }) {
+                    Text("Close")
+                }
+            },
+            dismissButton = {
+                if (backupCode != null) {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Recovery Code", backupCode)
+                        clipboard.setPrimaryClip(clip)
+                    }) {
+                        Text("Copy to Clipboard")
+                    }
                 }
             }
         )

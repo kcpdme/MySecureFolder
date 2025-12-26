@@ -29,6 +29,7 @@ fun PasswordSetupScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
 
     val passwordStrength = viewModel.getPasswordStrength(password)
 
@@ -177,8 +178,94 @@ fun PasswordSetupScreen(
             ) {
                 Text("Create Password & Encrypt Data")
             }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Restore button
+            TextButton(
+                onClick = { showRestoreDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Existing User? Restore from Backup")
+            }
         }
     }
+    
+    if (showRestoreDialog) {
+        RestoreBackupDialog(
+            onDismiss = { showRestoreDialog = false },
+            onRestore = { code, pwd ->
+                if (viewModel.recoverFromBackup(pwd, code)) {
+                    showRestoreDialog = false
+                    onPasswordSet()
+                } else {
+                    // Show error in dialog? 
+                    // For simplicity, we just close and show error on main screen or toast
+                    // ideally pass error back
+                    errorMessage = "Restore failed. Invalid code or password."
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun RestoreBackupDialog(
+    onDismiss: () -> Unit,
+    onRestore: (String, String) -> Unit
+) {
+    var backupCode by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Restore from Backup") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Enter your recovery code and password to restore access.")
+                
+                OutlinedTextField(
+                    value = backupCode,
+                    onValueChange = { backupCode = it },
+                    label = { Text("Recovery Code") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 3
+                )
+                
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onRestore(backupCode, password) },
+                enabled = backupCode.isNotBlank() && password.length >= 8
+            ) {
+                Text("Restore")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

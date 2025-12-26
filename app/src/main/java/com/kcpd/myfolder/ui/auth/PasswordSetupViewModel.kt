@@ -1,6 +1,7 @@
 package com.kcpd.myfolder.ui.auth
 
 import androidx.lifecycle.ViewModel
+import com.kcpd.myfolder.security.KeyRecoveryResult
 import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.PasswordStrength
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,5 +36,12 @@ class PasswordSetupViewModel @Inject constructor(
 
     fun exportSaltForBackup(): String? {
         return passwordManager.exportSaltForBackup()
+    }
+
+    fun recoverFromBackup(password: String, backupCode: String): Boolean {
+        return when (passwordManager.recoverFromBackupCode(password, backupCode)) {
+            is KeyRecoveryResult.Success -> true
+            else -> false
+        }
     }
 }

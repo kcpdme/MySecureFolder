@@ -35,17 +35,6 @@ class SecureFileManager @Inject constructor(
     }
 
     /**
-     * Cached encryption key from Android Keystore.
-     * Accessing keystore is expensive (~50-200ms), so we cache it.
-     * This dramatically improves image loading performance.
-     */
-    private val encryptionKey: javax.crypto.SecretKey by lazy {
-        val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
-        keyStore.load(null)
-        keyStore.getKey(KEY_ALIAS, null) as javax.crypto.SecretKey
-    }
-
-    /**
      * Gets the secure storage directory for encrypted files.
      */
     fun getSecureStorageDir(): File {
@@ -145,8 +134,8 @@ class SecureFileManager @Inject constructor(
                 throw IllegalStateException("Failed to read IV from encrypted file")
             }
 
-            // Use cached encryption key (avoid expensive keystore access on every image load)
-            val key = encryptionKey
+            // Use key from SecurityManager (supports password-derived key)
+            val key = securityManager.getFileEncryptionKey()
 
             // Initialize cipher for decryption
             val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
@@ -180,8 +169,8 @@ class SecureFileManager @Inject constructor(
         val fileOutputStream = FileOutputStream(targetFile)
 
         try {
-            // Use cached encryption key (avoid expensive keystore access)
-            val key = encryptionKey
+            // Use key from SecurityManager (supports password-derived key)
+            val key = securityManager.getFileEncryptionKey()
 
             // Initialize cipher for encryption
             val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
