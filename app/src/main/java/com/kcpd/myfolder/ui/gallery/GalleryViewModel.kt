@@ -93,6 +93,7 @@ class GalleryViewModel @Inject constructor(
                     "m4a" -> "audio/mp4"
                     "aac" -> "audio/aac"
                     "txt" -> "text/plain"
+                    "pdf" -> "application/pdf"
                     else -> "*/*"
                 }
 

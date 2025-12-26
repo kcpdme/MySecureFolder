@@ -290,11 +290,36 @@ class MediaRepository @Inject constructor(
 
     /**
      * Decrypts a media file for viewing.
+     * Uses the original filename to ensure proper file extension.
      * Caller must securely delete the returned file after use.
      */
-    suspend fun decryptForViewing(mediaFile: MediaFile): File {
+    suspend fun decryptForViewing(mediaFile: MediaFile): File = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        android.util.Log.d("MediaRepository", "Decrypting file for viewing...")
+        android.util.Log.d("MediaRepository", "  Original filename: ${mediaFile.fileName}")
+        android.util.Log.d("MediaRepository", "  Encrypted file: ${mediaFile.filePath}")
+
         val encryptedFile = File(mediaFile.filePath)
-        return secureFileManager.decryptFile(encryptedFile)
+        require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
+
+        // Decrypt using SecureFileManager's method first
+        val tempDecryptedFile = secureFileManager.decryptFile(encryptedFile)
+
+        // Rename to use original filename to preserve extension
+        val properTempFile = File(context.cacheDir, "temp_${mediaFile.fileName}")
+
+        // If temp file already exists, delete it first
+        if (properTempFile.exists()) {
+            properTempFile.delete()
+        }
+
+        // Rename the temp file to have proper extension
+        tempDecryptedFile.copyTo(properTempFile, overwrite = true)
+        tempDecryptedFile.delete()
+
+        android.util.Log.d("MediaRepository", "  ✓ Decrypted to: ${properTempFile.absolutePath}")
+        android.util.Log.d("MediaRepository", "  ✓ File extension: ${properTempFile.extension}")
+
+        properTempFile
     }
 
     /**
