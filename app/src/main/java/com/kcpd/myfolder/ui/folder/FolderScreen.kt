@@ -97,32 +97,48 @@ fun FolderScreen(
                 },
                 actions = {
                     if (isMultiSelectMode) {
+                        // Select All checkbox
                         IconButton(
                             onClick = {
-                                if (selectedCount == totalCount) {
+                                if (selectedCount == totalCount && selectedCount > 0) {
+                                    // All selected, deselect all
                                     selectedFiles = emptySet()
                                     selectedFolders = emptySet()
                                 } else {
+                                    // Some or none selected, select all
                                     selectedFiles = mediaFiles.map { it.id }.toSet()
                                     selectedFolders = folders.map { it.id }.toSet()
                                 }
                             }
                         ) {
                             Icon(
-                                if (selectedCount == totalCount)
-                                    Icons.Default.CheckBoxOutlineBlank
-                                else
-                                    Icons.Default.CheckBox,
-                                "Select All"
+                                imageVector = when {
+                                    selectedCount == 0 -> Icons.Default.CheckBoxOutlineBlank
+                                    selectedCount == totalCount -> Icons.Default.CheckBox
+                                    else -> Icons.Default.IndeterminateCheckBox
+                                },
+                                contentDescription = "Select All"
                             )
                         }
 
-                        if (selectedCount > 0) {
-                            IconButton(onClick = { showMoveDialog = true }) {
-                                Icon(Icons.Default.DriveFileMove, "Move")
-                            }
+                        // Move button - always visible in multi-select mode
+                        IconButton(
+                            onClick = { showMoveDialog = true },
+                            enabled = selectedCount > 0
+                        ) {
+                            Icon(
+                                Icons.Default.DriveFileMove,
+                                "Move",
+                                tint = if (selectedCount > 0)
+                                    MaterialTheme.colorScheme.onSurface
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        }
 
-                            IconButton(onClick = {
+                        // Share button - always visible in multi-select mode
+                        IconButton(
+                            onClick = {
                                 val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
                                 if (selectedMediaFiles.isNotEmpty()) {
                                     if (selectedMediaFiles.size == 1) {
@@ -131,11 +147,20 @@ fun FolderScreen(
                                         FolderActions.shareMultipleFiles(context, selectedMediaFiles)
                                     }
                                 }
-                            }) {
-                                Icon(Icons.Default.Share, "Share")
-                            }
+                            },
+                            enabled = selectedCount > 0
+                        ) {
+                            Icon(
+                                Icons.Default.Share,
+                                "Share",
+                                tint = if (selectedCount > 0)
+                                    MaterialTheme.colorScheme.onSurface
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
                         }
 
+                        // Delete button - always visible in multi-select mode
                         IconButton(
                             onClick = {
                                 selectedFiles.forEach { id ->
@@ -552,7 +577,7 @@ internal fun MediaThumbnail(
             )
 
             Icon(
-                if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                if (isSelected) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
                 contentDescription = if (isSelected) "Selected" else "Not selected",
                 tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
                 modifier = Modifier
@@ -561,7 +586,7 @@ internal fun MediaThumbnail(
                     .align(Alignment.TopStart)
                     .background(
                         Color.Black.copy(alpha = 0.6f),
-                        shape = androidx.compose.foundation.shape.CircleShape
+                        shape = RoundedCornerShape(4.dp)
                     )
                     .padding(2.dp)
             )
