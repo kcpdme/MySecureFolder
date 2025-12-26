@@ -46,7 +46,13 @@ fun FolderScreen(
     var showUploadDialog by remember { mutableStateOf(false) }
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedFiles by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var viewMode by remember { mutableStateOf(FolderViewMode.GRID) }
+
+    // Default to LIST mode for Notes and Recordings, GRID for others
+    val defaultViewMode = when (viewModel.category) {
+        FolderCategory.NOTES, FolderCategory.RECORDINGS -> FolderViewMode.LIST
+        else -> FolderViewMode.GRID
+    }
+    var viewMode by remember { mutableStateOf(defaultViewMode) }
 
     Scaffold(
         topBar = {
@@ -281,10 +287,10 @@ private fun MediaThumbnail(
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .pointerInput(Unit) {
+            .pointerInput(mediaFile.id) {
                 detectTapGestures(
-                    onLongPress = { onLongClick() },
-                    onTap = { onClick() }
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() }
                 )
             }
     ) {
@@ -617,10 +623,10 @@ private fun FolderMediaListItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(Unit) {
+            .pointerInput(mediaFile.id) {
                 detectTapGestures(
-                    onLongPress = { onLongClick() },
-                    onTap = { onClick() }
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() }
                 )
             },
         color = if (isSelected)

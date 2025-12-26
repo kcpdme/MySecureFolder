@@ -68,7 +68,16 @@ class MediaRepository @Inject constructor(
                                 filePath = file.absolutePath,
                                 mediaType = mediaType,
                                 size = file.length(),
-                                createdAt = Date(file.lastModified())
+                                createdAt = Date(file.lastModified()),
+                                textContent = if (mediaType == MediaType.NOTE) {
+                                    try {
+                                        file.readText()
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                } else {
+                                    null
+                                }
                             )
                         )
                     }
