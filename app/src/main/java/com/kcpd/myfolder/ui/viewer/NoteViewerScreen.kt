@@ -110,7 +110,25 @@ fun NoteViewerScreen(
 }
 
 @Composable
-fun NoteViewer(mediaFile: MediaFile) {
+fun NoteViewer(
+    mediaFile: MediaFile,
+    viewModel: GalleryViewModel = hiltViewModel()
+) {
+    // Lazy load encrypted note content when viewer is displayed
+    var noteContent by remember(mediaFile.id) { mutableStateOf<String?>(null) }
+    var isLoading by remember(mediaFile.id) { mutableStateOf(true) }
+
+    LaunchedEffect(mediaFile.id) {
+        isLoading = true
+        noteContent = try {
+            // Load encrypted content through repository
+            viewModel.loadNoteContent(mediaFile)
+        } catch (e: Exception) {
+            "Error loading note: ${e.message}"
+        }
+        isLoading = false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -118,24 +136,30 @@ fun NoteViewer(mediaFile: MediaFile) {
             .padding(16.dp),
         contentAlignment = Alignment.TopStart
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Note icon placeholder
-            Icon(
-                Icons.Default.Note,
-                contentDescription = "Note",
-                modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.primary
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center)
             )
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Note icon placeholder
+                Icon(
+                    Icons.Default.Note,
+                    contentDescription = "Note",
+                    modifier = Modifier.size(80.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
 
-            // Note content
-            Text(
-                text = mediaFile.textContent ?: "No content available",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+                // Note content
+                Text(
+                    text = noteContent ?: "No content available",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }

@@ -1,0 +1,220 @@
+package com.kcpd.myfolder.ui.auth
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.kcpd.myfolder.security.PasswordStrength
+
+/**
+ * Screen for setting up master password on first launch.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PasswordSetupScreen(
+    onPasswordSet: () -> Unit,
+    viewModel: PasswordSetupViewModel = hiltViewModel()
+) {
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val passwordStrength = viewModel.getPasswordStrength(password)
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Secure Your Data") }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Create Master Password",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Text(
+                text = "Your password encrypts all media files and metadata. " +
+                        "Choose a strong password and keep it safe!",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Password field
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = it
+                    errorMessage = null
+                },
+                label = { Text("Master Password") },
+                visualTransformation = if (passwordVisible)
+                    VisualTransformation.None
+                else
+                    PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Password strength indicator
+            if (password.isNotEmpty()) {
+                PasswordStrengthIndicator(strength = passwordStrength)
+            }
+
+            // Confirm password field
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = {
+                    confirmPassword = it
+                    errorMessage = null
+                },
+                label = { Text("Confirm Password") },
+                visualTransformation = if (confirmVisible)
+                    VisualTransformation.None
+                else
+                    PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { confirmVisible = !confirmVisible }) {
+                        Icon(
+                            if (confirmVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (confirmVisible) "Hide password" else "Show password"
+                        )
+                    }
+                },
+                isError = errorMessage != null,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Warning card
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "⚠️ Important",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        text = "• If you forget this password, your data CANNOT be recovered\n" +
+                                "• Save your password in a secure password manager\n" +
+                                "• Backup your salt code for device migration",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Set password button
+            Button(
+                onClick = {
+                    when {
+                        password.length < 8 -> {
+                            errorMessage = "Password must be at least 8 characters"
+                        }
+                        password != confirmPassword -> {
+                            errorMessage = "Passwords do not match"
+                        }
+                        passwordStrength == PasswordStrength.TOO_SHORT -> {
+                            errorMessage = "Password is too short"
+                        }
+                        else -> {
+                            if (viewModel.setupPassword(password)) {
+                                onPasswordSet()
+                            } else {
+                                errorMessage = "Failed to setup password. Please try again."
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = password.isNotEmpty() && confirmPassword.isNotEmpty()
+            ) {
+                Text("Create Password & Encrypt Data")
+            }
+        }
+    }
+}
+
+@Composable
+fun PasswordStrengthIndicator(strength: PasswordStrength) {
+    val (color, label) = when (strength) {
+        PasswordStrength.TOO_SHORT -> MaterialTheme.colorScheme.error to "Too Short"
+        PasswordStrength.WEAK -> MaterialTheme.colorScheme.error to "Weak"
+        PasswordStrength.MEDIUM -> Color(0xFFFFA500) to "Medium"
+        PasswordStrength.STRONG -> Color(0xFF4CAF50) to "Strong"
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Password Strength:",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = color
+        )
+    }
+
+    LinearProgressIndicator(
+        progress = when (strength) {
+            PasswordStrength.TOO_SHORT -> 0.1f
+            PasswordStrength.WEAK -> 0.33f
+            PasswordStrength.MEDIUM -> 0.66f
+            PasswordStrength.STRONG -> 1.0f
+        },
+        modifier = Modifier.fillMaxWidth(),
+        color = color,
+        trackColor = MaterialTheme.colorScheme.surfaceVariant
+    )
+}

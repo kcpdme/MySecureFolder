@@ -25,12 +25,18 @@ class GalleryViewModel @Inject constructor(
     val mediaFiles: StateFlow<List<MediaFile>> = mediaRepository.mediaFiles
 
     fun deleteMediaFile(mediaFile: MediaFile) {
-        val deleted = mediaRepository.deleteMediaFile(mediaFile)
-        if (deleted) {
-            Toast.makeText(getApplication(), "File deleted", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(getApplication(), "Failed to delete file", Toast.LENGTH_SHORT).show()
+        viewModelScope.launch {
+            val deleted = mediaRepository.deleteMediaFile(mediaFile)
+            if (deleted) {
+                Toast.makeText(getApplication(), "File securely deleted", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(getApplication(), "Failed to delete file", Toast.LENGTH_SHORT).show()
+            }
         }
+    }
+
+    suspend fun loadNoteContent(mediaFile: MediaFile): String {
+        return mediaRepository.loadNoteContent(mediaFile)
     }
 
     fun uploadToS3(mediaFile: MediaFile) {
@@ -57,42 +63,51 @@ class GalleryViewModel @Inject constructor(
     }
 
     fun shareMediaFile(mediaFile: MediaFile) {
-        try {
-            val context = getApplication<Application>()
-            val file = File(mediaFile.filePath)
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
-            )
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>()
 
-            val mimeType = when (file.extension.lowercase()) {
-                "jpg", "jpeg" -> "image/jpeg"
-                "png" -> "image/png"
-                "mp4" -> "video/mp4"
-                "mov" -> "video/quicktime"
-                "mp3" -> "audio/mpeg"
-                "m4a" -> "audio/mp4"
-                "aac" -> "audio/aac"
-                else -> "*/*"
+                // Decrypt file to temp location for sharing
+                val decryptedFile = mediaRepository.decryptForViewing(mediaFile)
+
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    decryptedFile
+                )
+
+                val mimeType = when (decryptedFile.extension.lowercase()) {
+                    "jpg", "jpeg" -> "image/jpeg"
+                    "png" -> "image/png"
+                    "mp4" -> "video/mp4"
+                    "mov" -> "video/quicktime"
+                    "mp3" -> "audio/mpeg"
+                    "m4a" -> "audio/mp4"
+                    "aac" -> "audio/aac"
+                    "txt" -> "text/plain"
+                    else -> "*/*"
+                }
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                context.startActivity(Intent.createChooser(shareIntent, "Share via").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+
+                // Note: The decrypted temp file should be cleaned up after sharing
+                // In a production app, you'd want to listen for when sharing is done
+            } catch (e: Exception) {
+                Toast.makeText(
+                    getApplication(),
+                    "Failed to share file: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
-
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = mimeType
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            context.startActivity(Intent.createChooser(shareIntent, "Share via").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
-        } catch (e: Exception) {
-            Toast.makeText(
-                getApplication(),
-                "Failed to share file: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
         }
     }
 }

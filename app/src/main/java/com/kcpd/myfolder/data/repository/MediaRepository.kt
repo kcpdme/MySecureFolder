@@ -1,135 +1,265 @@
 package com.kcpd.myfolder.data.repository
 
 import android.content.Context
+import com.kcpd.myfolder.data.database.dao.MediaFileDao
+import com.kcpd.myfolder.data.database.entity.MediaFileEntity
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
+import com.kcpd.myfolder.security.SecureFileManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.io.File
+import java.security.MessageDigest
 import java.util.Date
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * MediaRepository with encryption and secure deletion.
+ * Uses Room database for metadata and encrypted file storage.
+ */
 @Singleton
 class MediaRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val folderRepository: FolderRepository
+    private val mediaFileDao: MediaFileDao,
+    private val secureFileManager: SecureFileManager
 ) {
     private val _mediaFiles = MutableStateFlow<List<MediaFile>>(emptyList())
     val mediaFiles: StateFlow<List<MediaFile>> = _mediaFiles.asStateFlow()
 
-    private val mediaDir: File
-        get() = File(context.filesDir, "media").apply { mkdirs() }
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private val legacyMediaDir = File(context.filesDir, "media")
+
+    // Cached StateFlows for each category
+    private val categoryFilesCache = mutableMapOf<FolderCategory, StateFlow<List<MediaFile>>>()
+    private val categoryCountsCache = mutableMapOf<FolderCategory, StateFlow<Int>>()
 
     init {
-        migrateLegacyFiles()
-        loadMediaFiles()
-    }
+        scope.launch {
+            // Migrate legacy unencrypted files
+            migrateLegacyFiles()
 
-    private fun migrateLegacyFiles() {
-        // Migrate old files from media/ to categorized subdirectories
-        val oldFiles = mediaDir.listFiles()?.filter { it.isFile } ?: return
-
-        oldFiles.forEach { file ->
-            val mediaType = getMediaTypeFromExtension(file.extension.lowercase())
-            if (mediaType != null) {
-                val category = FolderCategory.fromMediaType(mediaType)
-                val categoryDir = getCategoryDirectory(category)
-                val newFile = File(categoryDir, file.name)
-                if (!newFile.exists()) {
-                    file.renameTo(newFile)
-                }
+            // Load from database
+            mediaFileDao.getAllFiles().collect { entities ->
+                _mediaFiles.value = entities.map { it.toMediaFile() }
             }
         }
     }
 
-    private fun loadMediaFiles() {
-        val files = mutableListOf<MediaFile>()
+    /**
+     * Migrates legacy unencrypted files to encrypted storage.
+     */
+    private suspend fun migrateLegacyFiles() {
+        if (!legacyMediaDir.exists()) return
 
-        // Load from all category subdirectories
+        val secureDir = secureFileManager.getSecureStorageDir()
+
         FolderCategory.entries.forEach { category ->
-            val categoryDir = getCategoryDirectory(category)
+            val categoryDir = File(legacyMediaDir, category.path)
+            if (!categoryDir.exists()) return@forEach
+
             categoryDir.listFiles()?.forEach { file ->
-                if (file.isFile) {
-                    val mediaType = getMediaTypeFromExtension(file.extension.lowercase())
-                    if (mediaType == category.mediaType) {
-                        files.add(
-                            MediaFile(
-                                id = file.nameWithoutExtension,
-                                fileName = file.name,
-                                filePath = file.absolutePath,
-                                mediaType = mediaType,
-                                size = file.length(),
-                                createdAt = Date(file.lastModified()),
-                                textContent = if (mediaType == MediaType.NOTE) {
-                                    try {
-                                        file.readText()
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                } else {
-                                    null
-                                }
-                            )
+                if (file.isFile && !secureFileManager.isEncrypted(file)) {
+                    try {
+                        // Encrypt and move to secure storage
+                        val categorySecureDir = File(secureDir, category.path).apply { mkdirs() }
+                        val encryptedFile = secureFileManager.encryptFile(file, categorySecureDir)
+
+                        // Create database entry
+                        val entity = MediaFileEntity(
+                            id = UUID.randomUUID().toString(),
+                            originalFileName = file.name,
+                            encryptedFileName = encryptedFile.name,
+                            encryptedFilePath = encryptedFile.absolutePath,
+                            mediaType = category.mediaType.name,
+                            encryptedThumbnailPath = null,
+                            duration = null,
+                            size = encryptedFile.length(),
+                            createdAt = file.lastModified(),
+                            isUploaded = false,
+                            s3Url = null,
+                            folderId = null,
+                            verificationHash = calculateHash(file),
+                            originalSize = file.length(),
+                            mimeType = getMimeType(file.extension)
                         )
+
+                        mediaFileDao.insertFile(entity)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
             }
         }
-
-        _mediaFiles.value = files.sortedByDescending { it.createdAt }
     }
 
-    private fun getMediaTypeFromExtension(extension: String): MediaType? {
-        return when (extension) {
-            "jpg", "jpeg", "png" -> MediaType.PHOTO
-            "mp4", "mov" -> MediaType.VIDEO
-            "mp3", "m4a", "aac" -> MediaType.AUDIO
-            "txt" -> MediaType.NOTE
-            else -> null
+    /**
+     * Adds a new media file with encryption.
+     */
+    suspend fun addMediaFile(file: File, mediaType: MediaType, folderId: String? = null): MediaFile {
+        val category = FolderCategory.fromMediaType(mediaType)
+        val secureDir = File(secureFileManager.getSecureStorageDir(), category.path).apply { mkdirs() }
+
+        // Encrypt the file
+        val encryptedFile = secureFileManager.encryptFile(file, secureDir)
+
+        // Create database entry
+        val entity = MediaFileEntity(
+            id = UUID.randomUUID().toString(),
+            originalFileName = file.name,
+            encryptedFileName = encryptedFile.name,
+            encryptedFilePath = encryptedFile.absolutePath,
+            mediaType = mediaType.name,
+            encryptedThumbnailPath = null,
+            duration = null, // TODO: Extract duration for audio/video
+            size = encryptedFile.length(),
+            createdAt = System.currentTimeMillis(),
+            isUploaded = false,
+            s3Url = null,
+            folderId = folderId,
+            verificationHash = calculateHash(file),
+            originalSize = file.length(),
+            mimeType = getMimeType(file.extension)
+        )
+
+        mediaFileDao.insertFile(entity)
+        return entity.toMediaFile()
+    }
+
+    /**
+     * Saves a note with encryption.
+     */
+    suspend fun saveNote(fileName: String, content: String, folderId: String? = null): MediaFile {
+        val category = FolderCategory.NOTES
+        val secureDir = File(secureFileManager.getSecureStorageDir(), category.path).apply { mkdirs() }
+
+        // Create temp file with content
+        val tempFile = File(context.cacheDir, fileName)
+        tempFile.writeText(content)
+
+        try {
+            // Encrypt the note
+            val encryptedFile = secureFileManager.encryptFile(tempFile, secureDir)
+
+            // Create database entry
+            val entity = MediaFileEntity(
+                id = UUID.randomUUID().toString(),
+                originalFileName = fileName,
+                encryptedFileName = encryptedFile.name,
+                encryptedFilePath = encryptedFile.absolutePath,
+                mediaType = MediaType.NOTE.name,
+                encryptedThumbnailPath = null,
+                duration = null,
+                size = encryptedFile.length(),
+                createdAt = System.currentTimeMillis(),
+                isUploaded = false,
+                s3Url = null,
+                folderId = folderId,
+                verificationHash = calculateHash(tempFile),
+                originalSize = tempFile.length(),
+                mimeType = "text/plain"
+            )
+
+            mediaFileDao.insertFile(entity)
+            return entity.toMediaFile()
+        } finally {
+            // Clean up temp file
+            tempFile.delete()
         }
     }
 
-    fun getCategoryDirectory(category: FolderCategory): File {
-        return File(mediaDir, category.path).apply { mkdirs() }
+    /**
+     * Loads decrypted note content.
+     */
+    suspend fun loadNoteContent(mediaFile: MediaFile): String {
+        if (mediaFile.mediaType != MediaType.NOTE) return ""
+
+        val encryptedFile = File(mediaFile.filePath)
+        if (!encryptedFile.exists()) return ""
+
+        return try {
+            val decryptedFile = secureFileManager.decryptFile(encryptedFile)
+            val content = decryptedFile.readText()
+            secureFileManager.secureDelete(decryptedFile)
+            content
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
+        }
+    }
+
+    /**
+     * Decrypts a media file for viewing.
+     * Caller must securely delete the returned file after use.
+     */
+    suspend fun decryptForViewing(mediaFile: MediaFile): File {
+        val encryptedFile = File(mediaFile.filePath)
+        return secureFileManager.decryptFile(encryptedFile)
+    }
+
+    /**
+     * Securely deletes a media file.
+     */
+    suspend fun deleteMediaFile(mediaFile: MediaFile): Boolean {
+        val encryptedFile = File(mediaFile.filePath)
+
+        // Delete encrypted file securely
+        val deleted = secureFileManager.secureDelete(encryptedFile)
+
+        // Delete thumbnail if exists
+        val entity = mediaFileDao.getFileById(mediaFile.id)
+        entity?.encryptedThumbnailPath?.let { thumbnailPath ->
+            secureFileManager.secureDelete(File(thumbnailPath))
+        }
+
+        // Remove from database
+        if (deleted) {
+            mediaFileDao.deleteFileById(mediaFile.id)
+        }
+
+        return deleted
+    }
+
+    suspend fun moveMediaFileToFolder(mediaFile: MediaFile, folderId: String?) {
+        mediaFileDao.moveToFolder(mediaFile.id, folderId)
+    }
+
+    suspend fun updateMediaFile(mediaFile: MediaFile) {
+        val entity = mediaFileDao.getFileById(mediaFile.id) ?: return
+
+        val updated = entity.copy(
+            originalFileName = mediaFile.fileName,
+            folderId = mediaFile.folderId,
+            isUploaded = mediaFile.isUploaded,
+            s3Url = mediaFile.s3Url
+        )
+
+        mediaFileDao.updateFile(updated)
+    }
+
+    suspend fun markAsUploaded(mediaFileId: String, s3Url: String) {
+        mediaFileDao.markAsUploaded(mediaFileId, s3Url)
     }
 
     fun getFilesForCategory(category: FolderCategory): StateFlow<List<MediaFile>> {
-        return mediaFiles.map { files ->
-            files.filter { it.mediaType == category.mediaType }
-        }.stateIn(
-            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default),
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-    }
-
-    fun addMediaFile(file: File, mediaType: MediaType, folderId: String? = null): MediaFile {
-        val mediaFile = MediaFile(
-            id = UUID.randomUUID().toString(),
-            fileName = file.name,
-            filePath = file.absolutePath,
-            mediaType = mediaType,
-            size = file.length(),
-            createdAt = Date(),
-            folderId = folderId
-        )
-        _mediaFiles.value = listOf(mediaFile) + _mediaFiles.value
-        return mediaFile
-    }
-
-    fun moveMediaFileToFolder(mediaFile: MediaFile, folderId: String?) {
-        _mediaFiles.value = _mediaFiles.value.map {
-            if (it.id == mediaFile.id) it.copy(folderId = folderId) else it
+        return categoryFilesCache.getOrPut(category) {
+            mediaFiles.map { files ->
+                files.filter { it.mediaType == category.mediaType }
+            }.stateIn(
+                scope = scope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
         }
     }
 
@@ -139,57 +269,72 @@ class MediaRepository @Inject constructor(
         }
     }
 
-    fun saveNote(fileName: String, content: String): MediaFile {
-        val category = FolderCategory.NOTES
-        val categoryDir = getCategoryDirectory(category)
-        val file = File(categoryDir, fileName)
-        file.writeText(content)
-
-        val mediaFile = MediaFile(
-            id = UUID.randomUUID().toString(),
-            fileName = fileName,
-            filePath = file.absolutePath,
-            mediaType = MediaType.NOTE,
-            size = file.length(),
-            createdAt = Date(),
-            textContent = content
-        )
-        _mediaFiles.value = listOf(mediaFile) + _mediaFiles.value
-        return mediaFile
-    }
-
-    fun loadNoteContent(mediaFile: MediaFile): String {
-        return if (mediaFile.mediaType == MediaType.NOTE) {
-            File(mediaFile.filePath).readText()
-        } else {
-            ""
-        }
-    }
-
-    fun deleteMediaFile(mediaFile: MediaFile): Boolean {
-        val file = File(mediaFile.filePath)
-        val deleted = file.delete()
-        if (deleted) {
-            _mediaFiles.value = _mediaFiles.value.filter { it.id != mediaFile.id }
-        }
-        return deleted
-    }
-
-    fun updateMediaFile(mediaFile: MediaFile) {
-        _mediaFiles.value = _mediaFiles.value.map {
-            if (it.id == mediaFile.id) mediaFile else it
-        }
-    }
-
-    fun getMediaDirectory(): File = mediaDir
-
     fun getFileCountForCategory(category: FolderCategory): StateFlow<Int> {
-        return mediaFiles.map { files ->
-            files.count { it.mediaType == category.mediaType }
-        }.stateIn(
-            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default),
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
-            initialValue = 0
+        return categoryCountsCache.getOrPut(category) {
+            mediaFiles.map { files ->
+                files.count { it.mediaType == category.mediaType }
+            }.stateIn(
+                scope = scope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = 0
+            )
+        }
+    }
+
+    fun getCategoryDirectory(category: FolderCategory): File {
+        return File(secureFileManager.getSecureStorageDir(), category.path).apply { mkdirs() }
+    }
+
+    /**
+     * Calculates SHA-256 hash for file integrity verification.
+     */
+    private fun calculateHash(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var read = input.read(buffer)
+            while (read > 0) {
+                digest.update(buffer, 0, read)
+                read = input.read(buffer)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Gets MIME type from file extension.
+     */
+    private fun getMimeType(extension: String): String {
+        return when (extension.lowercase()) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "mp4" -> "video/mp4"
+            "mov" -> "video/quicktime"
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "aac" -> "audio/aac"
+            "txt" -> "text/plain"
+            else -> "application/octet-stream"
+        }
+    }
+
+    /**
+     * Converts MediaFileEntity to MediaFile.
+     */
+    private fun MediaFileEntity.toMediaFile(): MediaFile {
+        return MediaFile(
+            id = id,
+            fileName = originalFileName,
+            filePath = encryptedFilePath,
+            mediaType = MediaType.valueOf(mediaType),
+            thumbnailPath = encryptedThumbnailPath,
+            duration = duration,
+            size = size,
+            createdAt = Date(createdAt),
+            isUploaded = isUploaded,
+            s3Url = s3Url,
+            folderId = folderId,
+            textContent = null // Lazy loaded
         )
     }
 }

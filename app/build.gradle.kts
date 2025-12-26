@@ -51,6 +51,13 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
+    androidResources {
+        noCompress += "tflite"
     }
 }
 
@@ -114,6 +121,19 @@ dependencies {
 
     // DataStore for preferences (Latest)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Room for encrypted database (Latest stable)
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // SQLCipher for database encryption (Latest stable)
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    implementation("androidx.sqlite:sqlite:2.4.0")
+
+    // AndroidX Security for encrypted preferences (Latest stable)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Testing (Latest)
     testImplementation("junit:junit:4.13.2")

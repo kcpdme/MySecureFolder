@@ -1,20 +1,28 @@
 package com.kcpd.myfolder.data.repository
 
 import android.content.Context
+import com.kcpd.myfolder.data.database.dao.FolderDao
+import com.kcpd.myfolder.data.database.entity.FolderEntity
 import com.kcpd.myfolder.data.model.FolderColor
 import com.kcpd.myfolder.data.model.UserFolder
+import com.kcpd.myfolder.security.SecurityManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Data class for legacy JSON deserialization.
+ */
 @Serializable
 data class UserFolderData(
     val id: String,
@@ -25,15 +33,21 @@ data class UserFolderData(
     val createdAtMillis: Long
 )
 
+/**
+ * FolderRepository that uses encrypted Room database.
+ * Handles migration from legacy JSON-based storage.
+ */
 @Singleton
 class FolderRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val folderDao: FolderDao,
+    private val securityManager: SecurityManager
 ) {
     private val _folders = MutableStateFlow<List<UserFolder>>(emptyList())
     val folders: StateFlow<List<UserFolder>> = _folders.asStateFlow()
 
-    private val foldersFile: File
-        get() = File(context.filesDir, "user_folders.json")
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private val legacyFoldersFile = File(context.filesDir, "user_folders.json")
 
     private val json = Json {
         prettyPrint = true
@@ -41,86 +55,74 @@ class FolderRepository @Inject constructor(
     }
 
     init {
-        loadFolders()
-    }
+        scope.launch {
+            // Migrate legacy folders if needed
+            migrateLegacyFolders()
 
-    private fun loadFolders() {
-        try {
-            if (foldersFile.exists()) {
-                val jsonString = foldersFile.readText()
-                val folderDataList = json.decodeFromString<List<UserFolderData>>(jsonString)
-                _folders.value = folderDataList.map { data ->
-                    UserFolder(
-                        id = data.id,
-                        name = data.name,
-                        color = FolderColor.valueOf(data.colorName),
-                        parentFolderId = data.parentFolderId,
-                        categoryPath = data.categoryPath,
-                        createdAt = Date(data.createdAtMillis)
-                    )
-                }
+            // Load folders from database
+            folderDao.getAllFolders().collect { entities ->
+                _folders.value = entities.map { it.toUserFolder() }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            _folders.value = emptyList()
         }
     }
 
-    private fun saveFolders() {
+    /**
+     * Migrates folders from legacy JSON file to encrypted database.
+     */
+    private suspend fun migrateLegacyFolders() {
+        if (!legacyFoldersFile.exists()) return
+
         try {
-            val folderDataList = _folders.value.map { folder ->
-                UserFolderData(
-                    id = folder.id,
-                    name = folder.name,
-                    colorName = folder.color.name,
-                    parentFolderId = folder.parentFolderId,
-                    categoryPath = folder.categoryPath,
-                    createdAtMillis = folder.createdAt.time
+            val jsonString = legacyFoldersFile.readText()
+            val folderDataList = json.decodeFromString<List<UserFolderData>>(jsonString)
+
+            // Insert into encrypted database
+            val entities = folderDataList.map { data ->
+                FolderEntity(
+                    id = data.id,
+                    name = data.name, // Will be encrypted by Room/SQLCipher
+                    colorHex = FolderColor.valueOf(data.colorName).colorHex,
+                    parentFolderId = data.parentFolderId,
+                    categoryPath = data.categoryPath,
+                    createdAt = data.createdAtMillis
                 )
             }
-            val jsonString = json.encodeToString(folderDataList)
-            foldersFile.writeText(jsonString)
+
+            folderDao.insertFolders(entities)
+
+            // Delete legacy file after successful migration
+            legacyFoldersFile.delete()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun createFolder(name: String, color: FolderColor, categoryPath: String, parentFolderId: String? = null): UserFolder {
+    suspend fun createFolder(
+        name: String,
+        color: FolderColor,
+        categoryPath: String,
+        parentFolderId: String? = null
+    ): UserFolder {
         val folder = UserFolder(
             name = name,
             color = color,
             categoryPath = categoryPath,
             parentFolderId = parentFolderId
         )
-        _folders.value = _folders.value + folder
-        saveFolders()
+
+        val entity = folder.toEntity()
+        folderDao.insertFolder(entity)
+
         return folder
     }
 
-    fun updateFolder(folder: UserFolder) {
-        _folders.value = _folders.value.map {
-            if (it.id == folder.id) folder else it
-        }
-        saveFolders()
+    suspend fun updateFolder(folder: UserFolder) {
+        folderDao.updateFolder(folder.toEntity())
     }
 
-    fun deleteFolder(folderId: String) {
-        // Delete folder and all its subfolders
-        val foldersToDelete = mutableSetOf(folderId)
-        var foundNew = true
-
-        while (foundNew) {
-            foundNew = false
-            _folders.value.forEach { folder ->
-                if (folder.parentFolderId in foldersToDelete && folder.id !in foldersToDelete) {
-                    foldersToDelete.add(folder.id)
-                    foundNew = true
-                }
-            }
-        }
-
-        _folders.value = _folders.value.filter { it.id !in foldersToDelete }
-        saveFolders()
+    suspend fun deleteFolder(folderId: String) {
+        // Room will cascade delete subfolders due to foreign key constraint
+        folderDao.deleteFolderById(folderId)
     }
 
     fun getFoldersForCategory(categoryPath: String, parentFolderId: String? = null): List<UserFolder> {
@@ -131,5 +133,33 @@ class FolderRepository @Inject constructor(
 
     fun getFolderById(folderId: String): UserFolder? {
         return _folders.value.find { it.id == folderId }
+    }
+
+    /**
+     * Converts FolderEntity to UserFolder.
+     */
+    private fun FolderEntity.toUserFolder(): UserFolder {
+        return UserFolder(
+            id = id,
+            name = name,
+            color = FolderColor.entries.find { it.colorHex == colorHex } ?: FolderColor.BLUE,
+            parentFolderId = parentFolderId,
+            categoryPath = categoryPath,
+            createdAt = Date(createdAt)
+        )
+    }
+
+    /**
+     * Converts UserFolder to FolderEntity.
+     */
+    private fun UserFolder.toEntity(): FolderEntity {
+        return FolderEntity(
+            id = id,
+            name = name,
+            colorHex = color.colorHex,
+            parentFolderId = parentFolderId,
+            categoryPath = categoryPath,
+            createdAt = createdAt.time
+        )
     }
 }
