@@ -36,12 +36,16 @@ class VaultManager @Inject constructor(
         private const val DEFAULT_LOCK_TIMEOUT_MS = 60_000L // 1 minute
         private const val IMMEDIATE_LOCK = 0L
         private const val NEVER_LOCK = -1L
+        private const val PREFS_NAME = "vault_prefs"
+        private const val KEY_LOCK_TIMEOUT = "lock_timeout"
+        private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     }
 
     private val _vaultState = MutableStateFlow<VaultState>(VaultState.Locked)
     val vaultState: StateFlow<VaultState> = _vaultState.asStateFlow()
 
-    private var lockTimeoutMs: Long = DEFAULT_LOCK_TIMEOUT_MS
+    private val prefs = application.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+    private var lockTimeoutMs: Long = prefs.getLong(KEY_LOCK_TIMEOUT, DEFAULT_LOCK_TIMEOUT_MS)
     private var backgroundTimestamp: Long = 0
 
     init {
@@ -84,6 +88,23 @@ class VaultManager @Inject constructor(
     }
 
     /**
+     * Unlocks the vault after biometric verification.
+     * This should only be called after successful biometric authentication.
+     * The actual password verification was already done during initial setup.
+     */
+    fun unlockWithBiometric() {
+        if (!isBiometricEnabled()) {
+            android.util.Log.w("VaultManager", "Attempted biometric unlock but biometric not enabled")
+            return
+        }
+
+        _vaultState.value = VaultState.Unlocked(
+            unlockedAt = System.currentTimeMillis(),
+            autoLockEnabled = lockTimeoutMs != NEVER_LOCK
+        )
+    }
+
+    /**
      * Locks the vault immediately.
      * All file access will require unlocking again.
      */
@@ -112,12 +133,27 @@ class VaultManager @Inject constructor(
      */
     fun setLockTimeout(timeoutMs: Long) {
         lockTimeoutMs = timeoutMs
+        prefs.edit().putLong(KEY_LOCK_TIMEOUT, timeoutMs).apply()
     }
 
     /**
      * Gets current lock timeout setting.
      */
     fun getLockTimeout(): Long = lockTimeoutMs
+
+    /**
+     * Enables or disables biometric authentication.
+     */
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
+    /**
+     * Checks if biometric authentication is enabled.
+     */
+    fun isBiometricEnabled(): Boolean {
+        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)
+    }
 
     /**
      * Configures common lock timeout presets.

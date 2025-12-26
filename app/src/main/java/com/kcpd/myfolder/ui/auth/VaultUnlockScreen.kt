@@ -20,9 +20,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kcpd.myfolder.security.BiometricManager
 import com.kcpd.myfolder.security.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +35,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class VaultUnlockViewModel @Inject constructor(
-    private val vaultManager: VaultManager
+    private val vaultManager: VaultManager,
+    private val biometricManager: BiometricManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VaultUnlockUiState())
@@ -95,6 +98,36 @@ class VaultUnlockViewModel @Inject constructor(
         )
         return "Auto-lock: ${preset.displayName}"
     }
+
+    fun isBiometricEnabled(): Boolean {
+        return vaultManager.isBiometricEnabled() && biometricManager.canUseBiometric()
+    }
+
+    fun unlockWithBiometric(activity: FragmentActivity) {
+        biometricManager.authenticate(
+            activity = activity,
+            title = "Unlock Vault",
+            subtitle = "Use biometric to unlock",
+            onSuccess = {
+                // Biometric authentication succeeded - unlock vault
+                vaultManager.unlockWithBiometric()
+                _uiState.value = _uiState.value.copy(
+                    isUnlocking = false,
+                    isUnlocked = true,
+                    error = null
+                )
+            },
+            onError = { error ->
+                _uiState.value = _uiState.value.copy(
+                    error = error,
+                    isUnlocking = false
+                )
+            },
+            onCancel = {
+                // User cancelled, they can still use password
+            }
+        )
+    }
 }
 
 @Composable
@@ -105,6 +138,9 @@ fun VaultUnlockScreen(
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = context as? FragmentActivity
+    val isBiometricEnabled = viewModel.isBiometricEnabled()
 
     // Navigate away when unlocked
     LaunchedEffect(uiState.isUnlocked) {
@@ -113,9 +149,18 @@ fun VaultUnlockScreen(
         }
     }
 
-    // Auto-focus password field
+    // Auto-focus password field (only if biometric not enabled)
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+        if (!isBiometricEnabled) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    // Auto-show biometric prompt on launch if enabled
+    LaunchedEffect(isBiometricEnabled) {
+        if (isBiometricEnabled && activity != null) {
+            viewModel.unlockWithBiometric(activity)
+        }
     }
 
     Scaffold { paddingValues ->
@@ -215,6 +260,25 @@ fun VaultUnlockScreen(
                     )
                 } else {
                     Text("Unlock Vault")
+                }
+            }
+
+            // Biometric button (if enabled)
+            if (isBiometricEnabled && activity != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = { viewModel.unlockWithBiometric(activity) },
+                    enabled = !uiState.isUnlocking,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = "Fingerprint",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Use Biometric")
                 }
             }
 

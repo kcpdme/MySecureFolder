@@ -13,6 +13,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
+import com.kcpd.myfolder.security.BiometricManager
 import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,11 +26,15 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val vaultManager: VaultManager,
-    private val passwordManager: PasswordManager
+    private val passwordManager: PasswordManager,
+    private val biometricManager: BiometricManager
 ) : ViewModel() {
 
     private val _lockTimeout = MutableStateFlow(vaultManager.getLockTimeout())
     val lockTimeout: StateFlow<Long> = _lockTimeout.asStateFlow()
+
+    private val _biometricEnabled = MutableStateFlow(vaultManager.isBiometricEnabled())
+    val biometricEnabled: StateFlow<Boolean> = _biometricEnabled.asStateFlow()
 
     fun setLockTimeout(preset: VaultManager.LockTimeoutPreset) {
         viewModelScope.launch {
@@ -49,6 +54,19 @@ class SettingsViewModel @Inject constructor(
     fun getBackupCode(): String? {
         return passwordManager.getBackupCode()
     }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        vaultManager.setBiometricEnabled(enabled)
+        _biometricEnabled.value = enabled
+    }
+
+    fun isBiometricAvailable(): Boolean {
+        return biometricManager.canUseBiometric()
+    }
+
+    fun getBiometricAvailabilityMessage(): String {
+        return biometricManager.checkBiometricAvailability().message
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +78,8 @@ fun SettingsScreen(
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     val lockTimeout by viewModel.lockTimeout.collectAsState()
+    val biometricEnabled by viewModel.biometricEnabled.collectAsState()
+    val isBiometricAvailable = viewModel.isBiometricAvailable()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
@@ -94,6 +114,56 @@ fun SettingsScreen(
                     navController.navigate("password_change")
                 }
             )
+
+            HorizontalDivider()
+
+            // Biometric Toggle
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = isBiometricAvailable) {
+                        viewModel.setBiometricEnabled(!biometricEnabled)
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = if (isBiometricAvailable)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Biometric Unlock",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (isBiometricAvailable)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                        Text(
+                            text = if (isBiometricAvailable)
+                                "Use fingerprint or face to unlock"
+                            else
+                                viewModel.getBiometricAvailabilityMessage(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = biometricEnabled && isBiometricAvailable,
+                        onCheckedChange = { viewModel.setBiometricEnabled(it) },
+                        enabled = isBiometricAvailable
+                    )
+                }
+            }
 
             HorizontalDivider()
 
