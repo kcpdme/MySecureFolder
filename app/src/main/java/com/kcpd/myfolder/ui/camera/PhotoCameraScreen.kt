@@ -37,12 +37,14 @@ import java.util.*
 @Composable
 fun PhotoCameraScreen(
     navController: NavController,
+    folderId: String? = null,
     viewModel: CameraViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
+    var showFlash by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (!cameraPermissionState.status.isGranted) {
@@ -58,10 +60,24 @@ fun PhotoCameraScreen(
         ) {
             PhotoCameraPreview(
                 onPhotoCaptured = { file ->
-                    viewModel.addMediaFile(file, MediaType.PHOTO)
+                    viewModel.addMediaFile(file, MediaType.PHOTO, folderId)
+                    showFlash = true
                 },
                 onClose = { navController.navigateUp() }
             )
+
+            // Flash effect
+            if (showFlash) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White)
+                )
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(100)
+                    showFlash = false
+                }
+            }
         }
     } else {
         Scaffold(

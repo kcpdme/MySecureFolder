@@ -45,26 +45,34 @@ fun MyFolderNavHost(
         }
 
         composable(
-            route = "folder/{category}",
-            arguments = listOf(navArgument("category") { type = NavType.StringType })
+            route = "folder/{category}?folderId={folderId}",
+            arguments = listOf(
+                navArgument("category") { type = NavType.StringType },
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
         ) { backStackEntry ->
             val category = backStackEntry.arguments?.getString("category")
             val folderCategory = category?.let { FolderCategory.fromPath(it) }
 
             FolderScreen(
                 onBackClick = { navController.navigateUp() },
-                onAddClick = {
+                onAddClick = { currentFolderId ->
                     // Navigate to appropriate capture/creation screen based on category
+                    val folderParam = currentFolderId?.let { "?folderId=$it" } ?: ""
                     when (folderCategory?.mediaType) {
                         com.kcpd.myfolder.data.model.MediaType.PHOTO ->
-                            navController.navigate("photo_camera")
+                            navController.navigate("photo_camera$folderParam")
                         com.kcpd.myfolder.data.model.MediaType.VIDEO ->
-                            navController.navigate("video_recorder")
+                            navController.navigate("video_recorder$folderParam")
                         com.kcpd.myfolder.data.model.MediaType.AUDIO ->
-                            navController.navigate("audio_recorder")
+                            navController.navigate("audio_recorder$folderParam")
                         com.kcpd.myfolder.data.model.MediaType.NOTE ->
-                            navController.navigate("note_editor")
-                        null -> navController.navigate("camera")
+                            navController.navigate("note_editor$folderParam")
+                        null -> navController.navigate("camera$folderParam")
                     }
                 },
                 onMediaClick = { index ->
@@ -84,24 +92,74 @@ fun MyFolderNavHost(
             )
         }
 
-        composable("camera") {
-            CameraScreen(navController = navController)
+        composable(
+            route = "camera?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId")
+            CameraScreen(navController = navController, folderId = folderId)
         }
 
-        composable("photo_camera") {
-            PhotoCameraScreen(navController = navController)
+        composable(
+            route = "photo_camera?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId")
+            PhotoCameraScreen(navController = navController, folderId = folderId)
         }
 
-        composable("video_recorder") {
-            VideoRecorderScreen(navController = navController)
+        composable(
+            route = "video_recorder?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId")
+            VideoRecorderScreen(navController = navController, folderId = folderId)
         }
 
-        composable("audio_recorder") {
-            AudioRecorderScreen(navController = navController)
+        composable(
+            route = "audio_recorder?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId")
+            AudioRecorderScreen(navController = navController, folderId = folderId)
         }
 
-        composable("note_editor") {
-            NoteEditorScreen(navController = navController)
+        composable(
+            route = "note_editor?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId")
+            NoteEditorScreen(navController = navController, folderId = folderId)
         }
 
         composable("s3_config") {

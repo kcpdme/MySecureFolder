@@ -37,7 +37,7 @@ enum class FolderViewMode {
 @Composable
 fun FolderScreen(
     onBackClick: () -> Unit,
-    onAddClick: () -> Unit,
+    onAddClick: (String?) -> Unit,
     onMediaClick: (Int) -> Unit,
     viewModel: FolderViewModel = hiltViewModel()
 ) {
@@ -189,7 +189,7 @@ fun FolderScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddClick) {
+            FloatingActionButton(onClick = { onAddClick(currentFolderId) }) {
                 Icon(getActionIcon(viewModel.category), "Add ${viewModel.category.displayName}")
             }
         }

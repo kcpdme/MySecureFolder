@@ -49,6 +49,7 @@ enum class CaptureMode {
 fun CameraScreen(
     navController: NavController,
     initialMode: CaptureMode = CaptureMode.PHOTO,
+    folderId: String? = null,
     viewModel: CameraViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -57,6 +58,7 @@ fun CameraScreen(
     var captureMode by remember { mutableStateOf(initialMode) }
     var isRecording by remember { mutableStateOf(false) }
     var recordingDuration by remember { mutableStateOf(0L) }
+    var showFlash by remember { mutableStateOf(false) }
 
     val permissionsState = rememberMultiplePermissionsState(
         permissions = listOf(
@@ -100,8 +102,8 @@ fun CameraScreen(
                         CameraPreview(
                             captureMode = captureMode,
                             onPhotoCaptured = { file ->
-                                viewModel.addMediaFile(file, MediaType.PHOTO)
-                                navController.navigateUp()
+                                viewModel.addMediaFile(file, MediaType.PHOTO, folderId)
+                                showFlash = true
                             },
                             onVideoRecordingStart = {
                                 isRecording = true
@@ -109,18 +111,30 @@ fun CameraScreen(
                             },
                             onVideoRecordingStop = { file ->
                                 isRecording = false
-                                viewModel.addMediaFile(file, MediaType.VIDEO)
-                                navController.navigateUp()
+                                viewModel.addMediaFile(file, MediaType.VIDEO, folderId)
+                                showFlash = true
                             }
                         )
                     }
                     CaptureMode.AUDIO -> {
                         AudioRecordingScreen(
                             onRecordingComplete = { file ->
-                                viewModel.addMediaFile(file, MediaType.AUDIO)
-                                navController.navigateUp()
+                                viewModel.addMediaFile(file, MediaType.AUDIO, folderId)
                             }
                         )
+                    }
+                }
+
+                // Flash effect for photo/video capture
+                if (showFlash) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.White)
+                    )
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(100)
+                        showFlash = false
                     }
                 }
 

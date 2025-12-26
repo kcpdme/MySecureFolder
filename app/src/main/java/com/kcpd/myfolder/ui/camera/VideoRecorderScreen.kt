@@ -36,10 +36,12 @@ import java.util.*
 @Composable
 fun VideoRecorderScreen(
     navController: NavController,
+    folderId: String? = null,
     viewModel: CameraViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var showFlash by remember { mutableStateOf(false) }
 
     val permissionsState = rememberMultiplePermissionsState(
         permissions = listOf(
@@ -80,10 +82,23 @@ fun VideoRecorderScreen(
             ) {
                 VideoRecorderPreview(
                     onVideoRecorded = { file ->
-                        viewModel.addMediaFile(file, MediaType.VIDEO)
-                        navController.navigateUp()
+                        viewModel.addMediaFile(file, MediaType.VIDEO, folderId)
+                        showFlash = true
                     }
                 )
+
+                // Flash effect
+                if (showFlash) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.White)
+                    )
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(100)
+                        showFlash = false
+                    }
+                }
             }
         } else {
             Box(

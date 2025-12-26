@@ -26,6 +26,7 @@ import java.util.*
 @Composable
 fun AudioRecorderScreen(
     navController: NavController,
+    folderId: String? = null,
     viewModel: CameraViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -62,7 +63,7 @@ fun AudioRecorderScreen(
             ) {
                 AudioRecordingContent(
                     onRecordingComplete = { file ->
-                        viewModel.addMediaFile(file, MediaType.AUDIO)
+                        viewModel.addMediaFile(file, MediaType.AUDIO, folderId)
                         navController.navigateUp()
                     }
                 )

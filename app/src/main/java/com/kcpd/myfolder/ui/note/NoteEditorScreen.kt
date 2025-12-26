@@ -19,6 +19,7 @@ import java.util.*
 @Composable
 fun NoteEditorScreen(
     navController: NavController,
+    folderId: String? = null,
     viewModel: CameraViewModel = hiltViewModel()
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -49,7 +50,7 @@ fun NoteEditorScreen(
                                     fileName,
                                     noteContent
                                 )
-                                viewModel.addMediaFile(noteFile, MediaType.NOTE)
+                                viewModel.addMediaFile(noteFile, MediaType.NOTE, folderId)
                                 navController.navigateUp()
                             }
                         },

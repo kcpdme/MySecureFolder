@@ -12,7 +12,7 @@ class CameraViewModel @Inject constructor(
     private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
-    fun addMediaFile(file: File, mediaType: MediaType) {
-        mediaRepository.addMediaFile(file, mediaType)
+    fun addMediaFile(file: File, mediaType: MediaType, folderId: String? = null) {
+        mediaRepository.addMediaFile(file, mediaType, folderId)
     }
 }
