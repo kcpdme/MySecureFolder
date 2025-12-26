@@ -17,8 +17,11 @@ import androidx.navigation.navArgument
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.SecurityManager
+import androidx.compose.runtime.collectAsState
+import com.kcpd.myfolder.security.VaultManager
 import com.kcpd.myfolder.ui.auth.PasswordChangeScreen
 import com.kcpd.myfolder.ui.auth.PasswordSetupScreen
+import com.kcpd.myfolder.ui.auth.VaultUnlockScreen
 import com.kcpd.myfolder.ui.camera.AudioRecorderScreen
 import com.kcpd.myfolder.ui.camera.CameraScreen
 import com.kcpd.myfolder.ui.camera.PhotoCameraScreen
@@ -37,19 +40,21 @@ import com.kcpd.myfolder.ui.viewer.VideoViewerScreen
 @Composable
 fun MyFolderNavHost(
     modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    vaultManager: VaultManager? = null
 ) {
     val context = LocalContext.current
     var startDestination by remember { mutableStateOf<String?>(null) }
 
-    // Check if password is set to determine start destination
+    // Check password setup and vault status to determine start destination
     LaunchedEffect(Unit) {
         val securityManager = SecurityManager(context)
         val passwordManager = PasswordManager(context, securityManager)
-        startDestination = if (passwordManager.isPasswordSet()) {
-            "home"
-        } else {
-            "password_setup"
+
+        startDestination = when {
+            !passwordManager.isPasswordSet() -> "password_setup"
+            vaultManager?.isLocked() == true -> "vault_unlock"
+            else -> "home"
         }
     }
 
@@ -70,7 +75,32 @@ fun MyFolderNavHost(
                 }
             )
         }
+
+        composable("vault_unlock") {
+            VaultUnlockScreen(
+                onUnlocked = {
+                    navController.navigate("home") {
+                        popUpTo("vault_unlock") { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable("home") {
+            // Observe vault state - navigate to unlock if locked
+            vaultManager?.let { manager ->
+                val vaultState by manager.vaultState.collectAsState()
+
+                LaunchedEffect(vaultState) {
+                    if (vaultState is VaultManager.VaultState.Locked) {
+                        // Navigate to unlock screen when vault is locked
+                        navController.navigate("vault_unlock") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    }
+                }
+            }
+
             HomeScreen(
                 onFolderClick = { category ->
                     // Navigate using the folder route with category parameter
