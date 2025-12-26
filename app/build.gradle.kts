@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
+    kotlin("plugin.serialization") version "2.1.0"
 }
 
 android {
@@ -102,6 +103,9 @@ dependencies {
 
     // Coroutines (Latest stable)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+
+    // Kotlinx Serialization (Latest stable)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Hilt for dependency injection (Latest - using KSP instead of kapt)
     implementation("com.google.dagger:hilt-android:2.52")

@@ -41,11 +41,24 @@ fun FolderScreen(
     onMediaClick: (Int) -> Unit,
     viewModel: FolderViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val mediaFiles by viewModel.mediaFiles.collectAsState()
+    val folders by viewModel.folders.collectAsState()
+    val currentFolder by viewModel.currentFolder.collectAsState()
+    val currentFolderId by viewModel.currentFolderId.collectAsState()
+
     var selectedFile by remember { mutableStateOf<MediaFile?>(null) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedFiles by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedFolders by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showCreateFolderDialog by remember { mutableStateOf(false) }
+    var showMoveDialog by remember { mutableStateOf(false) }
+    var showFabMenu by remember { mutableStateOf(false) }
+
+    val hasContent = folders.isNotEmpty() || mediaFiles.isNotEmpty()
+    val selectedCount = selectedFiles.size + selectedFolders.size
+    val totalCount = mediaFiles.size + folders.size
 
     // Default to LIST mode for Notes and Recordings, GRID for others
     val defaultViewMode = when (viewModel.category) {

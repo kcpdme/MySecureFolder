@@ -20,5 +20,6 @@ data class MediaFile(
     val createdAt: Date,
     val isUploaded: Boolean = false,
     val s3Url: String? = null,
-    val textContent: String? = null
+    val textContent: String? = null,
+    val folderId: String? = null // ID of the folder this file belongs to
 )

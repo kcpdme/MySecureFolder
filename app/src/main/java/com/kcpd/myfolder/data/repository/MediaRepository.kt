@@ -21,7 +21,8 @@ import javax.inject.Singleton
 
 @Singleton
 class MediaRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val folderRepository: FolderRepository
 ) {
     private val _mediaFiles = MutableStateFlow<List<MediaFile>>(emptyList())
     val mediaFiles: StateFlow<List<MediaFile>> = _mediaFiles.asStateFlow()
@@ -112,17 +113,30 @@ class MediaRepository @Inject constructor(
         )
     }
 
-    fun addMediaFile(file: File, mediaType: MediaType): MediaFile {
+    fun addMediaFile(file: File, mediaType: MediaType, folderId: String? = null): MediaFile {
         val mediaFile = MediaFile(
             id = UUID.randomUUID().toString(),
             fileName = file.name,
             filePath = file.absolutePath,
             mediaType = mediaType,
             size = file.length(),
-            createdAt = Date()
+            createdAt = Date(),
+            folderId = folderId
         )
         _mediaFiles.value = listOf(mediaFile) + _mediaFiles.value
         return mediaFile
+    }
+
+    fun moveMediaFileToFolder(mediaFile: MediaFile, folderId: String?) {
+        _mediaFiles.value = _mediaFiles.value.map {
+            if (it.id == mediaFile.id) it.copy(folderId = folderId) else it
+        }
+    }
+
+    fun getFilesInFolder(folderId: String?, category: FolderCategory): List<MediaFile> {
+        return _mediaFiles.value.filter {
+            it.mediaType == category.mediaType && it.folderId == folderId
+        }
     }
 
     fun saveNote(fileName: String, content: String): MediaFile {
