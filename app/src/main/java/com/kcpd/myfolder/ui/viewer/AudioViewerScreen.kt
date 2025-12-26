@@ -1,0 +1,274 @@
+package com.kcpd.myfolder.ui.viewer
+
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.navigation.NavController
+import com.kcpd.myfolder.data.model.MediaFile
+import com.kcpd.myfolder.data.model.MediaType
+import com.kcpd.myfolder.ui.gallery.GalleryViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AudioViewerScreen(
+    navController: NavController,
+    initialIndex: Int = 0,
+    category: String? = null,
+    viewModel: GalleryViewModel = hiltViewModel()
+) {
+    val allMediaFiles by viewModel.mediaFiles.collectAsState()
+
+    // Filter to show only audio files
+    val audioFiles = remember(allMediaFiles) {
+        allMediaFiles.filter { it.mediaType == MediaType.AUDIO }
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex.coerceIn(0, (audioFiles.size - 1).coerceAtLeast(0)),
+        pageCount = { audioFiles.size }
+    )
+    var showControls by remember { mutableStateOf(true) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val audioFile = audioFiles[page]
+            AudioPlayer(
+                mediaFile = audioFile,
+                onTap = { showControls = !showControls },
+                isCurrentPage = page == pagerState.currentPage
+            )
+        }
+
+        // Top app bar
+        if (showControls) {
+            TopAppBar(
+                title = {
+                    Text(
+                        if (audioFiles.isNotEmpty())
+                            audioFiles[pagerState.currentPage].fileName
+                        else
+                            ""
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        if (audioFiles.isNotEmpty()) {
+                            viewModel.shareMediaFile(audioFiles[pagerState.currentPage])
+                        }
+                    }) {
+                        Icon(Icons.Default.Share, "Share")
+                    }
+                    IconButton(onClick = {
+                        if (audioFiles.isNotEmpty()) {
+                            viewModel.deleteMediaFile(audioFiles[pagerState.currentPage])
+                            navController.navigateUp()
+                        }
+                    }) {
+                        Icon(Icons.Default.Delete, "Delete")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+
+        // Page indicator
+        if (showControls && audioFiles.size > 1) {
+            Text(
+                text = "${pagerState.currentPage + 1} / ${audioFiles.size}",
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun AudioPlayer(
+    mediaFile: MediaFile,
+    onTap: () -> Unit,
+    isCurrentPage: Boolean
+) {
+    val context = LocalContext.current
+    var isPlaying by remember { mutableStateOf(false) }
+    var currentPosition by remember { mutableStateOf(0L) }
+    var duration by remember { mutableStateOf(0L) }
+
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            val mediaItem = MediaItem.fromUri(Uri.fromFile(java.io.File(mediaFile.filePath)))
+            setMediaItem(mediaItem)
+            prepare()
+            addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY) {
+                        duration = this@apply.duration
+                    }
+                }
+
+                override fun onIsPlayingChanged(playing: Boolean) {
+                    isPlaying = playing
+                }
+            })
+        }
+    }
+
+    // Pause when not current page
+    LaunchedEffect(isCurrentPage) {
+        if (!isCurrentPage) {
+            exoPlayer.pause()
+        }
+    }
+
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            currentPosition = exoPlayer.currentPosition
+            kotlinx.coroutines.delay(100)
+        }
+    }
+
+    DisposableEffect(mediaFile.filePath) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onTap() })
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                Icons.Default.MusicNote,
+                contentDescription = "Audio",
+                modifier = Modifier.size(120.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Text(
+                text = mediaFile.fileName,
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            // Progress slider
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Slider(
+                    value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                    onValueChange = {
+                        exoPlayer.seekTo((it * duration).toLong())
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = formatDuration(currentPosition),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = formatDuration(duration),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            // Playback controls
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    exoPlayer.seekTo((currentPosition - 10000).coerceAtLeast(0))
+                }) {
+                    Icon(
+                        Icons.Default.Replay10,
+                        contentDescription = "Rewind",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                FloatingActionButton(
+                    onClick = {
+                        if (isPlaying) {
+                            exoPlayer.pause()
+                        } else {
+                            exoPlayer.play()
+                        }
+                    }
+                ) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                IconButton(onClick = {
+                    exoPlayer.seekTo((currentPosition + 10000).coerceAtMost(duration))
+                }) {
+                    Icon(
+                        Icons.Default.Forward10,
+                        contentDescription = "Forward",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatDuration(millis: Long): String {
+    if (millis < 0) return "00:00"
+    val seconds = (millis / 1000) % 60
+    val minutes = (millis / 1000) / 60
+    return String.format("%02d:%02d", minutes, seconds)
+}
