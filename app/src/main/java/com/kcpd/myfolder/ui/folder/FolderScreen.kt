@@ -48,6 +48,7 @@ fun FolderScreen(
     val folders by viewModel.folders.collectAsState()
     val currentFolder by viewModel.currentFolder.collectAsState()
     val currentFolderId by viewModel.currentFolderId.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
     // Log media files data
     android.util.Log.d("FolderScreen", "Category: ${viewModel.category}")
@@ -67,6 +68,7 @@ fun FolderScreen(
     var importErrorMessage by remember { mutableStateOf<String?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) } // current/total
+    var showSearch by remember { mutableStateOf(false) }
 
     val hasContent = folders.isNotEmpty() || mediaFiles.isNotEmpty()
     val selectedCount = selectedFiles.size + selectedFolders.size
@@ -319,6 +321,15 @@ fun FolderScreen(
                                 "Toggle View"
                             )
                         }
+                        // Search icon for ALL_FILES category
+                        if (viewModel.category == FolderCategory.ALL_FILES) {
+                            IconButton(onClick = { showSearch = !showSearch }) {
+                                Icon(
+                                    if (showSearch) Icons.Default.Close else Icons.Default.Search,
+                                    "Search"
+                                )
+                            }
+                        }
                         if (hasContent) {
                             IconButton(onClick = {
                                 isMultiSelectMode = true
@@ -335,12 +346,43 @@ fun FolderScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onAddClick(currentFolderId) }) {
-                Icon(getActionIcon(viewModel.category), "Add ${viewModel.category.displayName}")
+            if (viewModel.category != FolderCategory.ALL_FILES) {
+                FloatingActionButton(onClick = { onAddClick(currentFolderId) }) {
+                    Icon(getActionIcon(viewModel.category), "Add ${viewModel.category.displayName}")
+                }
             }
         }
     ) { padding ->
-        if (!hasContent) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Search bar for ALL_FILES category
+            if (viewModel.category == FolderCategory.ALL_FILES && showSearch) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.updateSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Search files...") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, "Search")
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { viewModel.clearSearch() }) {
+                                Icon(Icons.Default.Close, "Clear")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    )
+                )
+            }
+
+            if (!hasContent) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -361,18 +403,25 @@ fun FolderScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        getEmptyStateMessage(viewModel.category),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                    )
+                    if (viewModel.category != FolderCategory.ALL_FILES) {
+                        Text(
+                            getEmptyStateMessage(viewModel.category),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
                 }
             }
         } else {
             if (viewMode == FolderViewMode.GRID) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    contentPadding = padding,
+                    columns = GridCells.Fixed(4),
+                    contentPadding = PaddingValues(
+                        start = 13.dp,
+                        end = 13.dp,
+                        top = padding.calculateTopPadding(),
+                        bottom = padding.calculateBottomPadding()
+                    ),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     modifier = Modifier.fillMaxSize()
@@ -405,8 +454,8 @@ fun FolderScreen(
                     }
 
                     // Then media files
-                    items(mediaFiles.size) { index ->
-                        val mediaFile = mediaFiles[index]
+                    items(mediaFiles, key = { it.id }) { mediaFile ->
+                        val index = mediaFiles.indexOf(mediaFile)
                         android.util.Log.d("FolderScreen_Grid", "Rendering grid item [$index]: ${mediaFile.fileName}")
                         MediaThumbnail(
                             mediaFile = mediaFile,
@@ -437,7 +486,6 @@ fun FolderScreen(
             } else {
                 androidx.compose.foundation.lazy.LazyColumn(
                     contentPadding = padding,
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     // Folders first
@@ -468,7 +516,7 @@ fun FolderScreen(
                     }
 
                     // Then media files
-                    items(mediaFiles.size) { index ->
+                    items(mediaFiles.size, key = { mediaFiles[it].id }) { index ->
                         val mediaFile = mediaFiles[index]
                         android.util.Log.d("FolderScreen_List", "Rendering list item [$index]: ${mediaFile.fileName}")
                         FolderMediaListItem(
@@ -498,6 +546,8 @@ fun FolderScreen(
                     }
                 }
             }
+        }
+
         }
 
         selectedFile?.let { file ->
@@ -594,7 +644,7 @@ fun FolderScreen(
 }
 
 @Composable
-internal fun MediaThumbnail(
+fun MediaThumbnail(
     mediaFile: MediaFile,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
@@ -607,6 +657,8 @@ internal fun MediaThumbnail(
     Box(
         modifier = Modifier
             .aspectRatio(1f)
+            .padding(1.dp)  // Small padding between grid items
+            .clip(RoundedCornerShape(4.dp))  // Slight rounding like Tella
             .pointerInput(mediaFile.id) {
                 detectTapGestures(
                     onTap = {
@@ -678,12 +730,24 @@ internal fun MediaThumbnail(
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = "Audio",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(64.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = "Audio",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = mediaFile.fileName.removeSuffix(".mp3").removeSuffix(".m4a").removeSuffix(".aac"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 2
+                        )
+                    }
                 }
             }
             MediaType.NOTE -> {
@@ -720,12 +784,24 @@ internal fun MediaThumbnail(
                         .background(MaterialTheme.colorScheme.tertiaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.PictureAsPdf,
-                        contentDescription = "PDF",
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(64.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PictureAsPdf,
+                            contentDescription = "PDF",
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = mediaFile.fileName.removeSuffix(".pdf"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 2
+                        )
+                    }
                 }
             }
         }
@@ -800,7 +876,7 @@ internal fun MediaThumbnail(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MediaDetailDialog(
+fun MediaDetailDialog(
     mediaFile: MediaFile,
     onDismiss: () -> Unit,
     onDelete: (MediaFile) -> Unit,
@@ -949,7 +1025,7 @@ private fun MediaDetailDialog(
 }
 
 @Composable
-private fun UploadDialog(
+fun UploadDialog(
     mediaFile: MediaFile,
     onDismiss: () -> Unit,
     onUpload: (MediaFile) -> Unit
@@ -973,26 +1049,28 @@ private fun UploadDialog(
 }
 
 @Composable
-private fun getActionIcon(category: FolderCategory) = when (category) {
+fun getActionIcon(category: FolderCategory) = when (category) {
     FolderCategory.PHOTOS -> Icons.Default.CameraAlt
     FolderCategory.VIDEOS -> Icons.Default.Videocam
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
     FolderCategory.PDFS -> Icons.Default.Scanner
+    FolderCategory.ALL_FILES -> Icons.Default.Add
 }
 
-private fun getEmptyStateMessage(category: FolderCategory): String {
+fun getEmptyStateMessage(category: FolderCategory): String {
     return when (category) {
         FolderCategory.PHOTOS -> "Tap + to capture photos"
         FolderCategory.VIDEOS -> "Tap + to record videos"
         FolderCategory.RECORDINGS -> "Tap + to record audio"
         FolderCategory.NOTES -> "Tap + to create a note"
         FolderCategory.PDFS -> "Tap + to scan documents or import PDFs"
+        FolderCategory.ALL_FILES -> "Import files to get started"
     }
 }
 
 @Composable
-internal fun FolderMediaListItem(
+fun FolderMediaListItem(
     mediaFile: MediaFile,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
@@ -1017,40 +1095,23 @@ internal fun FolderMediaListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(vertical = 13.dp, horizontal = 17.dp),  // Tella-style padding
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(17.dp)  // Tella-style spacing
         ) {
-            // Thumbnail
-            Box(
-                modifier = Modifier.size(60.dp)
+            // Thumbnail in CardView style
+            Card(
+                modifier = Modifier.size(48.dp),  // Slightly larger than Tella's 35dp for better visibility
+                shape = RoundedCornerShape(7.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                when (mediaFile.mediaType) {
-                    MediaType.PHOTO -> {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                // Use thumbnail if available, otherwise fall back to full file
-                                .data(mediaFile.thumbnail ?: mediaFile)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = mediaFile.fileName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    }
-                    MediaType.VIDEO -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.Black),
-                            contentAlignment = Alignment.Center
-                        ) {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    when (mediaFile.mediaType) {
+                        MediaType.PHOTO -> {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    // Use thumbnail if available, otherwise fall back to full file
                                     .data(mediaFile.thumbnail ?: mediaFile)
                                     .crossfade(true)
                                     .build(),
@@ -1058,130 +1119,129 @@ internal fun FolderMediaListItem(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            Icon(
-                                Icons.Default.PlayCircle,
-                                contentDescription = "Video",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
+                        }
+                        MediaType.VIDEO -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(mediaFile.thumbnail ?: mediaFile)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = mediaFile.fileName,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Icon(
+                                    Icons.Default.PlayCircle,
+                                    contentDescription = "Video",
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        MediaType.AUDIO -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = "Audio",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        MediaType.NOTE -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Note,
+                                    contentDescription = "Note",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        MediaType.PDF -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.PictureAsPdf,
+                                    contentDescription = "PDF",
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
-                    MediaType.AUDIO -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.MusicNote,
-                                contentDescription = "Audio",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                    MediaType.NOTE -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Note,
-                                contentDescription = "Note",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                    MediaType.PDF -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.tertiaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.PictureAsPdf,
-                                contentDescription = "PDF",
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                }
 
-                if (isUploading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(24.dp)
+                    if (isUploading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+
+                    if (mediaFile.isUploaded) {
+                        Icon(
+                            Icons.Default.CloudDone,
+                            contentDescription = "Uploaded",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(2.dp)
+                                .size(12.dp)
+                                .align(Alignment.TopEnd)
+                                .background(
+                                    Color.Black.copy(alpha = 0.6f),
+                                    shape = RoundedCornerShape(2.dp)
+                                )
+                                .padding(1.dp)
                         )
                     }
                 }
-
-                if (mediaFile.isUploaded) {
-                    Icon(
-                        Icons.Default.CloudDone,
-                        contentDescription = "Uploaded",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .size(16.dp)
-                            .align(Alignment.TopEnd)
-                            .background(
-                                Color.Black.copy(alpha = 0.6f),
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .padding(2.dp)
-                    )
-                }
             }
 
-            // File info
+            // File info - Tella style
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = mediaFile.fileName,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f)
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = mediaFile.mediaType.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = "•",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = formatFileSize(mediaFile.size),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
                 Text(
-                    text = formatDate(mediaFile.createdAt),
+                    text = "${formatFileSize(mediaFile.size)} • ${formatDate(mediaFile.createdAt)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    maxLines = 1
                 )
             }
 

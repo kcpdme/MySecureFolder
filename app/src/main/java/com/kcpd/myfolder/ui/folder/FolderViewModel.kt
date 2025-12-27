@@ -34,20 +34,34 @@ class FolderViewModel @Inject constructor(
     private val _currentFolderId = MutableStateFlow<String?>(null)
     val currentFolderId: StateFlow<String?> = _currentFolderId.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     val currentFolder: StateFlow<UserFolder?> = _currentFolderId.asStateFlow().combine(folderRepository.folders) { folderId, _ ->
         folderId?.let { folderRepository.getFolderById(it) }
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), null)
 
     val mediaFiles: StateFlow<List<MediaFile>> = combine(
-        mediaRepository.getFilesForCategory(category),
-        _currentFolderId
-    ) { files, folderId ->
-        val filtered = files.filter { it.folderId == folderId }
-        android.util.Log.d("FolderViewModel", "Category: ${category.displayName}, FolderId: $folderId")
-        android.util.Log.d("FolderViewModel", "Total files for category: ${files.size}, Filtered for folder: ${filtered.size}")
-        filtered.forEachIndexed { index, file ->
-            android.util.Log.d("FolderViewModel", "[$index] ${file.fileName} - Type: ${file.mediaType}, FolderId: ${file.folderId}")
+        if (category == FolderCategory.ALL_FILES) mediaRepository.mediaFiles else mediaRepository.getFilesForCategory(category),
+        _currentFolderId,
+        _searchQuery
+    ) { files, folderId, query ->
+        var filtered = files
+
+        // Filter by folder if not ALL_FILES category
+        if (category != FolderCategory.ALL_FILES) {
+            filtered = filtered.filter { it.folderId == folderId }
         }
+
+        // Apply search filter
+        if (query.isNotBlank()) {
+            filtered = filtered.filter {
+                it.fileName.contains(query, ignoreCase = true)
+            }
+        }
+
+        android.util.Log.d("FolderViewModel", "Category: ${category.displayName}, FolderId: $folderId, Query: $query")
+        android.util.Log.d("FolderViewModel", "Total files for category: ${files.size}, Filtered: ${filtered.size}")
         filtered
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -136,4 +150,12 @@ class FolderViewModel @Inject constructor(
      * Returns a flow of import progress.
      */
     suspend fun importFiles(uris: List<android.net.Uri>) = importMediaUseCase.importFiles(uris, _currentFolderId.value)
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
 }

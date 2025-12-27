@@ -8,8 +8,9 @@ enum class FolderCategory(
     val displayName: String,
     val icon: ImageVector,
     val path: String,
-    val mediaType: MediaType
+    val mediaType: MediaType?
 ) {
+    ALL_FILES("All Files", Icons.Default.Folder, "all", null),
     PHOTOS("Photos", Icons.Default.Photo, "photos", MediaType.PHOTO),
     VIDEOS("Videos", Icons.Default.Videocam, "videos", MediaType.VIDEO),
     RECORDINGS("Recordings", Icons.Default.Mic, "recordings", MediaType.AUDIO),

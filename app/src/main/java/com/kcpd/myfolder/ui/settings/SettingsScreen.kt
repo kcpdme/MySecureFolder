@@ -134,9 +134,9 @@ fun SettingsScreen(
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         tint = if (isBiometricAvailable)
-                            MaterialTheme.colorScheme.primary
+                            androidx.compose.ui.graphics.Color.White
                         else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.38f)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
@@ -358,7 +358,7 @@ fun SettingsItem(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = androidx.compose.ui.graphics.Color.White
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -375,7 +375,7 @@ fun SettingsItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Navigate",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f)
             )
         }
     }

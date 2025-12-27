@@ -42,23 +42,30 @@ class SecureFileManager @Inject constructor(
     }
 
     /**
-     * Encrypts a file and stores it securely.
+     * Encrypts a file and stores it securely using streaming encryption.
      * Returns the path to the encrypted file.
+     *
+     * This method uses streaming I/O to handle files of any size without loading
+     * them entirely into memory. Perfect for large video files (100MB+).
      */
     suspend fun encryptFile(sourceFile: File, destinationDir: File): File = withContext(Dispatchers.IO) {
         require(sourceFile.exists()) { "Source file does not exist: ${sourceFile.path}" }
 
         destinationDir.mkdirs()
 
-        // Read source file
-        val plainData = sourceFile.readBytes()
-
-        // Encrypt the data
-        val encryptedData = securityManager.encrypt(plainData)
-
-        // Write to destination
         val encryptedFile = File(destinationDir, sourceFile.name + ENCRYPTED_FILE_EXTENSION)
-        encryptedFile.writeBytes(encryptedData)
+
+        // Use streaming encryption to avoid OutOfMemoryError
+        FileInputStream(sourceFile).use { input ->
+            getStreamingEncryptionOutputStream(encryptedFile).use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                }
+                output.flush()
+            }
+        }
 
         // Securely delete the source file
         secureDelete(sourceFile)
@@ -69,21 +76,27 @@ class SecureFileManager @Inject constructor(
     /**
      * Decrypts an encrypted file to a temporary location for viewing.
      * Caller is responsible for securely deleting the decrypted file after use.
+     * Uses streaming decryption to avoid OutOfMemoryError with large files.
      */
     suspend fun decryptFile(encryptedFile: File): File = withContext(Dispatchers.IO) {
         require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
-
-        // Read encrypted data
-        val encryptedData = encryptedFile.readBytes()
-
-        // Decrypt
-        val plainData = securityManager.decrypt(encryptedData)
 
         // Create temporary file (remove .enc extension)
         val originalName = encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)
         val tempFile = File(context.cacheDir, "temp_$originalName")
 
-        tempFile.writeBytes(plainData)
+        // Use streaming decryption
+        getStreamingDecryptedInputStream(encryptedFile).use { input ->
+            FileOutputStream(tempFile).use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                }
+                output.flush()
+            }
+        }
+
         tempFile
     }
 
@@ -196,17 +209,25 @@ class SecureFileManager @Inject constructor(
 
     /**
      * Encrypts data in place, replacing the original file with encrypted version.
+     * Uses streaming encryption to avoid OutOfMemoryError with large files.
      */
     suspend fun encryptFileInPlace(file: File): File = withContext(Dispatchers.IO) {
         require(file.exists()) { "File does not exist: ${file.path}" }
 
-        // Read and encrypt
-        val plainData = file.readBytes()
-        val encryptedData = securityManager.encrypt(plainData)
-
         // Create new encrypted file
         val encryptedFile = File(file.parentFile, file.name + ENCRYPTED_FILE_EXTENSION)
-        encryptedFile.writeBytes(encryptedData)
+
+        // Use streaming encryption
+        FileInputStream(file).use { input ->
+            getStreamingEncryptionOutputStream(encryptedFile).use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                }
+                output.flush()
+            }
+        }
 
         // Securely delete original
         secureDelete(file)
@@ -216,18 +237,26 @@ class SecureFileManager @Inject constructor(
 
     /**
      * Decrypts data in place, replacing the encrypted file with plaintext version.
+     * Uses streaming decryption to avoid OutOfMemoryError with large files.
      */
     suspend fun decryptFileInPlace(encryptedFile: File): File = withContext(Dispatchers.IO) {
         require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
 
-        // Read and decrypt
-        val encryptedData = encryptedFile.readBytes()
-        val plainData = securityManager.decrypt(encryptedData)
-
         // Create plaintext file
         val originalName = encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)
         val plainFile = File(encryptedFile.parentFile, originalName)
-        plainFile.writeBytes(plainData)
+
+        // Use streaming decryption
+        getStreamingDecryptedInputStream(encryptedFile).use { input ->
+            FileOutputStream(plainFile).use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                }
+                output.flush()
+            }
+        }
 
         // Securely delete encrypted file
         secureDelete(encryptedFile)
@@ -368,21 +397,28 @@ class SecureFileManager @Inject constructor(
      * Generates a thumbnail byte array from an encrypted image file.
      * The thumbnail is NOT encrypted - it's stored as a plain JPEG in the database.
      * This allows fast grid loading without decrypting full images.
+     * Uses streaming decryption to avoid OutOfMemoryError with large images.
      *
      * @param encryptedFile The encrypted image file
      * @return Thumbnail as JPEG byte array, or null if generation fails
      */
     suspend fun generateImageThumbnail(encryptedFile: File): ByteArray? = withContext(Dispatchers.IO) {
         try {
-            // Decrypt the image
-            val encryptedData = encryptedFile.readBytes()
-            val plainData = securityManager.decrypt(encryptedData)
+            // Get streaming decrypted input
+            val decryptedStream = getStreamingDecryptedInputStream(encryptedFile)
 
             // Decode to bitmap with efficient sampling
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-            BitmapFactory.decodeByteArray(plainData, 0, plainData.size, options)
+
+            // First pass: get dimensions
+            decryptedStream.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+
+            // Get fresh stream for actual decoding
+            val decryptedStream2 = getStreamingDecryptedInputStream(encryptedFile)
 
             // Tella's adaptive sizing: 1/10 of original dimensions for photos
             val targetWidth = options.outWidth / 10
@@ -392,9 +428,10 @@ class SecureFileManager @Inject constructor(
             options.inSampleSize = calculateInSampleSize(options, targetWidth, targetHeight)
             options.inJustDecodeBounds = false
 
-            // Decode the sampled bitmap
-            val bitmap = BitmapFactory.decodeByteArray(plainData, 0, plainData.size, options)
-                ?: return@withContext null
+            // Decode the sampled bitmap from stream
+            val bitmap = decryptedStream2.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            } ?: return@withContext null
 
             // Extract thumbnail at 1/10 size (adaptive to original image)
             val thumbnail = ThumbnailUtils.extractThumbnail(

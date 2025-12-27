@@ -91,7 +91,7 @@ class MediaRepository @Inject constructor(
                             originalFileName = file.name,
                             encryptedFileName = encryptedFile.name,
                             encryptedFilePath = encryptedFile.absolutePath,
-                            mediaType = category.mediaType.name,
+                            mediaType = category.mediaType?.name ?: "UNKNOWN",
                             encryptedThumbnailPath = null,
                             thumbnail = thumbnail,
                             duration = null,
@@ -369,7 +369,8 @@ class MediaRepository @Inject constructor(
     fun getFilesForCategory(category: FolderCategory): StateFlow<List<MediaFile>> {
         return categoryFilesCache.getOrPut(category) {
             mediaFiles.map { files ->
-                files.filter { it.mediaType == category.mediaType }
+                if (category.mediaType == null) files // ALL_FILES
+                else files.filter { it.mediaType == category.mediaType }
             }.stateIn(
                 scope = scope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -380,14 +381,16 @@ class MediaRepository @Inject constructor(
 
     fun getFilesInFolder(folderId: String?, category: FolderCategory): List<MediaFile> {
         return _mediaFiles.value.filter {
-            it.mediaType == category.mediaType && it.folderId == folderId
+            if (category.mediaType == null) true // ALL_FILES
+            else it.mediaType == category.mediaType && it.folderId == folderId
         }
     }
 
     fun getFileCountForCategory(category: FolderCategory): StateFlow<Int> {
         return categoryCountsCache.getOrPut(category) {
             mediaFiles.map { files ->
-                files.count { it.mediaType == category.mediaType }
+                if (category.mediaType == null) files.size // ALL_FILES
+                else files.count { it.mediaType == category.mediaType }
             }.stateIn(
                 scope = scope,
                 started = SharingStarted.WhileSubscribed(5000),

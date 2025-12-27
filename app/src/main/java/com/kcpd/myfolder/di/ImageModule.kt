@@ -6,6 +6,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.kcpd.myfolder.security.SecureFileManager
 import com.kcpd.myfolder.ui.image.EncryptedFileFetcher
+import com.kcpd.myfolder.ui.image.MemoryEfficientDecoder
 import com.kcpd.myfolder.ui.image.ThumbnailFetcher
 import dagger.Module
 import dagger.Provides
@@ -26,6 +27,8 @@ object ImageModule {
     ): ImageLoader {
         return ImageLoader.Builder(context)
             .components {
+                // Memory-efficient decoder (applies to all images)
+                add(MemoryEfficientDecoder.Factory())
                 // Thumbnail fetcher for ByteArray (highest priority - fastest)
                 add(ThumbnailFetcher.Factory())
                 // Encrypted file fetcher for MediaFile (for full images)
@@ -43,6 +46,9 @@ object ImageModule {
             .diskCache(null)
             .respectCacheHeaders(false)
             .crossfade(false)  // Disable crossfade globally to reduce recomposition
+            .allowHardware(false)  // Disable hardware bitmaps for better compatibility
+            // Enable bitmap pooling for better memory reuse and reduced GC
+            .allowRgb565(true)  // Use RGB_565 for images without alpha (50% less memory)
             .build()
     }
 }

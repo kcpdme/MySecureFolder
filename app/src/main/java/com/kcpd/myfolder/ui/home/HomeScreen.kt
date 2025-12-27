@@ -22,6 +22,7 @@ fun HomeScreen(
     onSettingsClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val allFilesCount by viewModel.allFilesCount.collectAsState()
     val photosCount by viewModel.photosCount.collectAsState()
     val videosCount by viewModel.videosCount.collectAsState()
     val recordingsCount by viewModel.recordingsCount.collectAsState()
@@ -49,60 +50,45 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // First row: Photos and Videos
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                FolderCard(
-                    category = FolderCategory.PHOTOS,
-                    count = photosCount,
-                    onClick = { onFolderClick(FolderCategory.PHOTOS) },
-                    modifier = Modifier.weight(1f)
-                )
-                FolderCard(
-                    category = FolderCategory.VIDEOS,
-                    count = videosCount,
-                    onClick = { onFolderClick(FolderCategory.VIDEOS) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Second row: Recordings and Notes
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                FolderCard(
-                    category = FolderCategory.RECORDINGS,
-                    count = recordingsCount,
-                    onClick = { onFolderClick(FolderCategory.RECORDINGS) },
-                    modifier = Modifier.weight(1f)
-                )
-                FolderCard(
-                    category = FolderCategory.NOTES,
-                    count = notesCount,
-                    onClick = { onFolderClick(FolderCategory.NOTES) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Third row: PDFs (centered)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                FolderCard(
-                    category = FolderCategory.PDFS,
-                    count = pdfsCount,
-                    onClick = { onFolderClick(FolderCategory.PDFS) },
-                    modifier = Modifier.weight(1f)
-                )
-                // Empty space to maintain layout
-                Spacer(modifier = Modifier.weight(1f))
-            }
+            // Landscape tiles like Tella
+            FolderCard(
+                category = FolderCategory.ALL_FILES,
+                count = allFilesCount,
+                onClick = { onFolderClick(FolderCategory.ALL_FILES) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            FolderCard(
+                category = FolderCategory.PHOTOS,
+                count = photosCount,
+                onClick = { onFolderClick(FolderCategory.PHOTOS) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            FolderCard(
+                category = FolderCategory.VIDEOS,
+                count = videosCount,
+                onClick = { onFolderClick(FolderCategory.VIDEOS) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            FolderCard(
+                category = FolderCategory.RECORDINGS,
+                count = recordingsCount,
+                onClick = { onFolderClick(FolderCategory.RECORDINGS) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            FolderCard(
+                category = FolderCategory.NOTES,
+                count = notesCount,
+                onClick = { onFolderClick(FolderCategory.NOTES) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            FolderCard(
+                category = FolderCategory.PDFS,
+                count = pdfsCount,
+                onClick = { onFolderClick(FolderCategory.PDFS) },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -116,61 +102,53 @@ fun FolderCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier
-            .aspectRatio(1f),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = modifier.height(80.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize()
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Main content
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            // Left: Icon and title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Icon(
                     imageVector = category.icon,
                     contentDescription = category.displayName,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    modifier = Modifier.size(40.dp),
+                    tint = androidx.compose.ui.graphics.Color.White
                 )
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = category.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = androidx.compose.ui.graphics.Color.White
                 )
             }
 
-            // File count badge
+            // Right: Count badge
             if (count > 0) {
-                Badge(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 ) {
-                    Text(text = count.toString())
+                    Text(
+                        text = count.toString(),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = androidx.compose.ui.graphics.Color.White
+                    )
                 }
-            }
-
-            // Floating action button
-            FloatingActionButton(
-                onClick = onClick,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
-                    .size(48.dp),
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Icon(
-                    imageVector = getActionIcon(category),
-                    contentDescription = "Add ${category.displayName}",
-                    modifier = Modifier.size(24.dp)
-                )
             }
         }
     }
@@ -183,4 +161,5 @@ private fun getActionIcon(category: FolderCategory) = when (category) {
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
     FolderCategory.PDFS -> Icons.Default.FileUpload
+    FolderCategory.ALL_FILES -> Icons.Default.Folder
 }

@@ -50,9 +50,11 @@ fun MediaViewerScreen(
     val mediaFiles = remember(allMediaFiles, category) {
         if (category != null) {
             val folderCategory = FolderCategory.fromPath(category)
-            if (folderCategory != null) {
+            if (folderCategory != null && folderCategory.mediaType != null) {
+                // Filter by specific media type
                 allMediaFiles.filter { it.mediaType == folderCategory.mediaType }
             } else {
+                // ALL_FILES or no specific media type - show all files
                 allMediaFiles
             }
         } else {
@@ -224,8 +226,11 @@ fun ZoomableImage(
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(mediaFile.filePath)
+                .data(mediaFile)  // Pass MediaFile object for decryption via EncryptedFileFetcher
                 .crossfade(true)
+                .allowHardware(false)  // Disable hardware bitmaps for better compatibility with transformations
+                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)  // Cache decoded bitmaps in memory
+                .diskCachePolicy(coil.request.CachePolicy.DISABLED)  // Don't cache encrypted files to disk
                 .build(),
             contentDescription = mediaFile.fileName,
             contentScale = ContentScale.Fit,
