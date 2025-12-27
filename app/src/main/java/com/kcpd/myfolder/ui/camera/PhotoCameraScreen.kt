@@ -138,6 +138,8 @@ fun PhotoCameraPreview(
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashEnabled by remember { mutableStateOf(false) }
     var zoomRatio by remember { mutableStateOf(1f) }
+    var minZoom by remember { mutableStateOf(1f) }
+    var maxZoom by remember { mutableStateOf(1f) }
 
     DisposableEffect(lensFacing, aspectRatio) {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
@@ -145,11 +147,12 @@ fun PhotoCameraPreview(
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             
-            // Configure Resolution based on Ratio (approx 2MP to save space)
+            // Configure Resolution based on Ratio
+            // Increased to ~5MP (Standard High Quality) to satisfy S23 Ultra users while saving space vs 12MP
             val targetResolution = if (aspectRatio == AspectRatio.RATIO_16_9) {
-                Size(1080, 1920) // 16:9
+                Size(1440, 2560) // 16:9 (QHD/3.7MP)
             } else {
-                Size(1200, 1600) // 4:3
+                Size(1920, 2560) // 4:3 (5MP)
             }
 
             val preview = Preview.Builder()
@@ -179,6 +182,11 @@ fun PhotoCameraPreview(
                     newImageCapture
                 )
                 cameraControl = camera.cameraControl
+
+                // Update zoom capabilities
+                val zoomState = camera.cameraInfo.zoomState.value
+                minZoom = zoomState?.minZoomRatio ?: 1f
+                maxZoom = zoomState?.maxZoomRatio ?: 1f
 
                 camera.cameraControl.setZoomRatio(zoomRatio)
 
@@ -224,7 +232,8 @@ fun PhotoCameraPreview(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .statusBarsPadding() // Respect notch/pinhole
+                .padding(top = 5.dp, start = 16.dp, end = 16.dp) // Extra margin
                 .align(Alignment.TopCenter),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -267,7 +276,7 @@ fun PhotoCameraPreview(
             }
         }
 
-        // Zoom controls (Moved up to accommodate bottom bar)
+        // Zoom controls (Dynamic based on camera capabilities)
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -280,9 +289,16 @@ fun PhotoCameraPreview(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val zoomLevels = listOf(0.5f, 1f, 2f, 5f)
+            // Define standard zoom levels
+            val standardLevels = listOf(0.6f, 1f, 2f, 5f, 10f)
+            
+            // Filter levels supported by the device
+            val supportedLevels = standardLevels.filter { it in minZoom..maxZoom }
+            
+            // Always ensure 1x is present (or min if > 1x)
+            val finalLevels = if (supportedLevels.isEmpty()) listOf(1f) else supportedLevels
 
-            zoomLevels.forEach { level ->
+            finalLevels.forEach { level ->
                 TextButton(
                     onClick = { zoomRatio = level },
                     colors = ButtonDefaults.textButtonColors(
