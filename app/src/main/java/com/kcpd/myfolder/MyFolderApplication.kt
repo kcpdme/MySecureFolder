@@ -26,6 +26,38 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
 
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(this)
+
+        // Clean up any orphaned temp files from cache directory
+        cleanupTempFiles()
+    }
+
+    /**
+     * Removes all temporary decrypted files from cache directory.
+     * These files may be left over from crashes or incomplete cleanup.
+     */
+    private fun cleanupTempFiles() {
+        try {
+            val cacheDir = cacheDir
+            val tempFiles = cacheDir.listFiles { file ->
+                file.name.startsWith("temp_") && file.isFile
+            }
+
+            tempFiles?.forEach { file ->
+                try {
+                    if (file.delete()) {
+                        android.util.Log.d("MyFolderApp", "Cleaned up temp file: ${file.name}")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MyFolderApp", "Failed to delete temp file: ${file.name}", e)
+                }
+            }
+
+            if (tempFiles != null && tempFiles.isNotEmpty()) {
+                android.util.Log.i("MyFolderApp", "Cleaned up ${tempFiles.size} orphaned temp files")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MyFolderApp", "Failed to cleanup temp files", e)
+        }
     }
 
     /**
@@ -74,6 +106,19 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
                 imageLoader.memoryCache?.clear()
             }
         }
+    }
+
+    /**
+     * Called when app process is terminating.
+     * Clean up temporary decrypted files to prevent leaving sensitive data on disk.
+     *
+     * NOTE: This is NOT guaranteed to be called (e.g., on force-stop or low memory kill).
+     * That's why we also clean up on startup in cleanupTempFiles().
+     */
+    override fun onTerminate() {
+        super.onTerminate()
+        android.util.Log.i("MyFolderApp", "App terminating - cleaning up temp files")
+        cleanupTempFiles()
     }
 
     override fun newImageLoader(): ImageLoader {

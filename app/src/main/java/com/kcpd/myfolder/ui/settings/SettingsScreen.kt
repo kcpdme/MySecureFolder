@@ -27,7 +27,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val vaultManager: VaultManager,
     private val passwordManager: PasswordManager,
-    private val biometricManager: BiometricManager
+    private val biometricManager: BiometricManager,
+    private val mediaRepository: com.kcpd.myfolder.data.repository.MediaRepository
 ) : ViewModel() {
 
     private val _lockTimeout = MutableStateFlow(vaultManager.getLockTimeout())
@@ -35,6 +36,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _biometricEnabled = MutableStateFlow(vaultManager.isBiometricEnabled())
     val biometricEnabled: StateFlow<Boolean> = _biometricEnabled.asStateFlow()
+
+    private val _storageInfo = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val storageInfo: StateFlow<Map<String, Long>> = _storageInfo.asStateFlow()
 
     fun setLockTimeout(preset: VaultManager.LockTimeoutPreset) {
         viewModelScope.launch {
@@ -67,6 +71,30 @@ class SettingsViewModel @Inject constructor(
     fun getBiometricAvailabilityMessage(): String {
         return biometricManager.checkBiometricAvailability().message
     }
+
+    fun loadStorageInfo() {
+        viewModelScope.launch {
+            try {
+                _storageInfo.value = mediaRepository.analyzeStorageUsage()
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Failed to load storage info", e)
+            }
+        }
+    }
+
+    fun cleanupOrphanedFiles(onComplete: (Int) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val deletedCount = mediaRepository.cleanupOrphanedFiles()
+                onComplete(deletedCount)
+                // Refresh storage info after cleanup
+                _storageInfo.value = mediaRepository.analyzeStorageUsage()
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Failed to cleanup orphaned files", e)
+                onComplete(0)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,8 +105,10 @@ fun SettingsScreen(
 ) {
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
+    var showStorageDialog by remember { mutableStateOf(false) }
     val lockTimeout by viewModel.lockTimeout.collectAsState()
     val biometricEnabled by viewModel.biometricEnabled.collectAsState()
+    val storageInfo by viewModel.storageInfo.collectAsState()
     val isBiometricAvailable = viewModel.isBiometricAvailable()
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -212,6 +242,43 @@ fun SettingsScreen(
 
             // Storage Section
             Text(
+                text = "Storage",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+
+            SettingsItem(
+                icon = Icons.Default.Storage,
+                title = "Storage Usage",
+                description = "View storage breakdown by file type",
+                onClick = {
+                    viewModel.loadStorageInfo()
+                    showStorageDialog = true
+                }
+            )
+
+            HorizontalDivider()
+
+            SettingsItem(
+                icon = Icons.Default.Delete,
+                title = "Clean Orphaned Files",
+                description = "Remove unencrypted leftovers (SECURITY FIX)",
+                onClick = {
+                    viewModel.cleanupOrphanedFiles { deletedCount ->
+                        val message = if (deletedCount > 0) {
+                            "Deleted $deletedCount orphaned files"
+                        } else {
+                            "No orphaned files found"
+                        }
+                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+
+            HorizontalDivider()
+
+            // Cloud Storage Section
+            Text(
                 text = "Cloud Storage",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(16.dp)
@@ -334,6 +401,68 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    // Storage Info Dialog
+    if (showStorageDialog) {
+        AlertDialog(
+            onDismissRequest = { showStorageDialog = false },
+            title = { Text("Storage Usage") },
+            text = {
+                Column {
+                    if (storageInfo.isEmpty()) {
+                        Text("Loading storage information...")
+                    } else {
+                        val totalSize = storageInfo.values.sum()
+                        Text(
+                            text = "Total: ${formatBytes(totalSize)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        storageInfo.forEach { (category, size) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = category,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = formatBytes(size),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Note: Cache is automatically cleaned on app startup. Large 'Data' size is normal - it contains your encrypted files.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showStorageDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+}
+
+fun formatBytes(bytes: Long): String {
+    return when {
+        bytes >= 1024 * 1024 * 1024 -> "%.2f GB".format(bytes / (1024.0 * 1024.0 * 1024.0))
+        bytes >= 1024 * 1024 -> "%.2f MB".format(bytes / (1024.0 * 1024.0))
+        bytes >= 1024 -> "%.2f KB".format(bytes / 1024.0)
+        else -> "$bytes bytes"
     }
 }
 

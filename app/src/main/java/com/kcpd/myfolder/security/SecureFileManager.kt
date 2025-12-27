@@ -283,11 +283,13 @@ class SecureFileManager @Inject constructor(
      */
     suspend fun secureDelete(file: File): Boolean = withContext(Dispatchers.IO) {
         if (!file.exists()) {
+            android.util.Log.w("SecureFileManager", "Cannot delete file that doesn't exist: ${file.absolutePath}")
             return@withContext false
         }
 
         try {
             val fileSize = file.length()
+            android.util.Log.d("SecureFileManager", "Securely deleting file: ${file.name} (${fileSize} bytes)")
 
             if (fileSize > 0) {
                 // Pass 1: Overwrite with zeros
@@ -301,10 +303,18 @@ class SecureFileManager @Inject constructor(
             }
 
             // Finally delete the file
-            file.delete()
+            val deleted = file.delete()
+            if (deleted) {
+                android.util.Log.d("SecureFileManager", "Successfully deleted: ${file.name}")
+            } else {
+                android.util.Log.e("SecureFileManager", "Failed to delete: ${file.name}")
+            }
+            return@withContext deleted
         } catch (e: Exception) {
+            android.util.Log.e("SecureFileManager", "Error during secure deletion of ${file.name}", e)
             // If secure deletion fails, still attempt regular deletion
-            file.delete()
+            val deleted = file.delete()
+            return@withContext deleted
         }
     }
 

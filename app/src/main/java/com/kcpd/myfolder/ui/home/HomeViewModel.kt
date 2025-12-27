@@ -16,6 +16,7 @@ class HomeViewModel @Inject constructor(
     private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
+    // File counts
     val allFilesCount: StateFlow<Int> = mediaRepository.mediaFiles.map { it.size }
         .stateIn(
             scope = viewModelScope,
@@ -38,6 +39,30 @@ class HomeViewModel @Inject constructor(
     val pdfsCount: StateFlow<Int> =
         mediaRepository.getFileCountForCategory(FolderCategory.PDFS)
 
+    // File sizes (in bytes)
+    val allFilesSize: StateFlow<Long> = mediaRepository.mediaFiles.map { files ->
+        files.sumOf { it.size }
+    }.stateIn(
+        scope = viewModelScope,
+        started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        initialValue = 0L
+    )
+
+    val photosSize: StateFlow<Long> =
+        mediaRepository.getFileSizeForCategory(FolderCategory.PHOTOS)
+
+    val videosSize: StateFlow<Long> =
+        mediaRepository.getFileSizeForCategory(FolderCategory.VIDEOS)
+
+    val recordingsSize: StateFlow<Long> =
+        mediaRepository.getFileSizeForCategory(FolderCategory.RECORDINGS)
+
+    val notesSize: StateFlow<Long> =
+        mediaRepository.getFileSizeForCategory(FolderCategory.NOTES)
+
+    val pdfsSize: StateFlow<Long> =
+        mediaRepository.getFileSizeForCategory(FolderCategory.PDFS)
+
     fun getCountForCategory(category: FolderCategory): StateFlow<Int> {
         return when (category) {
             FolderCategory.ALL_FILES -> allFilesCount
@@ -46,6 +71,29 @@ class HomeViewModel @Inject constructor(
             FolderCategory.RECORDINGS -> recordingsCount
             FolderCategory.NOTES -> notesCount
             FolderCategory.PDFS -> pdfsCount
+        }
+    }
+
+    fun getSizeForCategory(category: FolderCategory): StateFlow<Long> {
+        return when (category) {
+            FolderCategory.ALL_FILES -> allFilesSize
+            FolderCategory.PHOTOS -> photosSize
+            FolderCategory.VIDEOS -> videosSize
+            FolderCategory.RECORDINGS -> recordingsSize
+            FolderCategory.NOTES -> notesSize
+            FolderCategory.PDFS -> pdfsSize
+        }
+    }
+
+    /**
+     * Formats bytes to human-readable size (MB, KB, etc.)
+     */
+    fun formatFileSize(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+            else -> "%.2f GB".format(bytes / (1024.0 * 1024.0 * 1024.0))
         }
     }
 }

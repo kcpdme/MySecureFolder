@@ -108,8 +108,19 @@ class GalleryViewModel @Inject constructor(
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 })
 
-                // Note: The decrypted temp file should be cleaned up after sharing
-                // In a production app, you'd want to listen for when sharing is done
+                // Clean up temp file after a delay (sharing app should have accessed it by then)
+                // This prevents accumulation of temp files in cache
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(30000) // Wait 30 seconds
+                    try {
+                        if (decryptedFile.exists()) {
+                            decryptedFile.delete()
+                            android.util.Log.d("GalleryViewModel", "Cleaned up shared temp file: ${decryptedFile.name}")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("GalleryViewModel", "Failed to cleanup shared file", e)
+                    }
+                }
             } catch (e: Exception) {
                 Toast.makeText(
                     getApplication(),

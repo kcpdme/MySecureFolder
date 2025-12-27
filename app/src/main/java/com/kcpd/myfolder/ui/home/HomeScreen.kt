@@ -3,7 +3,14 @@ package com.kcpd.myfolder.ui.home
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,6 +35,13 @@ fun HomeScreen(
     val recordingsCount by viewModel.recordingsCount.collectAsState()
     val notesCount by viewModel.notesCount.collectAsState()
     val pdfsCount by viewModel.pdfsCount.collectAsState()
+
+    val allFilesSize by viewModel.allFilesSize.collectAsState()
+    val photosSize by viewModel.photosSize.collectAsState()
+    val videosSize by viewModel.videosSize.collectAsState()
+    val recordingsSize by viewModel.recordingsSize.collectAsState()
+    val notesSize by viewModel.notesSize.collectAsState()
+    val pdfsSize by viewModel.pdfsSize.collectAsState()
 
     Scaffold(
         topBar = {
@@ -56,36 +70,42 @@ fun HomeScreen(
             FolderCard(
                 category = FolderCategory.ALL_FILES,
                 count = allFilesCount,
+                size = viewModel.formatFileSize(allFilesSize),
                 onClick = { onFolderClick(FolderCategory.ALL_FILES) },
                 modifier = Modifier.fillMaxWidth()
             )
             FolderCard(
                 category = FolderCategory.PHOTOS,
                 count = photosCount,
+                size = viewModel.formatFileSize(photosSize),
                 onClick = { onFolderClick(FolderCategory.PHOTOS) },
                 modifier = Modifier.fillMaxWidth()
             )
             FolderCard(
                 category = FolderCategory.VIDEOS,
                 count = videosCount,
+                size = viewModel.formatFileSize(videosSize),
                 onClick = { onFolderClick(FolderCategory.VIDEOS) },
                 modifier = Modifier.fillMaxWidth()
             )
             FolderCard(
                 category = FolderCategory.RECORDINGS,
                 count = recordingsCount,
+                size = viewModel.formatFileSize(recordingsSize),
                 onClick = { onFolderClick(FolderCategory.RECORDINGS) },
                 modifier = Modifier.fillMaxWidth()
             )
             FolderCard(
                 category = FolderCategory.NOTES,
                 count = notesCount,
+                size = viewModel.formatFileSize(notesSize),
                 onClick = { onFolderClick(FolderCategory.NOTES) },
                 modifier = Modifier.fillMaxWidth()
             )
             FolderCard(
                 category = FolderCategory.PDFS,
                 count = pdfsCount,
+                size = viewModel.formatFileSize(pdfsSize),
                 onClick = { onFolderClick(FolderCategory.PDFS) },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -97,6 +117,7 @@ fun HomeScreen(
 fun FolderCard(
     category: FolderCategory,
     count: Int,
+    size: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -127,28 +148,30 @@ fun FolderCard(
                     modifier = Modifier.size(40.dp),
                     tint = androidx.compose.ui.graphics.Color.White
                 )
-                Text(
-                    text = category.displayName,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = androidx.compose.ui.graphics.Color.White
-                )
-            }
-
-            // Right: Count badge
-            if (count > 0) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                ) {
+                Column {
                     Text(
-                        text = count.toString(),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        text = category.displayName,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Medium,
                         color = androidx.compose.ui.graphics.Color.White
                     )
+                    if (count > 0) {
+                        Text(
+                            text = "$count files • $size",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                        )
+                    }
                 }
+            }
+
+            // Right: Arrow icon
+            if (count > 0) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Open",
+                    tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f)
+                )
             }
         }
     }
