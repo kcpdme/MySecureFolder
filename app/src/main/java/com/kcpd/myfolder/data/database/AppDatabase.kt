@@ -22,7 +22,7 @@ import net.sqlcipher.database.SupportFactory
         MediaFileEntity::class,
         FolderEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,6 +42,50 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE media_files ADD COLUMN thumbnail BLOB")
+            }
+        }
+
+        /**
+         * Migration from version 2 to 3: Remove upload tracking columns
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // SQLite doesn't support DROP COLUMN directly, so we recreate the table
+                database.execSQL("""
+                    CREATE TABLE media_files_new (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        originalFileName TEXT NOT NULL,
+                        encryptedFileName TEXT NOT NULL,
+                        encryptedFilePath TEXT NOT NULL,
+                        mediaType TEXT NOT NULL,
+                        encryptedThumbnailPath TEXT,
+                        thumbnail BLOB,
+                        duration INTEGER,
+                        size INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        folderId TEXT,
+                        verificationHash TEXT,
+                        originalSize INTEGER NOT NULL,
+                        mimeType TEXT,
+                        FOREIGN KEY(folderId) REFERENCES folders(id) ON DELETE CASCADE
+                    )
+                """)
+
+                database.execSQL("""
+                    INSERT INTO media_files_new
+                    SELECT id, originalFileName, encryptedFileName, encryptedFilePath,
+                           mediaType, encryptedThumbnailPath, thumbnail, duration, size,
+                           createdAt, folderId, verificationHash, originalSize, mimeType
+                    FROM media_files
+                """)
+
+                database.execSQL("DROP TABLE media_files")
+                database.execSQL("ALTER TABLE media_files_new RENAME TO media_files")
+
+                // Recreate indices
+                database.execSQL("CREATE INDEX index_media_files_folderId ON media_files(folderId)")
+                database.execSQL("CREATE INDEX index_media_files_mediaType ON media_files(mediaType)")
+                database.execSQL("CREATE INDEX index_media_files_createdAt ON media_files(createdAt)")
             }
         }
 
@@ -66,7 +110,7 @@ abstract class AppDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 // REMOVED: fallbackToDestructiveMigration() - prevents data loss on schema changes
                 // All future migrations must be properly implemented to preserve user data
                 .build()

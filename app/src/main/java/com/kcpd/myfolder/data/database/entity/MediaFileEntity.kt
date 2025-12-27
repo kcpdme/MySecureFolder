@@ -14,8 +14,7 @@ import androidx.room.ForeignKey
     indices = [
         Index(value = ["folderId"]),
         Index(value = ["mediaType"]),
-        Index(value = ["createdAt"]),
-        Index(value = ["isUploaded"])
+        Index(value = ["createdAt"])
     ],
     foreignKeys = [
         ForeignKey(
@@ -56,12 +55,6 @@ data class MediaFileEntity(
 
     /** Creation timestamp in milliseconds */
     val createdAt: Long,
-
-    /** Upload status to S3 */
-    val isUploaded: Boolean = false,
-
-    /** S3 URL if uploaded */
-    val s3Url: String?,
 
     /** Associated folder ID (nullable for root files) */
     val folderId: String?,

@@ -106,8 +106,6 @@ class MediaRepository @Inject constructor(
                             duration = null,
                             size = encryptedFile.length(),
                             createdAt = file.lastModified(),
-                            isUploaded = false,
-                            s3Url = null,
                             folderId = null,
                             verificationHash = calculateHash(file),
                             originalSize = file.length(),
@@ -264,8 +262,6 @@ class MediaRepository @Inject constructor(
                 duration = duration,
                 size = encryptedFile.length(),
                 createdAt = System.currentTimeMillis(),
-                isUploaded = false,
-                s3Url = null,
                 folderId = folderId,
                 verificationHash = verificationHash,
                 originalSize = originalSize,
@@ -330,8 +326,6 @@ class MediaRepository @Inject constructor(
                     duration = null,
                     size = encryptedFile.length(),
                     createdAt = System.currentTimeMillis(),
-                    isUploaded = false,
-                    s3Url = null,
                     folderId = folderId,
                     verificationHash = verificationHash,
                     originalSize = originalSize,
@@ -735,20 +729,10 @@ class MediaRepository @Inject constructor(
 
         val updated = entity.copy(
             originalFileName = mediaFile.fileName,
-            folderId = mediaFile.folderId,
-            isUploaded = mediaFile.isUploaded,
-            s3Url = mediaFile.s3Url
+            folderId = mediaFile.folderId
         )
 
         mediaFileDao.updateFile(updated)
-    }
-
-    suspend fun markAsUploaded(mediaFileId: String, s3Url: String) {
-        mediaFileDao.markAsUploaded(mediaFileId, s3Url)
-    }
-
-    suspend fun markAsNotUploaded(mediaFileId: String) {
-        mediaFileDao.markAsNotUploaded(mediaFileId)
     }
 
     fun getFilesForCategory(category: FolderCategory): StateFlow<List<MediaFile>> {
@@ -979,8 +963,6 @@ class MediaRepository @Inject constructor(
             duration = duration,
             size = size,
             createdAt = Date(createdAt),
-            isUploaded = isUploaded,
-            s3Url = s3Url,
             folderId = folderId,
             textContent = null, // Lazy loaded
             mimeType = mimeType

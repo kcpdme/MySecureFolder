@@ -132,8 +132,6 @@ class FolderViewModel @Inject constructor(
                 delay(500)
                 val result = remoteStorageRepository.uploadFile(mediaFile)
                 result.onSuccess { url ->
-                    val updatedFile = mediaFile.copy(isUploaded = true, s3Url = url)
-                    mediaRepository.updateMediaFile(updatedFile)
                     android.util.Log.d("FolderViewModel", "File uploaded successfully: ${mediaFile.fileName} -> $url")
                 }.onFailure { error ->
                     android.util.Log.e("FolderViewModel", "Upload failed for ${mediaFile.fileName}", error)

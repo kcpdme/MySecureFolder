@@ -178,25 +178,6 @@ fun FolderMediaListItem(
                                 strokeWidth = 1.5.dp
                             )
                         }
-                    } else if (mediaFile.isUploaded) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .align(Alignment.TopEnd)
-                                .padding(2.dp)
-                                .background(
-                                    Color(0xFF4CAF50).copy(alpha = 0.85f),
-                                    shape = CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.CloudDone,
-                                contentDescription = "Uploaded",
-                                tint = Color.White,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
                     }
                 }
             }
@@ -268,24 +249,6 @@ fun FolderMediaListItem(
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp
-                        )
-                    }
-                } else if (mediaFile.isUploaded) {
-                    // Show uploaded status
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                Color(0xFF4CAF50).copy(alpha = 0.2f),
-                                shape = CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.CloudDone,
-                            contentDescription = "Uploaded",
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(24.dp)
                         )
                     }
                 } else {

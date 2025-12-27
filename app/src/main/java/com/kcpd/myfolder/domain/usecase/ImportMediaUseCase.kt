@@ -148,8 +148,6 @@ class ImportMediaUseCase @Inject constructor(
                     duration = duration,
                     size = encryptedFile.length(),
                     createdAt = System.currentTimeMillis(),
-                    isUploaded = false,
-                    s3Url = null,
                     folderId = targetFolderId,
                     verificationHash = verificationHash,
                     originalSize = originalSize,
@@ -446,8 +444,6 @@ private fun MediaFileEntity.toMediaFile(): MediaFile {
         duration = duration,
         size = size,
         createdAt = Date(createdAt),
-        isUploaded = isUploaded,
-        s3Url = s3Url,
         textContent = null, // Lazy loaded
         folderId = folderId,
         mimeType = mimeType

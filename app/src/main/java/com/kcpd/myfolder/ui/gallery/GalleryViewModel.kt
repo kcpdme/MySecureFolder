@@ -58,7 +58,7 @@ class GalleryViewModel @Inject constructor(
 
             val result = s3Repository.uploadFile(mediaFile)
             result.onSuccess { url ->
-                val updatedFile = mediaFile.copy(isUploaded = true, s3Url = url)
+                val updatedFile = mediaFile.copy()
                 mediaRepository.updateMediaFile(updatedFile)
                 Toast.makeText(
                     getApplication(),

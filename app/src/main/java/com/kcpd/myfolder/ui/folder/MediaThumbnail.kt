@@ -214,28 +214,8 @@ fun MediaThumbnail(
                     strokeWidth = 2.dp
                 )
             }
-        } else if (mediaFile.isUploaded) {
-            // Already uploaded - show checkmark (not clickable)
-            Box(
-                modifier = Modifier
-                    .padding(6.dp)
-                    .size(32.dp)
-                    .align(Alignment.TopEnd)
-                    .background(
-                        Color(0xFF4CAF50).copy(alpha = 0.85f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.CloudDone,
-                    contentDescription = "Uploaded",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         } else if (onUploadClick != null && !isMultiSelectMode) {
-            // Not uploaded - show clickable upload icon
+            // Show upload icon
             Box(
                 modifier = Modifier
                     .padding(6.dp)

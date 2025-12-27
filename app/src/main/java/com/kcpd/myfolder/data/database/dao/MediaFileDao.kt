@@ -28,9 +28,6 @@ interface MediaFileDao {
     @Query("SELECT * FROM media_files WHERE id = :id")
     suspend fun getFileById(id: String): MediaFileEntity?
 
-    @Query("SELECT * FROM media_files WHERE isUploaded = 0 ORDER BY createdAt DESC")
-    fun getUnuploadedFiles(): Flow<List<MediaFileEntity>>
-
     @Query("SELECT * FROM media_files WHERE originalFileName LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     fun searchFiles(query: String): Flow<List<MediaFileEntity>>
 
@@ -51,12 +48,6 @@ interface MediaFileDao {
 
     @Query("DELETE FROM media_files WHERE folderId = :folderId")
     suspend fun deleteFilesByFolder(folderId: String)
-
-    @Query("UPDATE media_files SET isUploaded = 1, s3Url = :s3Url WHERE id = :id")
-    suspend fun markAsUploaded(id: String, s3Url: String)
-
-    @Query("UPDATE media_files SET isUploaded = 0, s3Url = NULL WHERE id = :id")
-    suspend fun markAsNotUploaded(id: String)
 
     @Query("UPDATE media_files SET folderId = :folderId WHERE id = :id")
     suspend fun moveToFolder(id: String, folderId: String?)

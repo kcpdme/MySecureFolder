@@ -20,8 +20,6 @@ data class MediaFile(
     val duration: Long? = null,
     val size: Long,
     val createdAt: Date,
-    val isUploaded: Boolean = false,
-    val s3Url: String? = null,
     val textContent: String? = null,
     val folderId: String? = null, // ID of the folder this file belongs to
     val mimeType: String? = null // MIME type for proper file handling
@@ -45,8 +43,6 @@ data class MediaFile(
         if (duration != other.duration) return false
         if (size != other.size) return false
         if (createdAt != other.createdAt) return false
-        if (isUploaded != other.isUploaded) return false
-        if (s3Url != other.s3Url) return false
         if (textContent != other.textContent) return false
         if (folderId != other.folderId) return false
         if (mimeType != other.mimeType) return false
@@ -64,8 +60,6 @@ data class MediaFile(
         result = 31 * result + (duration?.hashCode() ?: 0)
         result = 31 * result + size.hashCode()
         result = 31 * result + createdAt.hashCode()
-        result = 31 * result + isUploaded.hashCode()
-        result = 31 * result + (s3Url?.hashCode() ?: 0)
         result = 31 * result + (textContent?.hashCode() ?: 0)
         result = 31 * result + (folderId?.hashCode() ?: 0)
         result = 31 * result + (mimeType?.hashCode() ?: 0)

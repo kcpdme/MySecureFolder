@@ -133,23 +133,14 @@ fun MediaDetailDialog(
                     "Created: ${formatDate(mediaFile.createdAt)}",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                if (mediaFile.isUploaded && mediaFile.s3Url != null) {
-                    Text(
-                        "Status: Uploaded to S3",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!mediaFile.isUploaded) {
-                    TextButton(onClick = { onUpload(mediaFile) }) {
-                        Icon(Icons.Default.CloudUpload, "Upload")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Upload")
-                    }
+                TextButton(onClick = { onUpload(mediaFile) }) {
+                    Icon(Icons.Default.CloudUpload, "Upload")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Upload")
                 }
                 TextButton(
                     onClick = { onDelete(mediaFile) },
