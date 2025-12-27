@@ -67,10 +67,15 @@ class S3Repository @Inject constructor(
     suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
         var tempDecryptedFile: File? = null
         try {
-            // Try to use cached session first
-            val cachedClient = sessionManager.get().getClient()
-            val cachedConfig = sessionManager.get().getConfig()
+            // Get session manager on main thread first to avoid lifecycle issues
+            val cachedClient = withContext(Dispatchers.Main) {
+                sessionManager.get().getClient()
+            }
+            val cachedConfig = withContext(Dispatchers.Main) {
+                sessionManager.get().getConfig()
+            }
 
+            // Now do all IO operations (already on IO dispatcher from outer withContext)
             val minioClient: MinioClient
             val config: S3Config
 
@@ -136,10 +141,15 @@ class S3Repository @Inject constructor(
      */
     suspend fun verifyFileExists(mediaFile: MediaFile): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            // Get S3 client
-            val cachedClient = sessionManager.get().getClient()
-            val cachedConfig = sessionManager.get().getConfig()
+            // Get S3 client (must get session manager on main thread first)
+            val cachedClient = withContext(Dispatchers.Main) {
+                sessionManager.get().getClient()
+            }
+            val cachedConfig = withContext(Dispatchers.Main) {
+                sessionManager.get().getConfig()
+            }
 
+            // Now do S3 operations (already on IO dispatcher)
             val minioClient: MinioClient
             val config: S3Config
 

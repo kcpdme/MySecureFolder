@@ -287,6 +287,10 @@ fun MyFolderNavHost(
             S3ConfigScreen(navController = navController)
         }
 
+        composable("s3_sync") {
+            com.kcpd.myfolder.ui.settings.S3SyncScreen(navController = navController)
+        }
+
         composable(
             route = "media_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(

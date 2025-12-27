@@ -2,6 +2,8 @@ package com.kcpd.myfolder.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -128,6 +130,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
         ) {
             // Security Section
             Text(
@@ -290,6 +293,15 @@ fun SettingsScreen(
                 description = "Configure cloud storage for backups",
                 onClick = {
                     navController.navigate("s3_config")
+                }
+            )
+
+            SettingsItem(
+                icon = Icons.Default.Sync,
+                title = "Sync Upload Status",
+                description = "Verify which files still exist on S3",
+                onClick = {
+                    navController.navigate("s3_sync")
                 }
             )
         }
