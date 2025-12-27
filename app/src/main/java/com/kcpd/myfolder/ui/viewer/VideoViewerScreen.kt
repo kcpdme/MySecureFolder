@@ -133,6 +133,7 @@ fun VideoPlayer(
     var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
     // Decrypt file on first composition
     LaunchedEffect(mediaFile.id) {
@@ -150,29 +151,41 @@ fun VideoPlayer(
         }
     }
 
-    val exoPlayer = remember(decryptedFile) {
-        decryptedFile?.let { file ->
-            ExoPlayer.Builder(context).build().apply {
+    // Manage Player Lifecycle properly
+    // Use DisposableEffect keyed to decryptedFile to handle creation/cleanup when file is ready/changed
+    DisposableEffect(decryptedFile) {
+        val file = decryptedFile
+        if (file != null) {
+            val player = ExoPlayer.Builder(context).build().apply {
                 val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
                 setMediaItem(mediaItem)
                 prepare()
                 playWhenReady = true
                 repeatMode = Player.REPEAT_MODE_OFF
             }
+            exoPlayer = player
+            
+            onDispose {
+                player.release()
+                exoPlayer = null
+            }
+        } else {
+            onDispose { }
         }
     }
 
     // Pause when not current page
-    LaunchedEffect(isCurrentPage) {
+    LaunchedEffect(isCurrentPage, exoPlayer) {
         if (!isCurrentPage) {
             exoPlayer?.pause()
         }
     }
 
+    // Cleanup temp file on screen disposal
     DisposableEffect(mediaFile.filePath) {
         onDispose {
-            exoPlayer?.release()
             // Clean up temp file securely
+            // We use the current value of decryptedFile
             decryptedFile?.let { file ->
                 try {
                     if (file.exists()) {
@@ -215,6 +228,10 @@ fun VideoPlayer(
                             controllerAutoShow = true
                             controllerShowTimeoutMs = 3000
                         }
+                    },
+                    update = { view ->
+                        // Ensure view is updated if player changes
+                        view.player = exoPlayer
                     },
                     modifier = Modifier.fillMaxSize()
                 )

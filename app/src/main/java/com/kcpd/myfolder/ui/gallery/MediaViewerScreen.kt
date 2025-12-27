@@ -265,6 +265,7 @@ fun VideoPlayer(
     val context = LocalContext.current
     var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
     // Decrypt the video file
     LaunchedEffect(mediaFile.id) {
@@ -278,9 +279,10 @@ fun VideoPlayer(
         }
     }
 
-    val exoPlayer = remember(decryptedFile) {
+    // Create ExoPlayer when decrypted file is ready
+    LaunchedEffect(decryptedFile) {
         decryptedFile?.let { file ->
-            ExoPlayer.Builder(context).build().apply {
+            exoPlayer = ExoPlayer.Builder(context).build().apply {
                 val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
                 setMediaItem(mediaItem)
                 prepare()
@@ -290,14 +292,24 @@ fun VideoPlayer(
         }
     }
 
-    DisposableEffect(mediaFile.filePath, decryptedFile) {
+    DisposableEffect(Unit) {
         onDispose {
-            exoPlayer?.release()
+            android.util.Log.d("VideoPlayer", "Disposing video player - stopping immediately")
+            // CRITICAL: Stop and release player immediately when leaving screen
+            exoPlayer?.let { player ->
+                player.stop()
+                player.clearMediaItems()
+                player.release()
+                android.util.Log.d("VideoPlayer", "Player stopped and released")
+            }
+            exoPlayer = null
+
             // Clean up decrypted temp file
             decryptedFile?.let { file ->
                 try {
                     if (file.exists()) {
                         file.delete()
+                        android.util.Log.d("VideoPlayer", "Deleted temp file: ${file.name}")
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("VideoPlayer", "Failed to delete temp file", e)
