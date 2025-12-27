@@ -27,7 +27,8 @@ private val Context.dataStore by preferencesDataStore(name = "s3_config")
 class S3Repository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionManager: dagger.Lazy<S3SessionManager>, // Lazy to avoid circular dependency
-    private val secureFileManager: com.kcpd.myfolder.security.SecureFileManager
+    private val secureFileManager: com.kcpd.myfolder.security.SecureFileManager,
+    private val folderRepository: FolderRepository
 ) : RemoteStorageRepository {
     private val endpointKey = stringPreferencesKey("endpoint")
     private val accessKeyKey = stringPreferencesKey("access_key")
@@ -121,7 +122,16 @@ class S3Repository @Inject constructor(
 
                     // Step 2: Upload the decrypted file to S3 with uniform path structure
                     val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-                    val objectName = "MyFolderPrivate/${category.displayName}/${mediaFile.fileName}"
+
+                    // Build folder path if file is in a folder
+                    val folderPath = buildFolderPath(mediaFile.folderId)
+                    val objectName = if (folderPath.isNotEmpty()) {
+                        "MyFolderPrivate/${category.displayName}/$folderPath/${mediaFile.fileName}"
+                    } else {
+                        "MyFolderPrivate/${category.displayName}/${mediaFile.fileName}"
+                    }
+
+                    Log.d("S3Repository", "Uploading to S3 path: $objectName")
 
                     minioClient.putObject(
                         PutObjectArgs.builder()
@@ -163,6 +173,30 @@ class S3Repository @Inject constructor(
         }
     }
 
+
+    /**
+     * Build the folder path hierarchy for S3 object key.
+     * Returns path like "FolderA/FolderB/FolderC" for nested folders.
+     */
+    private fun buildFolderPath(folderId: String?): String {
+        if (folderId == null) return ""
+
+        val folderNames = mutableListOf<String>()
+        var currentFolderId: String? = folderId
+
+        // Traverse up the folder hierarchy
+        while (currentFolderId != null) {
+            val folder = folderRepository.getFolderById(currentFolderId)
+            if (folder != null) {
+                folderNames.add(0, folder.name) // Add to beginning to maintain order
+                currentFolderId = folder.parentFolderId
+            } else {
+                break
+            }
+        }
+
+        return folderNames.joinToString("/")
+    }
 
     private fun getContentType(fileName: String): String {
         return when (fileName.substringAfterLast('.').lowercase()) {

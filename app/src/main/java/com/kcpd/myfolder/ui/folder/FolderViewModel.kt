@@ -119,6 +119,50 @@ class FolderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Get all files from selected folders (recursively includes subfolders).
+     * Returns a list of MediaFile objects that are within the specified folder IDs and their subfolders.
+     */
+    suspend fun getFilesFromFolders(folderIds: Set<String>): List<MediaFile> {
+        val allFiles = mutableListOf<MediaFile>()
+        val processedFolders = mutableSetOf<String>()
+
+        // Process each folder recursively
+        folderIds.forEach { folderId ->
+            collectFilesRecursively(folderId, allFiles, processedFolders)
+        }
+
+        android.util.Log.d("FolderViewModel", "getFilesFromFolders: Collected ${allFiles.size} files from ${folderIds.size} folders (including ${processedFolders.size} subfolders)")
+        return allFiles
+    }
+
+    /**
+     * Recursively collect files from a folder and all its subfolders.
+     */
+    private suspend fun collectFilesRecursively(
+        folderId: String,
+        allFiles: MutableList<MediaFile>,
+        processedFolders: MutableSet<String>
+    ) {
+        // Avoid processing the same folder twice
+        if (folderId in processedFolders) return
+        processedFolders.add(folderId)
+
+        // Get files directly in this folder
+        val filesInFolder = mediaRepository.getFilesInFolder(folderId, category)
+        allFiles.addAll(filesInFolder)
+        android.util.Log.d("FolderViewModel", "Folder $folderId: Found ${filesInFolder.size} files")
+
+        // Find all subfolders
+        val subfolders = folders.value.filter { it.parentFolderId == folderId }
+        android.util.Log.d("FolderViewModel", "Folder $folderId: Found ${subfolders.size} subfolders")
+
+        // Recursively process each subfolder
+        subfolders.forEach { subfolder ->
+            collectFilesRecursively(subfolder.id, allFiles, processedFolders)
+        }
+    }
+
     fun moveToFolder(mediaFile: MediaFile, folderId: String?) {
         viewModelScope.launch {
             mediaRepository.moveMediaFileToFolder(mediaFile, folderId)
@@ -142,11 +186,11 @@ class FolderViewModel @Inject constructor(
 
             // Wait for available slot (max 2 concurrent uploads)
             uploadSemaphore.withPermit {
-                // Remove from queue, add to uploading
-                _uploadQueue.value = _uploadQueue.value - mediaFile.id
+                // Remove from queue, add to uploading - create new collections to trigger StateFlow
+                _uploadQueue.value = _uploadQueue.value.filterNot { it == mediaFile.id }
                 _uploadingFiles.value = _uploadingFiles.value + mediaFile.id
 
-                android.util.Log.d("FolderViewModel", "Upload started for: ${mediaFile.fileName}")
+                android.util.Log.d("FolderViewModel", "Upload started for: ${mediaFile.fileName}, uploading: ${_uploadingFiles.value.size}, queued: ${_uploadQueue.value.size}")
                 try {
                     val result = remoteStorageRepository.uploadFile(mediaFile)
                     result.onSuccess { url ->
@@ -157,8 +201,9 @@ class FolderViewModel @Inject constructor(
                 } catch (e: Exception) {
                     android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
                 } finally {
-                    _uploadingFiles.value = _uploadingFiles.value - mediaFile.id
-                    android.util.Log.d("FolderViewModel", "Upload finished for: ${mediaFile.fileName}")
+                    // Remove from uploading set - create new set to trigger StateFlow update
+                    _uploadingFiles.value = _uploadingFiles.value.filterNot { it == mediaFile.id }.toSet()
+                    android.util.Log.d("FolderViewModel", "Upload finished for: ${mediaFile.fileName}, remaining: ${_uploadingFiles.value.size}, current set: ${_uploadingFiles.value}")
 
                     // Rate limiting: delay before next upload
                     // Google Drive: max 1000 requests/100s = ~10 req/s = 100ms delay

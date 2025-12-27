@@ -23,7 +23,8 @@ import javax.inject.Singleton
 @Singleton
 class GoogleDriveRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val secureFileManager: SecureFileManager
+    private val secureFileManager: SecureFileManager,
+    private val folderRepository: FolderRepository
 ) : RemoteStorageRepository {
 
     private var driveService: Drive? = null
@@ -75,12 +76,22 @@ class GoogleDriveRepository @Inject constructor(
             // Decrypt file
             val encryptedFile = File(mediaFile.filePath)
             tempDecryptedFile = secureFileManager.decryptFile(encryptedFile)
-            
-            // Create folder structure: MyFolderPrivate/Category
+
+            // Create folder structure: MyFolderPrivate/Category/[FolderPath]
             val rootFolderId = getOrCreateFolder("MyFolderPrivate")
             val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-            val parentFolderId = getOrCreateFolder(category.displayName, rootFolderId)
-            
+            var parentFolderId = getOrCreateFolder(category.displayName, rootFolderId)
+
+            // Build user folder path if file is in a folder
+            val userFolderPath = buildFolderPathList(mediaFile.folderId)
+            if (userFolderPath.isNotEmpty()) {
+                // Create nested folders in Google Drive
+                for (folderName in userFolderPath) {
+                    parentFolderId = getOrCreateFolder(folderName, parentFolderId)
+                }
+                Log.d("GoogleDriveRepository", "Created folder hierarchy: ${userFolderPath.joinToString("/")}")
+            }
+
             val fileMetadata = com.google.api.services.drive.model.File()
             fileMetadata.name = mediaFile.fileName
             fileMetadata.parents = listOf(parentFolderId)
@@ -107,10 +118,34 @@ class GoogleDriveRepository @Inject constructor(
     }
 
 
+    /**
+     * Build the folder path hierarchy as a list of folder names.
+     * Returns list like ["FolderA", "FolderB", "FolderC"] for nested folders.
+     */
+    private fun buildFolderPathList(folderId: String?): List<String> {
+        if (folderId == null) return emptyList()
+
+        val folderNames = mutableListOf<String>()
+        var currentFolderId: String? = folderId
+
+        // Traverse up the folder hierarchy
+        while (currentFolderId != null) {
+            val folder = folderRepository.getFolderById(currentFolderId)
+            if (folder != null) {
+                folderNames.add(0, folder.name) // Add to beginning to maintain order
+                currentFolderId = folder.parentFolderId
+            } else {
+                break
+            }
+        }
+
+        return folderNames
+    }
+
     private fun getFolderId(name: String, parentId: String? = null): String {
         val key = "${parentId ?: "root"}/$name"
         folderIdCache[key]?.let { return it }
-        
+
         val id = getOrCreateFolder(name, parentId)
         folderIdCache[key] = id
         return id

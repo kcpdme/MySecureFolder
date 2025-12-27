@@ -125,6 +125,7 @@ fun FolderScreen(
                     }
                 },
                 actions = {
+                    val scope = rememberCoroutineScope()
                     if (isMultiSelectMode) {
                         // Select All button - modern circular design
                         IconButton(
@@ -197,14 +198,28 @@ fun FolderScreen(
                         // Upload button - always visible in multi-select mode
                         IconButton(
                             onClick = {
-                                val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
-                                viewModel.uploadFiles(selectedMediaFiles)
-                                // Clear selection and exit multi-select mode
-                                selectedFiles = emptySet()
-                                selectedFolders = emptySet()
-                                isMultiSelectMode = false
-                                // Show upload queue bottom sheet
-                                showUploadQueue = true
+                                scope.launch {
+                                    // Get directly selected files
+                                    val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
+
+                                    // Get files from selected folders
+                                    val filesFromFolders = if (selectedFolders.isNotEmpty()) {
+                                        viewModel.getFilesFromFolders(selectedFolders)
+                                    } else {
+                                        emptyList()
+                                    }
+
+                                    // Combine and upload all files
+                                    val allFilesToUpload = (selectedMediaFiles + filesFromFolders).distinctBy { it.id }
+                                    viewModel.uploadFiles(allFilesToUpload)
+
+                                    // Clear selection and exit multi-select mode
+                                    selectedFiles = emptySet()
+                                    selectedFolders = emptySet()
+                                    isMultiSelectMode = false
+                                    // Show upload queue bottom sheet
+                                    showUploadQueue = true
+                                }
                             },
                             enabled = selectedCount > 0
                         ) {
@@ -586,7 +601,7 @@ fun FolderScreen(
                                     selectedFiles = setOf(mediaFile.id)
                                 }
                             },
-                            isUploading = viewModel.isUploading(mediaFile.id),
+                            isUploading = uploadingFiles.contains(mediaFile.id),
                             onUploadClick = { viewModel.uploadFile(mediaFile) }
                         )
                     }
@@ -630,7 +645,7 @@ fun FolderScreen(
                             mediaFile = mediaFile,
                             isSelected = selectedFiles.contains(mediaFile.id),
                             isMultiSelectMode = isMultiSelectMode,
-                            isUploading = viewModel.isUploading(mediaFile.id),
+                            isUploading = uploadingFiles.contains(mediaFile.id),
                             onClick = {
                                 if (isMultiSelectMode) {
                                     selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
