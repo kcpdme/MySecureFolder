@@ -47,6 +47,8 @@ fun HomeScreen(
     val recordingsSize by viewModel.recordingsSize.collectAsState()
     val notesSize by viewModel.notesSize.collectAsState()
     val pdfsSize by viewModel.pdfsSize.collectAsState()
+    
+    val activeRemoteType by viewModel.activeRemoteType.collectAsState()
 
     // VERSION VERIFICATION LOGGING
     LaunchedEffect(Unit) {
@@ -70,7 +72,16 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("My Folder") },
+                title = { 
+                    Column {
+                        Text("My Folder")
+                        Text(
+                            text = "Remote: ${if (activeRemoteType == com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) "Google Drive" else "S3 MinIO"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")

@@ -17,7 +17,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.repository.MediaRepository
-import com.kcpd.myfolder.data.repository.S3Repository
+import com.kcpd.myfolder.data.repository.RemoteRepositoryManager
+import com.kcpd.myfolder.data.repository.RemoteStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,11 +31,14 @@ import javax.inject.Inject
 class S3SyncViewModel @Inject constructor(
     application: Application,
     private val mediaRepository: MediaRepository,
-    private val s3Repository: S3Repository
+    private val remoteStorageRepository: RemoteStorageRepository,
+    private val remoteRepositoryManager: RemoteRepositoryManager
 ) : AndroidViewModel(application) {
 
     private val _syncStates = MutableStateFlow<Map<FolderCategory, SyncState>>(emptyMap())
     val syncStates: StateFlow<Map<FolderCategory, SyncState>> = _syncStates.asStateFlow()
+
+    val activeRemoteType = remoteRepositoryManager.activeRemoteType
 
     data class SyncState(
         val isLoading: Boolean = false,
@@ -100,7 +104,7 @@ class S3SyncViewModel @Inject constructor(
                 android.util.Log.d("S3SyncViewModel", "Syncing ${category.displayName}: ${uploadedFiles.size} uploaded files")
 
                 // Verify all uploaded files
-                val results = s3Repository.verifyMultipleFiles(uploadedFiles)
+                val results = remoteStorageRepository.verifyMultipleFiles(uploadedFiles)
 
                 var deletedCount = 0
                 var verifiedCount = 0
@@ -200,7 +204,7 @@ class S3SyncViewModel @Inject constructor(
 
                     android.util.Log.d("S3SyncViewModel", "Uploading ${mediaFile.fileName} (${index + 1}/${filesToUpload.size})")
 
-                    val result = s3Repository.uploadFile(mediaFile)
+                    val result = remoteStorageRepository.uploadFile(mediaFile)
                     result.onSuccess { url ->
                         mediaRepository.markAsUploaded(mediaFile.id, url)
                         successCount++
@@ -251,6 +255,8 @@ fun S3SyncScreen(
     viewModel: S3SyncViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val syncStates by viewModel.syncStates.collectAsState()
+    val activeRemoteType by viewModel.activeRemoteType.collectAsState(initial = com.kcpd.myfolder.data.model.RemoteType.S3_MINIO)
+    val remoteName = if (activeRemoteType == com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) "Google Drive" else "S3"
 
     Scaffold(
         topBar = {
@@ -296,7 +302,7 @@ fun S3SyncScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Check if uploaded files still exist on S3. Files deleted from server will be marked for re-upload.",
+                            text = "Check if uploaded files still exist on $remoteName. Files deleted from server will be marked for re-upload.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
@@ -306,13 +312,15 @@ fun S3SyncScreen(
 
             // Category list
             items(
-                FolderCategory.entries.filter { it != FolderCategory.ALL_FILES }
+                items = FolderCategory.entries.filter { it != FolderCategory.ALL_FILES },
+                key = { it.name }
             ) { category ->
                 CategorySyncCard(
                     category = category,
                     syncState = syncStates[category] ?: S3SyncViewModel.SyncState(),
                     onSyncClick = { viewModel.syncCategory(category) },
-                    onUploadClick = { viewModel.uploadAllFiles(category) }
+                    onUploadClick = { viewModel.uploadAllFiles(category) },
+                    remoteName = remoteName
                 )
             }
         }
@@ -324,7 +332,8 @@ fun CategorySyncCard(
     category: FolderCategory,
     syncState: S3SyncViewModel.SyncState,
     onSyncClick: () -> Unit,
-    onUploadClick: () -> Unit
+    onUploadClick: () -> Unit,
+    remoteName: String
 ) {
     Card(
         modifier = Modifier
@@ -387,7 +396,7 @@ fun CategorySyncCard(
                         )
                         if (syncState.deletedFromS3 > 0) {
                             Text(
-                                text = "⚠️ ${syncState.deletedFromS3} deleted from S3",
+                                text = "⚠️ ${syncState.deletedFromS3} deleted from $remoteName",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )

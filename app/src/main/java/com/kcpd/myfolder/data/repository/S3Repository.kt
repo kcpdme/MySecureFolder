@@ -28,7 +28,7 @@ class S3Repository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionManager: dagger.Lazy<S3SessionManager>, // Lazy to avoid circular dependency
     private val secureFileManager: com.kcpd.myfolder.security.SecureFileManager
-) {
+) : RemoteStorageRepository {
     private val endpointKey = stringPreferencesKey("endpoint")
     private val accessKeyKey = stringPreferencesKey("access_key")
     private val secretKeyKey = stringPreferencesKey("secret_key")
@@ -64,7 +64,7 @@ class S3Repository @Inject constructor(
         }
     }
 
-    suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
+    override suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
         var tempDecryptedFile: File? = null
         try {
             // Step 1: Decrypt the encrypted file to a temporary file (do this once)
@@ -104,7 +104,13 @@ class S3Repository @Inject constructor(
                         config = cachedConfig
                     } else {
                         Log.d("S3Repository", "Attempt $attempt: Creating new MinIO client")
-                        config = s3Config.first() ?: throw Exception("S3 configuration not found. Please configure S3 settings first.")
+                        val currentConfig = s3Config.first()
+                        if (currentConfig == null) {
+                            // Gracefully handle missing config without crashing
+                            Log.e("S3Repository", "S3 configuration not found")
+                            return@withContext Result.failure(Exception("S3 configuration not found. Please configure S3 settings first."))
+                        }
+                        config = currentConfig
 
                         minioClient = MinioClient.builder()
                             .endpoint(config.endpoint)
@@ -161,7 +167,7 @@ class S3Repository @Inject constructor(
      * Verify if a file exists on S3.
      * Returns true if file exists, false if deleted or not found.
      */
-    suspend fun verifyFileExists(mediaFile: MediaFile): Result<Boolean> = withContext(Dispatchers.IO) {
+    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             // Get S3 client (must get session manager on main thread first)
             val cachedClient = withContext(Dispatchers.Main) {
@@ -219,7 +225,7 @@ class S3Repository @Inject constructor(
      * Verify multiple files exist on S3.
      * Returns map of fileId -> exists status.
      */
-    suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, Boolean> = withContext(Dispatchers.IO) {
+    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, Boolean> = withContext(Dispatchers.IO) {
         val results = mutableMapOf<String, Boolean>()
 
         mediaFiles.forEach { mediaFile ->

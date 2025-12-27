@@ -9,7 +9,7 @@ import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.UserFolder
 import com.kcpd.myfolder.data.repository.FolderRepository
 import com.kcpd.myfolder.data.repository.MediaRepository
-import com.kcpd.myfolder.data.repository.S3Repository
+import com.kcpd.myfolder.data.repository.RemoteStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +24,7 @@ import javax.inject.Inject
 class FolderViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val folderRepository: FolderRepository,
-    private val s3Repository: S3Repository,
+    private val remoteStorageRepository: RemoteStorageRepository,
     private val s3SessionManager: com.kcpd.myfolder.data.repository.S3SessionManager,
     private val importMediaUseCase: com.kcpd.myfolder.domain.usecase.ImportMediaUseCase,
     savedStateHandle: SavedStateHandle
@@ -130,7 +130,7 @@ class FolderViewModel @Inject constructor(
             try {
                 // Add minimum delay to ensure progress indicator is visible
                 delay(500)
-                val result = s3Repository.uploadFile(mediaFile)
+                val result = remoteStorageRepository.uploadFile(mediaFile)
                 result.onSuccess { url ->
                     val updatedFile = mediaFile.copy(isUploaded = true, s3Url = url)
                     mediaRepository.updateMediaFile(updatedFile)
@@ -158,7 +158,7 @@ class FolderViewModel @Inject constructor(
      */
     fun verifyUploadStatus(mediaFile: MediaFile) {
         viewModelScope.launch {
-            val result = s3Repository.verifyFileExists(mediaFile)
+            val result = remoteStorageRepository.verifyFileExists(mediaFile)
             result.onSuccess { exists ->
                 if (!exists && mediaFile.isUploaded) {
                     // File was deleted from S3 - mark as not uploaded
@@ -184,7 +184,7 @@ class FolderViewModel @Inject constructor(
             }
 
             android.util.Log.d("FolderViewModel", "Syncing upload status for ${uploadedFiles.size} files...")
-            val results = s3Repository.verifyMultipleFiles(uploadedFiles)
+            val results = remoteStorageRepository.verifyMultipleFiles(uploadedFiles)
 
             var markedCount = 0
             results.forEach { (fileId, exists) ->

@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.kcpd.myfolder" />
+                  <option name="mobileSdkAppId" value="1:851296002298:android:76e1bb4ccae6220e47e943" />
+                  <option name="projectId" value="myfolderprivateandroidapp" />
+                  <option name="projectNumber" value="851296002298" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
     kotlin("plugin.serialization") version "2.0.21"
 }
 
@@ -50,6 +51,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/DEPENDENCIES"
             // Don't exclude MANIFEST.MF - MinIO SDK needs it to read version info
         }
         jniLibs {
@@ -157,6 +160,21 @@ dependencies {
 
     // ML Kit Document Scanner (Latest)
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+
+    // Google Sign In
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
+
+    // Google Drive API
+    implementation("com.google.api-client:google-api-client-android:2.7.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.apis:google-api-services-drive:v3-rev20241027-2.0.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.30.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.http-client:google-http-client-android:1.44.1")
 
     // Testing (Latest)
     testImplementation("junit:junit:4.13.2")

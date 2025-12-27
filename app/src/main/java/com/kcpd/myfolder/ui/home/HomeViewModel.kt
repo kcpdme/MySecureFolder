@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.repository.MediaRepository
+import com.kcpd.myfolder.data.repository.RemoteRepositoryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,8 +14,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val mediaRepository: MediaRepository
+    private val mediaRepository: MediaRepository,
+    private val remoteRepositoryManager: RemoteRepositoryManager
 ) : ViewModel() {
+
+    val activeRemoteType = remoteRepositoryManager.activeRemoteType.stateIn(
+        scope = viewModelScope,
+        started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        initialValue = com.kcpd.myfolder.data.model.RemoteType.S3_MINIO
+    )
 
     // File counts
     val allFilesCount: StateFlow<Int> = mediaRepository.mediaFiles.map { it.size }

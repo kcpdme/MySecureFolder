@@ -19,9 +19,12 @@ import com.kcpd.myfolder.security.BiometricManager
 import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -30,7 +33,10 @@ class SettingsViewModel @Inject constructor(
     private val vaultManager: VaultManager,
     private val passwordManager: PasswordManager,
     private val biometricManager: BiometricManager,
-    private val mediaRepository: com.kcpd.myfolder.data.repository.MediaRepository
+    private val mediaRepository: com.kcpd.myfolder.data.repository.MediaRepository,
+    private val remoteRepositoryManager: com.kcpd.myfolder.data.repository.RemoteRepositoryManager,
+    private val googleDriveRepository: com.kcpd.myfolder.data.repository.GoogleDriveRepository,
+    @ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
     private val _lockTimeout = MutableStateFlow(vaultManager.getLockTimeout())
@@ -41,6 +47,59 @@ class SettingsViewModel @Inject constructor(
 
     private val _storageInfo = MutableStateFlow<Map<String, Long>>(emptyMap())
     val storageInfo: StateFlow<Map<String, Long>> = _storageInfo.asStateFlow()
+
+    val activeRemoteType = remoteRepositoryManager.activeRemoteType.stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        com.kcpd.myfolder.data.model.RemoteType.S3_MINIO
+    )
+
+    private val _googleAccountEmail = MutableStateFlow<String?>(null)
+    val googleAccountEmail: StateFlow<String?> = _googleAccountEmail.asStateFlow()
+
+    init {
+        // Check for existing signed-in account using Application Context
+        val account = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
+        if (account != null) {
+            _googleAccountEmail.value = account.email
+            googleDriveRepository.setSignedInAccount(account)
+        }
+    }
+
+    fun setRemoteType(type: com.kcpd.myfolder.data.model.RemoteType) {
+        viewModelScope.launch {
+            remoteRepositoryManager.setRemoteType(type)
+        }
+    }
+
+    fun handleGoogleSignInResult(task: com.google.android.gms.tasks.Task<com.google.android.gms.auth.api.signin.GoogleSignInAccount>) {
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            googleDriveRepository.setSignedInAccount(account)
+            _googleAccountEmail.value = account.email
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            android.util.Log.w("SettingsViewModel", "signInResult:failed code=" + e.statusCode)
+            _googleAccountEmail.value = null
+        }
+    }
+
+    fun checkGoogleSignIn(context: android.content.Context) {
+        val account = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
+        _googleAccountEmail.value = account?.email
+        googleDriveRepository.setSignedInAccount(account)
+    }
+    
+    fun signOutGoogle(context: android.content.Context) {
+        val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+            com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+        ).requestEmail().build()
+        
+        val client = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+        client.signOut().addOnCompleteListener {
+            _googleAccountEmail.value = null
+            googleDriveRepository.setSignedInAccount(null)
+        }
+    }
 
     fun setLockTimeout(preset: VaultManager.LockTimeoutPreset) {
         viewModelScope.launch {
@@ -113,6 +172,19 @@ fun SettingsScreen(
     val storageInfo by viewModel.storageInfo.collectAsState()
     val isBiometricAvailable = viewModel.isBiometricAvailable()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val activeRemoteType by viewModel.activeRemoteType.collectAsState()
+    val googleAccountEmail by viewModel.googleAccountEmail.collectAsState()
+
+    val googleSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        viewModel.handleGoogleSignInResult(task)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.checkGoogleSignIn(context)
+    }
 
     Scaffold(
         topBar = {
@@ -287,19 +359,102 @@ fun SettingsScreen(
                 modifier = Modifier.padding(16.dp)
             )
 
-            SettingsItem(
-                icon = Icons.Default.Cloud,
-                title = "S3/Minio Configuration",
-                description = "Configure cloud storage for backups",
-                onClick = {
-                    navController.navigate("s3_config")
+            // Remote Type Selector
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    text = "Storage Provider",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable { viewModel.setRemoteType(com.kcpd.myfolder.data.model.RemoteType.S3_MINIO) }
+                            .padding(8.dp)
+                    ) {
+                        RadioButton(
+                            selected = activeRemoteType == com.kcpd.myfolder.data.model.RemoteType.S3_MINIO,
+                            onClick = { viewModel.setRemoteType(com.kcpd.myfolder.data.model.RemoteType.S3_MINIO) }
+                        )
+                        Text(text = "S3 / MinIO", modifier = Modifier.padding(start = 8.dp))
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable { viewModel.setRemoteType(com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) }
+                            .padding(8.dp)
+                    ) {
+                        RadioButton(
+                            selected = activeRemoteType == com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE,
+                            onClick = { viewModel.setRemoteType(com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) }
+                        )
+                        Text(text = "Google Drive", modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
-            )
+            }
+
+            if (activeRemoteType == com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (googleAccountEmail != null) {
+                            Text(text = "Signed in as: $googleAccountEmail")
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = { viewModel.signOutGoogle(context) }) {
+                                Text("Sign Out")
+                            }
+                        } else {
+                            Button(onClick = {
+                                val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                                    com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+                                )
+                                .requestEmail()
+                                .requestScopes(com.google.android.gms.common.api.Scope(com.google.api.services.drive.DriveScopes.DRIVE_FILE))
+                                .requestScopes(com.google.android.gms.common.api.Scope(com.google.api.services.drive.DriveScopes.DRIVE_APPDATA))
+                                .build()
+
+                                val client = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+                                googleSignInLauncher.launch(client.signInIntent)
+                            }) {
+                                Text("Sign In with Google")
+                            }
+                            Text(
+                                text = "Note: Requires Google Cloud Console setup",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                SettingsItem(
+                    icon = Icons.Default.Cloud,
+                    title = "S3/Minio Configuration",
+                    description = "Configure cloud storage for backups",
+                    onClick = {
+                        navController.navigate("s3_config")
+                    }
+                )
+            }
 
             SettingsItem(
                 icon = Icons.Default.Sync,
                 title = "Sync Upload Status",
-                description = "Verify which files still exist on S3",
+                description = "Verify which files still exist on remote storage",
                 onClick = {
                     navController.navigate("s3_sync")
                 }
