@@ -74,11 +74,8 @@ fun FolderScreen(
     val selectedCount = selectedFiles.size + selectedFolders.size
     val totalCount = mediaFiles.size + folders.size
 
-    // Default to LIST mode for Notes and Recordings, GRID for others
-    val defaultViewMode = when (viewModel.category) {
-        FolderCategory.NOTES, FolderCategory.RECORDINGS -> FolderViewMode.LIST
-        else -> FolderViewMode.GRID
-    }
+    // Default to LIST mode for all categories
+    val defaultViewMode = FolderViewMode.LIST
     var viewMode by remember { mutableStateOf(defaultViewMode) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -310,8 +307,11 @@ fun FolderScreen(
                                 Icon(Icons.Default.FileUpload, "Import Files")
                             }
                         }
-                        IconButton(onClick = { showCreateFolderDialog = true }) {
-                            Icon(Icons.Default.CreateNewFolder, "Create Folder")
+                        // Don't allow folder creation in ALL_FILES category
+                        if (viewModel.category != FolderCategory.ALL_FILES) {
+                            IconButton(onClick = { showCreateFolderDialog = true }) {
+                                Icon(Icons.Default.CreateNewFolder, "Create Folder")
+                            }
                         }
                         IconButton(onClick = {
                             viewMode = if (viewMode == FolderViewMode.GRID) FolderViewMode.LIST else FolderViewMode.GRID
@@ -353,7 +353,11 @@ fun FolderScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
             // Search bar for ALL_FILES category
             if (viewModel.category == FolderCategory.ALL_FILES && showSearch) {
                 OutlinedTextField(
@@ -384,9 +388,7 @@ fun FolderScreen(
 
             if (!hasContent) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -419,8 +421,8 @@ fun FolderScreen(
                     contentPadding = PaddingValues(
                         start = 13.dp,
                         end = 13.dp,
-                        top = padding.calculateTopPadding(),
-                        bottom = padding.calculateBottomPadding()
+                        top = 0.dp,
+                        bottom = 0.dp
                     ),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -485,7 +487,6 @@ fun FolderScreen(
                 }
             } else {
                 androidx.compose.foundation.lazy.LazyColumn(
-                    contentPadding = padding,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     // Folders first
