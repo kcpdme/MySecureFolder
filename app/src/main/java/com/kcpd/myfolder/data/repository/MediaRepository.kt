@@ -747,6 +747,10 @@ class MediaRepository @Inject constructor(
         mediaFileDao.markAsUploaded(mediaFileId, s3Url)
     }
 
+    suspend fun markAsNotUploaded(mediaFileId: String) {
+        mediaFileDao.markAsNotUploaded(mediaFileId)
+    }
+
     fun getFilesForCategory(category: FolderCategory): StateFlow<List<MediaFile>> {
         return categoryFilesCache.getOrPut(category) {
             mediaFiles.map { files ->

@@ -147,6 +147,52 @@ class FolderViewModel @Inject constructor(
         return _uploadingFiles.value.contains(fileId)
     }
 
+    /**
+     * Verify if a file still exists on S3.
+     * If file doesn't exist, mark it as not uploaded so it can be re-uploaded.
+     */
+    fun verifyUploadStatus(mediaFile: MediaFile) {
+        viewModelScope.launch {
+            val result = s3Repository.verifyFileExists(mediaFile)
+            result.onSuccess { exists ->
+                if (!exists && mediaFile.isUploaded) {
+                    // File was deleted from S3 - mark as not uploaded
+                    mediaRepository.markAsNotUploaded(mediaFile.id)
+                    android.util.Log.d("FolderViewModel", "File deleted from S3, marked for re-upload: ${mediaFile.fileName}")
+                }
+            }.onFailure { error ->
+                android.util.Log.e("FolderViewModel", "Failed to verify upload status for ${mediaFile.fileName}", error)
+            }
+        }
+    }
+
+    /**
+     * Sync upload status for all uploaded files in current view.
+     * Checks S3 and marks files as not uploaded if they've been deleted.
+     */
+    fun syncUploadStatus() {
+        viewModelScope.launch {
+            val uploadedFiles = mediaFiles.value.filter { it.isUploaded }
+            if (uploadedFiles.isEmpty()) {
+                android.util.Log.d("FolderViewModel", "No uploaded files to sync")
+                return@launch
+            }
+
+            android.util.Log.d("FolderViewModel", "Syncing upload status for ${uploadedFiles.size} files...")
+            val results = s3Repository.verifyMultipleFiles(uploadedFiles)
+
+            var markedCount = 0
+            results.forEach { (fileId, exists) ->
+                if (!exists) {
+                    mediaRepository.markAsNotUploaded(fileId)
+                    markedCount++
+                }
+            }
+
+            android.util.Log.d("FolderViewModel", "Sync complete: $markedCount files marked for re-upload")
+        }
+    }
+
     fun shareMediaFile(mediaFile: MediaFile) {
         // This will be handled by FolderScreen using FolderActions
     }

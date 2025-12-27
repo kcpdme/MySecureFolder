@@ -55,6 +55,9 @@ interface MediaFileDao {
     @Query("UPDATE media_files SET isUploaded = 1, s3Url = :s3Url WHERE id = :id")
     suspend fun markAsUploaded(id: String, s3Url: String)
 
+    @Query("UPDATE media_files SET isUploaded = 0, s3Url = NULL WHERE id = :id")
+    suspend fun markAsNotUploaded(id: String)
+
     @Query("UPDATE media_files SET folderId = :folderId WHERE id = :id")
     suspend fun moveToFolder(id: String, folderId: String?)
 
