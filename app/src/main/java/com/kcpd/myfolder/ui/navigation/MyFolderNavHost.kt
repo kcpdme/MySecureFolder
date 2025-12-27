@@ -147,38 +147,37 @@ fun MyFolderNavHost(
                         null -> navController.navigate("camera$folderParam")
                     }
                 },
-                onMediaClick = { index ->
-                    // Navigate to the appropriate viewer based on media type
-                    android.util.Log.d("Navigation", "onMediaClick called: index=$index, category=$category, mediaType=${folderCategory?.mediaType}")
-                    when (folderCategory?.mediaType) {
+                onMediaClick = { index, mediaFile ->
+                    // Navigate to the appropriate viewer based on the actual media file type
+                    // Pass fileId to handle cases where the list is filtered (e.g., search results in ALL_FILES)
+                    android.util.Log.d("Navigation", "onMediaClick called: index=$index, fileId=${mediaFile.id}, file=${mediaFile.fileName}, actualType=${mediaFile.mediaType}, category=$category")
+
+                    // Use actual media file type instead of category type
+                    // This fixes the issue where ALL_FILES category would route incorrectly
+                    when (mediaFile.mediaType) {
                         com.kcpd.myfolder.data.model.MediaType.PHOTO -> {
-                            val route = "photo_viewer/$index?category=$category"
-                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            val route = "photo_viewer/$index?category=$category&fileId=${mediaFile.id}"
+                            android.util.Log.d("Navigation", "Navigating to photo viewer: $route")
                             navController.navigate(route)
                         }
                         com.kcpd.myfolder.data.model.MediaType.VIDEO -> {
-                            val route = "video_viewer/$index?category=$category"
-                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            val route = "video_viewer/$index?category=$category&fileId=${mediaFile.id}"
+                            android.util.Log.d("Navigation", "Navigating to video viewer: $route")
                             navController.navigate(route)
                         }
                         com.kcpd.myfolder.data.model.MediaType.AUDIO -> {
-                            val route = "audio_viewer/$index?category=$category"
-                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            val route = "audio_viewer/$index?category=$category&fileId=${mediaFile.id}"
+                            android.util.Log.d("Navigation", "Navigating to audio viewer: $route")
                             navController.navigate(route)
                         }
                         com.kcpd.myfolder.data.model.MediaType.NOTE -> {
-                            val route = "note_viewer/$index?category=$category"
-                            android.util.Log.d("Navigation", "Navigating to: $route")
+                            val route = "note_viewer/$index?category=$category&fileId=${mediaFile.id}"
+                            android.util.Log.d("Navigation", "Navigating to note viewer: $route")
                             navController.navigate(route)
                         }
                         com.kcpd.myfolder.data.model.MediaType.PDF -> {
-                            val route = "media_viewer/$index?category=$category"
+                            val route = "media_viewer/$index?category=$category&fileId=${mediaFile.id}"
                             android.util.Log.d("Navigation", "Navigating to PDF viewer: $route")
-                            navController.navigate(route)  // TODO: Implement dedicated PDF viewer
-                        }
-                        null -> {
-                            val route = "media_viewer/$index?category=$category"
-                            android.util.Log.d("Navigation", "Navigating to: $route")
                             navController.navigate(route)
                         }
                     }
@@ -283,10 +282,15 @@ fun MyFolderNavHost(
         }
 
         composable(
-            route = "media_viewer/{index}?category={category}",
+            route = "media_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(
                 navArgument("index") { type = NavType.IntType },
                 navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("fileId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -295,18 +299,25 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val index = backStackEntry.arguments?.getInt("index") ?: 0
             val category = backStackEntry.arguments?.getString("category")
+            val fileId = backStackEntry.arguments?.getString("fileId")
             MediaViewerScreen(
                 navController = navController,
                 initialIndex = index,
-                category = category
+                category = category,
+                fileId = fileId
             )
         }
 
         composable(
-            route = "photo_viewer/{index}?category={category}",
+            route = "photo_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(
                 navArgument("index") { type = NavType.IntType },
                 navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("fileId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -315,18 +326,25 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val index = backStackEntry.arguments?.getInt("index") ?: 0
             val category = backStackEntry.arguments?.getString("category")
+            val fileId = backStackEntry.arguments?.getString("fileId")
             PhotoViewerScreen(
                 navController = navController,
                 initialIndex = index,
-                category = category
+                category = category,
+                fileId = fileId
             )
         }
 
         composable(
-            route = "video_viewer/{index}?category={category}",
+            route = "video_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(
                 navArgument("index") { type = NavType.IntType },
                 navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("fileId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -335,18 +353,25 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val index = backStackEntry.arguments?.getInt("index") ?: 0
             val category = backStackEntry.arguments?.getString("category")
+            val fileId = backStackEntry.arguments?.getString("fileId")
             VideoViewerScreen(
                 navController = navController,
                 initialIndex = index,
-                category = category
+                category = category,
+                fileId = fileId
             )
         }
 
         composable(
-            route = "audio_viewer/{index}?category={category}",
+            route = "audio_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(
                 navArgument("index") { type = NavType.IntType },
                 navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("fileId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -355,18 +380,25 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val index = backStackEntry.arguments?.getInt("index") ?: 0
             val category = backStackEntry.arguments?.getString("category")
+            val fileId = backStackEntry.arguments?.getString("fileId")
             AudioViewerScreen(
                 navController = navController,
                 initialIndex = index,
-                category = category
+                category = category,
+                fileId = fileId
             )
         }
 
         composable(
-            route = "note_viewer/{index}?category={category}",
+            route = "note_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(
                 navArgument("index") { type = NavType.IntType },
                 navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("fileId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -375,10 +407,12 @@ fun MyFolderNavHost(
         ) { backStackEntry ->
             val index = backStackEntry.arguments?.getInt("index") ?: 0
             val category = backStackEntry.arguments?.getString("category")
+            val fileId = backStackEntry.arguments?.getString("fileId")
             NoteViewerScreen(
                 navController = navController,
                 initialIndex = index,
-                category = category
+                category = category,
+                fileId = fileId
             )
         }
     }

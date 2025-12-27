@@ -32,6 +32,7 @@ fun AudioViewerScreen(
     navController: NavController,
     initialIndex: Int = 0,
     category: String? = null,
+    fileId: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     // Prevent screenshots and screen recording for security
@@ -44,8 +45,24 @@ fun AudioViewerScreen(
         allMediaFiles.filter { it.mediaType == MediaType.AUDIO }
     }
 
+    // If fileId is provided, find the correct index in the filtered list
+    val actualIndex = remember(audioFiles, fileId, initialIndex) {
+        if (fileId != null) {
+            val foundIndex = audioFiles.indexOfFirst { it.id == fileId }
+            if (foundIndex != -1) {
+                android.util.Log.d("AudioViewerScreen", "Found file by ID at index $foundIndex")
+                foundIndex
+            } else {
+                android.util.Log.w("AudioViewerScreen", "File ID $fileId not found, using initialIndex $initialIndex")
+                initialIndex
+            }
+        } else {
+            initialIndex
+        }
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = initialIndex.coerceIn(0, (audioFiles.size - 1).coerceAtLeast(0)),
+        initialPage = actualIndex.coerceIn(0, (audioFiles.size - 1).coerceAtLeast(0)),
         pageCount = { audioFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }

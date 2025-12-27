@@ -32,6 +32,7 @@ fun VideoViewerScreen(
     navController: NavController,
     initialIndex: Int = 0,
     category: String? = null,
+    fileId: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     // Prevent screenshots and screen recording for security
@@ -44,8 +45,24 @@ fun VideoViewerScreen(
         allMediaFiles.filter { it.mediaType == MediaType.VIDEO }
     }
 
+    // If fileId is provided, find the correct index in the filtered list
+    val actualIndex = remember(videoFiles, fileId, initialIndex) {
+        if (fileId != null) {
+            val foundIndex = videoFiles.indexOfFirst { it.id == fileId }
+            if (foundIndex != -1) {
+                android.util.Log.d("VideoViewerScreen", "Found file by ID at index $foundIndex")
+                foundIndex
+            } else {
+                android.util.Log.w("VideoViewerScreen", "File ID $fileId not found, using initialIndex $initialIndex")
+                initialIndex
+            }
+        } else {
+            initialIndex
+        }
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = initialIndex.coerceIn(0, (videoFiles.size - 1).coerceAtLeast(0)),
+        initialPage = actualIndex.coerceIn(0, (videoFiles.size - 1).coerceAtLeast(0)),
         pageCount = { videoFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }

@@ -36,12 +36,13 @@ fun PhotoViewerScreen(
     navController: NavController,
     initialIndex: Int = 0,
     category: String? = null,
+    fileId: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     // Prevent screenshots and screen recording for security
     ScreenSecureEffect()
 
-    android.util.Log.d("PhotoViewerScreen", "PhotoViewerScreen created: initialIndex=$initialIndex, category=$category")
+    android.util.Log.d("PhotoViewerScreen", "PhotoViewerScreen created: initialIndex=$initialIndex, category=$category, fileId=$fileId")
 
     val allMediaFiles by viewModel.mediaFiles.collectAsState()
 
@@ -57,8 +58,24 @@ fun PhotoViewerScreen(
         filtered
     }
 
+    // If fileId is provided, find the correct index in the filtered list
+    val actualIndex = remember(photoFiles, fileId, initialIndex) {
+        if (fileId != null) {
+            val foundIndex = photoFiles.indexOfFirst { it.id == fileId }
+            if (foundIndex != -1) {
+                android.util.Log.d("PhotoViewerScreen", "Found file by ID at index $foundIndex")
+                foundIndex
+            } else {
+                android.util.Log.w("PhotoViewerScreen", "File ID $fileId not found, using initialIndex $initialIndex")
+                initialIndex
+            }
+        } else {
+            initialIndex
+        }
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = initialIndex.coerceIn(0, (photoFiles.size - 1).coerceAtLeast(0)),
+        initialPage = actualIndex.coerceIn(0, (photoFiles.size - 1).coerceAtLeast(0)),
         pageCount = { photoFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }

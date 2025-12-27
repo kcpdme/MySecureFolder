@@ -25,6 +25,7 @@ fun NoteViewerScreen(
     navController: NavController,
     initialIndex: Int = 0,
     category: String? = null,
+    fileId: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     // Prevent screenshots and screen recording for security
@@ -37,8 +38,24 @@ fun NoteViewerScreen(
         allMediaFiles.filter { it.mediaType == MediaType.NOTE }
     }
 
+    // If fileId is provided, find the correct index in the filtered list
+    val actualIndex = remember(noteFiles, fileId, initialIndex) {
+        if (fileId != null) {
+            val foundIndex = noteFiles.indexOfFirst { it.id == fileId }
+            if (foundIndex != -1) {
+                android.util.Log.d("NoteViewerScreen", "Found file by ID at index $foundIndex")
+                foundIndex
+            } else {
+                android.util.Log.w("NoteViewerScreen", "File ID $fileId not found, using initialIndex $initialIndex")
+                initialIndex
+            }
+        } else {
+            initialIndex
+        }
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = initialIndex.coerceIn(0, (noteFiles.size - 1).coerceAtLeast(0)),
+        initialPage = actualIndex.coerceIn(0, (noteFiles.size - 1).coerceAtLeast(0)),
         pageCount = { noteFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }

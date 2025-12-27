@@ -1,0 +1,60 @@
+┌─────────────────────────────────────────────────────────────────┐
+│                         APP LAUNCH                              │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ▼
+            ┌────────────────────┐
+            │  Check Conditions  │
+            └────────┬───────────┘
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+        ▼            ▼            ▼
+   No Password?  Locked?      Unlocked
+        │            │            │
+        ▼            ▼            ▼
+┌──────────────┐ ┌──────────┐ ┌──────────────────────────────────┐
+│Password Setup│ │Vault     │ │   HOME SCREEN                    │
+│Screen        │ │Unlock    │ │   Title: "My Folder"             │
+│              │ │Screen    │ │   File: HomeScreen.kt            │
+└──────┬───────┘ └────┬─────┘ └───────────┬──────────────────────┘
+       │              │                    │
+       └──────────────┴────────────────────┘
+                                           │
+              ┌────────────────────────────┼────────────────┐
+              │                            │                │
+              ▼                            ▼                ▼
+     ┌────────────────┐           ┌──────────────┐   ┌──────────┐
+     │ 6 Category     │           │  Settings    │   │ Various  │
+     │ Cards          │           │  Screen      │   │ Dialogs  │
+     └────┬───────────┘           └──────────────┘   └──────────┘
+          │
+          │ Click on any category card
+          ▼
+┌────────────────────────────────────────────────────────────────┐
+│                    FOLDER SCREEN                               │
+│                    File: FolderScreen.kt                       │
+│                                                                │
+│  Title: "All Files" | "Photos" | "Videos" | "Recordings" |    │
+│         "Notes" | "PDFs"                                       │
+│                                                                │
+│  Features:                                                     │
+│  • Grid/List toggle                                            │
+│  • Search (ALL_FILES only) ⭐                                  │
+│  • Create Folder (disabled for ALL_FILES) ⭐                   │
+│  • Import Files                                                │
+│  • Multi-select                                                │
+│  • FAB to create content (no FAB for ALL_FILES)               │
+└────────┬───────────────────────────────┬───────────────────────┘
+         │                               │
+         │ Click FAB                     │ Click file
+         ▼                               ▼
+┌─────────────────────┐         ┌──────────────────────┐
+│ CAPTURE SCREENS     │         │  VIEWER SCREENS      │
+│                     │         │                      │
+│ • PhotoCamera       │         │  • PhotoViewer       │
+│ • VideoRecorder     │         │  • VideoViewer       │
+│ • AudioRecorder     │         │  • AudioViewer       │
+│ • NoteEditor        │         │  • NoteViewer        │
+│ • DocumentScanner   │         │  • MediaViewer (PDF) │
+└─────────────────────┘         └──────────────────────┘

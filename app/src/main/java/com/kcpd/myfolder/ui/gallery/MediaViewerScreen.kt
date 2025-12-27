@@ -42,6 +42,7 @@ fun MediaViewerScreen(
     navController: NavController,
     initialIndex: Int = 0,
     category: String? = null,
+    fileId: String? = null,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     val allMediaFiles by viewModel.mediaFiles.collectAsState()
@@ -62,8 +63,24 @@ fun MediaViewerScreen(
         }
     }
 
+    // If fileId is provided, find the correct index in the filtered list
+    val actualIndex = remember(mediaFiles, fileId, initialIndex) {
+        if (fileId != null) {
+            val foundIndex = mediaFiles.indexOfFirst { it.id == fileId }
+            if (foundIndex != -1) {
+                android.util.Log.d("MediaViewerScreen", "Found file by ID at index $foundIndex")
+                foundIndex
+            } else {
+                android.util.Log.w("MediaViewerScreen", "File ID $fileId not found, using initialIndex $initialIndex")
+                initialIndex
+            }
+        } else {
+            initialIndex
+        }
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = initialIndex.coerceIn(0, (mediaFiles.size - 1).coerceAtLeast(0)),
+        initialPage = actualIndex.coerceIn(0, (mediaFiles.size - 1).coerceAtLeast(0)),
         pageCount = { mediaFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }

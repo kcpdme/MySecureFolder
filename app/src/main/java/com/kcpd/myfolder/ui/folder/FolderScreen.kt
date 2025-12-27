@@ -40,7 +40,7 @@ enum class FolderViewMode {
 fun FolderScreen(
     onBackClick: () -> Unit,
     onAddClick: (String?) -> Unit,
-    onMediaClick: (Int) -> Unit,
+    onMediaClick: (Int, MediaFile) -> Unit,
     viewModel: FolderViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -472,7 +472,7 @@ fun FolderScreen(
                                     }
                                 } else {
                                     android.util.Log.d("FolderScreen_Grid", "Grid item clicked: index=$index, file=${mediaFile.fileName}")
-                                    onMediaClick(index)
+                                    onMediaClick(index, mediaFile)
                                 }
                             },
                             onLongClick = {
@@ -534,7 +534,7 @@ fun FolderScreen(
                                     }
                                 } else {
                                     android.util.Log.d("FolderScreen_List", "List item clicked: index=$index, file=${mediaFile.fileName}")
-                                    onMediaClick(index)
+                                    onMediaClick(index, mediaFile)
                                 }
                             },
                             onLongClick = {
