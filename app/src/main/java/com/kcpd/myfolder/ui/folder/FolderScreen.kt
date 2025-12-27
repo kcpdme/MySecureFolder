@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -50,6 +51,7 @@ fun FolderScreen(
     val currentFolderId by viewModel.currentFolderId.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val uploadingFiles by viewModel.uploadingFiles.collectAsState()
+    val uploadQueue by viewModel.uploadQueue.collectAsState()
 
     // Log media files data
     android.util.Log.d("FolderScreen", "Category: ${viewModel.category}")
@@ -71,6 +73,7 @@ fun FolderScreen(
     var isImporting by remember { mutableStateOf(false) }
     var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) } // current/total
     var showSearch by remember { mutableStateOf(false) }
+    var showUploadQueue by remember { mutableStateOf(false) }
 
     val hasContent = folders.isNotEmpty() || mediaFiles.isNotEmpty()
     val selectedCount = selectedFiles.size + selectedFolders.size
@@ -189,6 +192,30 @@ fun FolderScreen(
                                     )
                                 }
                             }
+                        }
+
+                        // Upload button - always visible in multi-select mode
+                        IconButton(
+                            onClick = {
+                                val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
+                                viewModel.uploadFiles(selectedMediaFiles)
+                                // Clear selection and exit multi-select mode
+                                selectedFiles = emptySet()
+                                selectedFolders = emptySet()
+                                isMultiSelectMode = false
+                                // Show upload queue bottom sheet
+                                showUploadQueue = true
+                            },
+                            enabled = selectedCount > 0
+                        ) {
+                            Icon(
+                                Icons.Default.CloudUpload,
+                                "Upload Selected",
+                                tint = if (selectedCount > 0)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
                         }
 
                         // Move button - always visible in multi-select mode
@@ -338,6 +365,30 @@ fun FolderScreen(
                             }) {
                                 Icon(Icons.Default.CheckCircle, "Select")
                             }
+
+                            // Overflow menu for bulk actions
+                            var showMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, "More options")
+                                }
+                                DropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Upload All Files") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.CloudUpload, "Upload All")
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            viewModel.uploadFiles(mediaFiles)
+                                            showUploadQueue = true
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 },
@@ -360,13 +411,56 @@ fun FolderScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Show upload progress bar if any files are uploading
-            if (uploadingFiles.isNotEmpty()) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primaryContainer
-                )
+            // Floating upload status indicator (replaces simple progress bar)
+            val totalUploads = uploadingFiles.size + uploadQueue.size
+            if (totalUploads > 0) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showUploadQueue = true },
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Column {
+                                Text(
+                                    text = if (uploadingFiles.size > 0)
+                                        "Uploading ${uploadingFiles.size} file${if (uploadingFiles.size > 1) "s" else ""}"
+                                    else
+                                        "Preparing uploads...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                                )
+                                if (uploadQueue.size > 0) {
+                                    Text(
+                                        text = "${uploadQueue.size} in queue",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        Icon(
+                            Icons.Default.ExpandLess,
+                            contentDescription = "Show upload details",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
 
             // Search bar for ALL_FILES category
@@ -654,5 +748,193 @@ fun FolderScreen(
                 }
             }
         }
+
+        // Upload Queue Bottom Sheet
+        if (showUploadQueue) {
+            ModalBottomSheet(
+                onDismissRequest = { showUploadQueue = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                UploadQueueSheet(
+                    uploadingFiles = uploadingFiles,
+                    queuedFiles = uploadQueue,
+                    allFiles = mediaFiles,
+                    onDismiss = { showUploadQueue = false }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UploadQueueSheet(
+    uploadingFiles: Set<String>,
+    queuedFiles: List<String>,
+    allFiles: List<MediaFile>,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Upload Queue",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "${uploadingFiles.size} uploading, ${queuedFiles.size} waiting",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, "Close")
+            }
+        }
+
+        Divider()
+
+        // Uploading files section
+        if (uploadingFiles.isNotEmpty()) {
+            Text(
+                text = "Uploading Now",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            uploadingFiles.forEach { fileId ->
+                val file = allFiles.find { it.id == fileId }
+                file?.let {
+                    UploadQueueItem(
+                        fileName = it.fileName,
+                        fileSize = it.size,
+                        status = UploadStatus.UPLOADING
+                    )
+                }
+            }
+        }
+
+        // Queued files section
+        if (queuedFiles.isNotEmpty()) {
+            Text(
+                text = "Waiting in Queue",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            queuedFiles.forEach { fileId ->
+                val file = allFiles.find { it.id == fileId }
+                file?.let {
+                    UploadQueueItem(
+                        fileName = it.fileName,
+                        fileSize = it.size,
+                        status = UploadStatus.QUEUED
+                    )
+                }
+            }
+        }
+
+        // Empty state
+        if (uploadingFiles.isEmpty() && queuedFiles.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.CloudDone,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No uploads in progress",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "All files uploaded successfully",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+enum class UploadStatus {
+    UPLOADING, QUEUED
+}
+
+@Composable
+fun UploadQueueItem(
+    fileName: String,
+    fileSize: Long,
+    status: UploadStatus
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Status indicator
+        if (status == UploadStatus.UPLOADING) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Icon(
+                Icons.Default.Schedule,
+                contentDescription = "Queued",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        // File info
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = fileName,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = formatFileSize(fileSize),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Status text
+        Text(
+            text = if (status == UploadStatus.UPLOADING) "Uploading..." else "Waiting",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (status == UploadStatus.UPLOADING)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

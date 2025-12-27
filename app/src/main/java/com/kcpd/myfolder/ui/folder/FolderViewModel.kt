@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 
 @HiltViewModel
@@ -79,6 +81,12 @@ class FolderViewModel @Inject constructor(
     private val _uploadingFiles = MutableStateFlow<Set<String>>(emptySet())
     val uploadingFiles: StateFlow<Set<String>> = _uploadingFiles.asStateFlow()
 
+    private val _uploadQueue = MutableStateFlow<List<String>>(emptyList())
+    val uploadQueue: StateFlow<List<String>> = _uploadQueue.asStateFlow()
+
+    // Semaphore to limit concurrent uploads (2 for Google Drive, 3 for B2)
+    private val uploadSemaphore = Semaphore(2)
+
     fun navigateToFolder(folderId: String?) {
         _currentFolderId.value = folderId
     }
@@ -123,26 +131,51 @@ class FolderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Upload a single file with rate limiting and concurrency control.
+     * Uses a semaphore to limit concurrent uploads to 2-3 at a time.
+     */
     fun uploadFile(mediaFile: MediaFile) {
         viewModelScope.launch {
-            _uploadingFiles.value = _uploadingFiles.value + mediaFile.id
-            android.util.Log.d("FolderViewModel", "Upload started for: ${mediaFile.fileName}, uploading state: true")
-            try {
-                // Add minimum delay to ensure progress indicator is visible
-                delay(500)
-                val result = remoteStorageRepository.uploadFile(mediaFile)
-                result.onSuccess { url ->
-                    android.util.Log.d("FolderViewModel", "File uploaded successfully: ${mediaFile.fileName} -> $url")
-                }.onFailure { error ->
-                    android.util.Log.e("FolderViewModel", "Upload failed for ${mediaFile.fileName}", error)
-                    // Upload failed - could show toast or error state here
+            // Add to queue first
+            _uploadQueue.value = _uploadQueue.value + mediaFile.id
+
+            // Wait for available slot (max 2 concurrent uploads)
+            uploadSemaphore.withPermit {
+                // Remove from queue, add to uploading
+                _uploadQueue.value = _uploadQueue.value - mediaFile.id
+                _uploadingFiles.value = _uploadingFiles.value + mediaFile.id
+
+                android.util.Log.d("FolderViewModel", "Upload started for: ${mediaFile.fileName}")
+                try {
+                    val result = remoteStorageRepository.uploadFile(mediaFile)
+                    result.onSuccess { url ->
+                        android.util.Log.d("FolderViewModel", "File uploaded successfully: ${mediaFile.fileName} -> $url")
+                    }.onFailure { error ->
+                        android.util.Log.e("FolderViewModel", "Upload failed for ${mediaFile.fileName}", error)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
+                } finally {
+                    _uploadingFiles.value = _uploadingFiles.value - mediaFile.id
+                    android.util.Log.d("FolderViewModel", "Upload finished for: ${mediaFile.fileName}")
+
+                    // Rate limiting: delay before next upload
+                    // Google Drive: max 1000 requests/100s = ~10 req/s = 100ms delay
+                    // B2: max 1000 requests/day for free tier = be conservative
+                    delay(150)
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
-            } finally {
-                _uploadingFiles.value = _uploadingFiles.value - mediaFile.id
-                android.util.Log.d("FolderViewModel", "Upload finished for: ${mediaFile.fileName}, uploading state: false")
             }
+        }
+    }
+
+    /**
+     * Upload multiple files in batches with proper rate limiting.
+     * Recommended for bulk operations.
+     */
+    fun uploadFiles(mediaFiles: List<MediaFile>) {
+        mediaFiles.forEach { file ->
+            uploadFile(file)
         }
     }
 
