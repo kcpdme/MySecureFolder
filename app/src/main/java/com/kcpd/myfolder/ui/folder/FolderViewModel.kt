@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 @HiltViewModel
@@ -125,7 +126,10 @@ class FolderViewModel @Inject constructor(
     fun uploadFile(mediaFile: MediaFile) {
         viewModelScope.launch {
             _uploadingFiles.value = _uploadingFiles.value + mediaFile.id
+            android.util.Log.d("FolderViewModel", "Upload started for: ${mediaFile.fileName}, uploading state: true")
             try {
+                // Add minimum delay to ensure progress indicator is visible
+                delay(500)
                 val result = s3Repository.uploadFile(mediaFile)
                 result.onSuccess { url ->
                     val updatedFile = mediaFile.copy(isUploaded = true, s3Url = url)
@@ -139,6 +143,7 @@ class FolderViewModel @Inject constructor(
                 android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
             } finally {
                 _uploadingFiles.value = _uploadingFiles.value - mediaFile.id
+                android.util.Log.d("FolderViewModel", "Upload finished for: ${mediaFile.fileName}, uploading state: false")
             }
         }
     }

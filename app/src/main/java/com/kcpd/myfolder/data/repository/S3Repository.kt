@@ -67,60 +67,82 @@ class S3Repository @Inject constructor(
     suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
         var tempDecryptedFile: File? = null
         try {
-            // Get session manager on main thread first to avoid lifecycle issues
-            val cachedClient = withContext(Dispatchers.Main) {
-                sessionManager.get().getClient()
-            }
-            val cachedConfig = withContext(Dispatchers.Main) {
-                sessionManager.get().getConfig()
-            }
-
-            // Now do all IO operations (already on IO dispatcher from outer withContext)
-            val minioClient: MinioClient
-            val config: S3Config
-
-            if (cachedClient != null && cachedConfig != null) {
-                // Use cached session
-                Log.d("S3Repository", "Using cached S3 session")
-                minioClient = cachedClient
-                config = cachedConfig
-            } else {
-                // No cached session - create new client
-                Log.d("S3Repository", "No cached session, creating new MinIO client")
-                config = s3Config.first() ?: return@withContext Result.failure(
-                    Exception("S3 configuration not found. Please configure S3 settings first.")
-                )
-
-                minioClient = MinioClient.builder()
-                    .endpoint(config.endpoint)
-                    .credentials(config.accessKey, config.secretKey)
-                    .region(config.region)
-                    .build()
-            }
-
-            // Step 1: Decrypt the encrypted file to a temporary file
+            // Step 1: Decrypt the encrypted file to a temporary file (do this once)
             val encryptedFile = File(mediaFile.filePath)
             Log.d("S3Repository", "Decrypting file for upload: ${mediaFile.fileName}")
             tempDecryptedFile = secureFileManager.decryptFile(encryptedFile)
             Log.d("S3Repository", "Decrypted to temp file: ${tempDecryptedFile.absolutePath}, size: ${tempDecryptedFile.length()} bytes")
 
-            // Step 2: Upload the decrypted file to S3
-            val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-            val objectName = "${category.path}/${mediaFile.fileName}"
+            var lastException: Exception? = null
+            val maxRetries = 3
 
-            minioClient.putObject(
-                PutObjectArgs.builder()
-                    .bucket(config.bucketName)
-                    .`object`(objectName)
-                    .stream(tempDecryptedFile.inputStream(), tempDecryptedFile.length(), -1)
-                    .contentType(getContentType(mediaFile.fileName))
-                    .build()
-            )
+            // Retry loop for upload
+            for (attempt in 1..maxRetries) {
+                try {
+                    val minioClient: MinioClient
+                    val config: S3Config
 
-            val url = "${config.endpoint}/${config.bucketName}/$objectName"
-            Log.d("S3Repository", "File uploaded successfully: $url")
+                    // Attempt 1: Try to use cached session
+                    // Attempts > 1: Force new client to handle potential stale connections (Broken pipe)
+                    val useCached = attempt == 1
+                    
+                    var cachedClient: MinioClient? = null
+                    var cachedConfig: S3Config? = null
 
-            Result.success(url)
+                    if (useCached) {
+                        cachedClient = withContext(Dispatchers.Main) {
+                            sessionManager.get().getClient()
+                        }
+                        cachedConfig = withContext(Dispatchers.Main) {
+                            sessionManager.get().getConfig()
+                        }
+                    }
+
+                    if (useCached && cachedClient != null && cachedConfig != null) {
+                        Log.d("S3Repository", "Attempt $attempt: Using cached S3 session")
+                        minioClient = cachedClient
+                        config = cachedConfig
+                    } else {
+                        Log.d("S3Repository", "Attempt $attempt: Creating new MinIO client")
+                        config = s3Config.first() ?: throw Exception("S3 configuration not found. Please configure S3 settings first.")
+
+                        minioClient = MinioClient.builder()
+                            .endpoint(config.endpoint)
+                            .credentials(config.accessKey, config.secretKey)
+                            .region(config.region)
+                            .build()
+                    }
+
+                    // Step 2: Upload the decrypted file to S3
+                    val category = FolderCategory.fromMediaType(mediaFile.mediaType)
+                    val objectName = "${category.path}/${mediaFile.fileName}"
+
+                    minioClient.putObject(
+                        PutObjectArgs.builder()
+                            .bucket(config.bucketName)
+                            .`object`(objectName)
+                            .stream(tempDecryptedFile.inputStream(), tempDecryptedFile.length(), -1)
+                            .contentType(getContentType(mediaFile.fileName))
+                            .build()
+                    )
+
+                    val url = "${config.endpoint}/${config.bucketName}/$objectName"
+                    Log.d("S3Repository", "File uploaded successfully on attempt $attempt: $url")
+
+                    return@withContext Result.success(url)
+
+                } catch (e: Exception) {
+                    Log.e("S3Repository", "Upload attempt $attempt failed", e)
+                    lastException = e
+                    if (attempt < maxRetries) {
+                        // Exponential backoff: 1s, 2s
+                        kotlinx.coroutines.delay(1000L * attempt)
+                    }
+                }
+            }
+
+            throw lastException ?: Exception("Upload failed after $maxRetries attempts")
+
         } catch (e: Exception) {
             Log.e("S3Repository", "Upload failed", e)
             Result.failure(e)

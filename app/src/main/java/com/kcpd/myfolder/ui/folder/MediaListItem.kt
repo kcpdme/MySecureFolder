@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,13 +59,14 @@ fun FolderMediaListItem(
         else
             MaterialTheme.colorScheme.surface
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 13.dp, horizontal = 17.dp),  // Tella-style padding
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(17.dp)  // Tella-style spacing
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 13.dp, horizontal = 17.dp),  // Tella-style padding
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(17.dp)  // Tella-style spacing
+            ) {
             // Thumbnail in CardView style
             Card(
                 modifier = Modifier.size(48.dp),  // Slightly larger than Tella's 35dp for better visibility
@@ -300,6 +302,19 @@ fun FolderMediaListItem(
                         )
                     }
                 }
+            }
+        }
+
+            // Horizontal progress indicator at bottom when uploading
+            if (isUploading) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             }
         }
     }

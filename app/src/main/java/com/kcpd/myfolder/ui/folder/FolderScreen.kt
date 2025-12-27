@@ -49,10 +49,12 @@ fun FolderScreen(
     val currentFolder by viewModel.currentFolder.collectAsState()
     val currentFolderId by viewModel.currentFolderId.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val uploadingFiles by viewModel.uploadingFiles.collectAsState()
 
     // Log media files data
     android.util.Log.d("FolderScreen", "Category: ${viewModel.category}")
     android.util.Log.d("FolderScreen", "MediaFiles count: ${mediaFiles.size}")
+    android.util.Log.d("FolderScreen", "Uploading files: ${uploadingFiles.size} files: $uploadingFiles")
     mediaFiles.forEachIndexed { index, file ->
         android.util.Log.d("FolderScreen", "[$index] File: ${file.fileName}, Type: ${file.mediaType}, Path: ${file.filePath}")
     }
@@ -358,6 +360,15 @@ fun FolderScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Show upload progress bar if any files are uploading
+            if (uploadingFiles.isNotEmpty()) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            }
+
             // Search bar for ALL_FILES category
             if (viewModel.category == FolderCategory.ALL_FILES && showSearch) {
                 OutlinedTextField(
@@ -424,8 +435,8 @@ fun FolderScreen(
                         top = 0.dp,
                         bottom = 0.dp
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     // Folders first
@@ -645,5 +656,3 @@ fun FolderScreen(
         }
     }
 }
-
-
