@@ -12,10 +12,9 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +28,9 @@ fun HomeScreen(
     onSettingsClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val allFilesCount by viewModel.allFilesCount.collectAsState()
     val photosCount by viewModel.photosCount.collectAsState()
     val videosCount by viewModel.videosCount.collectAsState()
@@ -43,7 +45,24 @@ fun HomeScreen(
     val notesSize by viewModel.notesSize.collectAsState()
     val pdfsSize by viewModel.pdfsSize.collectAsState()
 
+    // VERSION VERIFICATION LOGGING
+    LaunchedEffect(Unit) {
+        val buildTime = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        android.util.Log.d("HomeScreen", "═══════════════════════════════════════")
+        android.util.Log.d("HomeScreen", "🏠 HOME SCREEN v2.0 LOADED 🏠")
+        android.util.Log.d("HomeScreen", "Build Time: $buildTime")
+        android.util.Log.d("HomeScreen", "Photo orientation: Tella approach (pre-rotate before encryption)")
+        android.util.Log.d("HomeScreen", "Camera controls: Bottom layout")
+        android.util.Log.d("HomeScreen", "═══════════════════════════════════════")
+
+        snackbarHostState.showSnackbar(
+            message = "✅ App v2.0 - Build: $buildTime",
+            duration = SnackbarDuration.Long
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("My Folder") },

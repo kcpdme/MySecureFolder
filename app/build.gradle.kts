@@ -99,6 +99,9 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")
 
+    // ExifInterface for reading/writing image orientation metadata
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // ExoPlayer for video playback (Latest Media3)
     implementation("androidx.media3:media3-exoplayer:1.5.0")
     implementation("androidx.media3:media3-ui:1.5.0")

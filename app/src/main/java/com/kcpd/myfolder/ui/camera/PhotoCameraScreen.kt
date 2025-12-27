@@ -193,55 +193,17 @@ fun PhotoCameraPreview(
                 }
         )
 
-        // Top controls bar
-        Row(
+        // Top controls bar (Only Close button)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .align(Alignment.TopCenter)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(
-                    onClick = { flashEnabled = !flashEnabled },
-                    modifier = Modifier
-                        .background(
-                            Color.Black.copy(alpha = 0.5f),
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                        contentDescription = "Flash",
-                        tint = Color.White
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
-                            CameraSelector.LENS_FACING_FRONT
-                        } else {
-                            CameraSelector.LENS_FACING_BACK
-                        }
-                    },
-                    modifier = Modifier
-                        .background(
-                            Color.Black.copy(alpha = 0.5f),
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        Icons.Default.FlipCameraAndroid,
-                        contentDescription = "Flip Camera",
-                        tint = Color.White
-                    )
-                }
-            }
-
             IconButton(
                 onClick = onClose,
                 modifier = Modifier
+                    .align(Alignment.TopEnd)
                     .background(
                         Color.Black.copy(alpha = 0.5f),
                         shape = CircleShape
@@ -255,11 +217,11 @@ fun PhotoCameraPreview(
             }
         }
 
-        // Zoom controls
+        // Zoom controls (Moved up to accommodate bottom bar)
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 120.dp)
+                .padding(bottom = 140.dp)
                 .background(
                     Color.Black.copy(alpha = 0.5f),
                     shape = MaterialTheme.shapes.medium
@@ -285,37 +247,85 @@ fun PhotoCameraPreview(
             }
         }
 
-        FloatingActionButton(
-            onClick = {
-                val photoFile = createMediaFile(context, "jpg")
-                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
-                imageCapture.takePicture(
-                    outputOptions,
-                    androidx.core.content.ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            onPhotoCaptured(photoFile)
-                        }
-                        override fun onError(exception: ImageCaptureException) {
-                            exception.printStackTrace()
-                        }
-                    }
-                )
-            },
+        // Bottom Controls Row: Flash | Shutter | Flip
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 40.dp)
-                .size(72.dp),
-            containerColor = Color.White,
-            shape = CircleShape
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.PhotoCamera,
-                contentDescription = "Take Photo",
-                tint = Color.Black,
-                modifier = Modifier.size(32.dp)
-            )
+            // Flash Button
+            IconButton(
+                onClick = { flashEnabled = !flashEnabled },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = "Flash",
+                    tint = Color.White
+                )
+            }
+
+            // Shutter Button
+            FloatingActionButton(
+                onClick = {
+                    val photoFile = createMediaFile(context, "jpg")
+                    val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+                    imageCapture.takePicture(
+                        outputOptions,
+                        androidx.core.content.ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                onPhotoCaptured(photoFile)
+                            }
+                            override fun onError(exception: ImageCaptureException) {
+                                exception.printStackTrace()
+                            }
+                        }
+                    )
+                },
+                modifier = Modifier.size(72.dp),
+                containerColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Default.PhotoCamera,
+                    contentDescription = "Take Photo",
+                    tint = Color.Black,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            // Flip Camera Button
+            IconButton(
+                onClick = {
+                    lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        CameraSelector.LENS_FACING_FRONT
+                    } else {
+                        CameraSelector.LENS_FACING_BACK
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    Icons.Default.FlipCameraAndroid,
+                    contentDescription = "Flip Camera",
+                    tint = Color.White
+                )
+            }
         }
     }
 }

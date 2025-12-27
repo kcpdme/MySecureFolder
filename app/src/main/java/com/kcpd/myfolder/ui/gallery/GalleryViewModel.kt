@@ -2,11 +2,16 @@ package com.kcpd.myfolder.ui.gallery
 
 import android.app.Application
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.graphics.Rect
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kcpd.myfolder.data.model.MediaFile
+import com.kcpd.myfolder.data.model.MediaType
 import com.kcpd.myfolder.data.repository.MediaRepository
 import com.kcpd.myfolder.data.repository.S3Repository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -127,6 +132,145 @@ class GalleryViewModel @Inject constructor(
                     "Failed to share file: ${e.message}",
                     Toast.LENGTH_SHORT
                 ).show()
+            }
+        }
+    }
+
+    /**
+     * Rotates a photo 90 degrees clockwise and saves as a new encrypted file.
+     * @param mediaFile The photo to rotate
+     * @return The newly created rotated MediaFile, or null if rotation failed
+     */
+    fun rotatePhoto(mediaFile: MediaFile, onComplete: (MediaFile?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>()
+
+                // Decrypt the file to temp location
+                val decryptedFile = mediaRepository.decryptForViewing(mediaFile)
+
+                // Load bitmap
+                val originalBitmap = BitmapFactory.decodeFile(decryptedFile.absolutePath)
+                    ?: throw IllegalStateException("Failed to decode image")
+
+                // Rotate 90 degrees clockwise
+                val matrix = Matrix().apply {
+                    postRotate(90f)
+                }
+                val rotatedBitmap = Bitmap.createBitmap(
+                    originalBitmap,
+                    0, 0,
+                    originalBitmap.width,
+                    originalBitmap.height,
+                    matrix,
+                    true
+                )
+
+                // Save rotated bitmap to temp file
+                val rotatedTempFile = File(context.cacheDir, "rotated_${System.currentTimeMillis()}.jpg")
+                rotatedTempFile.outputStream().use { out ->
+                    rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                }
+
+                // Clean up bitmaps
+                originalBitmap.recycle()
+                rotatedBitmap.recycle()
+                decryptedFile.delete()
+
+                // Add as new encrypted file with same folder as original
+                val newMediaFile = mediaRepository.addMediaFile(
+                    file = rotatedTempFile,
+                    mediaType = MediaType.PHOTO,
+                    folderId = mediaFile.folderId
+                )
+
+                // Clean up temp file
+                rotatedTempFile.delete()
+
+                Toast.makeText(context, "Photo rotated and saved", Toast.LENGTH_SHORT).show()
+                onComplete(newMediaFile)
+            } catch (e: Exception) {
+                android.util.Log.e("GalleryViewModel", "Failed to rotate photo", e)
+                Toast.makeText(
+                    getApplication(),
+                    "Failed to rotate photo: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                onComplete(null)
+            }
+        }
+    }
+
+    /**
+     * Crops a photo using the provided crop rectangle and saves as a new encrypted file.
+     * @param mediaFile The photo to crop
+     * @param cropRect The crop rectangle (x, y, width, height) in image coordinates
+     * @return The newly created cropped MediaFile, or null if crop failed
+     */
+    fun cropPhoto(mediaFile: MediaFile, cropRect: Rect, onComplete: (MediaFile?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>()
+
+                // Decrypt the file to temp location
+                val decryptedFile = mediaRepository.decryptForViewing(mediaFile)
+
+                // Load bitmap
+                val originalBitmap = BitmapFactory.decodeFile(decryptedFile.absolutePath)
+                    ?: throw IllegalStateException("Failed to decode image")
+
+                // Validate crop rectangle
+                val validCropRect = Rect(
+                    cropRect.left.coerceIn(0, originalBitmap.width),
+                    cropRect.top.coerceIn(0, originalBitmap.height),
+                    cropRect.right.coerceIn(0, originalBitmap.width),
+                    cropRect.bottom.coerceIn(0, originalBitmap.height)
+                )
+
+                if (validCropRect.width() <= 0 || validCropRect.height() <= 0) {
+                    throw IllegalArgumentException("Invalid crop rectangle")
+                }
+
+                // Crop bitmap
+                val croppedBitmap = Bitmap.createBitmap(
+                    originalBitmap,
+                    validCropRect.left,
+                    validCropRect.top,
+                    validCropRect.width(),
+                    validCropRect.height()
+                )
+
+                // Save cropped bitmap to temp file
+                val croppedTempFile = File(context.cacheDir, "cropped_${System.currentTimeMillis()}.jpg")
+                croppedTempFile.outputStream().use { out ->
+                    croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                }
+
+                // Clean up bitmaps
+                originalBitmap.recycle()
+                croppedBitmap.recycle()
+                decryptedFile.delete()
+
+                // Add as new encrypted file with same folder as original
+                val newMediaFile = mediaRepository.addMediaFile(
+                    file = croppedTempFile,
+                    mediaType = MediaType.PHOTO,
+                    folderId = mediaFile.folderId
+                )
+
+                // Clean up temp file
+                croppedTempFile.delete()
+
+                Toast.makeText(context, "Photo cropped and saved", Toast.LENGTH_SHORT).show()
+                onComplete(newMediaFile)
+            } catch (e: Exception) {
+                android.util.Log.e("GalleryViewModel", "Failed to crop photo", e)
+                Toast.makeText(
+                    getApplication(),
+                    "Failed to crop photo: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                onComplete(null)
             }
         }
     }

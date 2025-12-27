@@ -187,9 +187,16 @@ class MediaRepository @Inject constructor(
         val category = FolderCategory.fromMediaType(mediaType)
         val secureDir = File(secureFileManager.getSecureStorageDir(), category.path).apply { mkdirs() }
 
+        // For photos: rotate based on EXIF orientation BEFORE encryption (Tella's approach)
+        val fileToEncrypt = if (mediaType == MediaType.PHOTO) {
+            rotatePhotoIfNeeded(file)
+        } else {
+            file
+        }
+
         // Calculate hash and size BEFORE encryption
-        val originalSize = file.length()
-        val verificationHash = calculateHash(file)
+        val originalSize = fileToEncrypt.length()
+        val verificationHash = calculateHash(fileToEncrypt)
         val fileName = file.name
         val mimeType = getMimeType(file.extension)
 
@@ -197,9 +204,14 @@ class MediaRepository @Inject constructor(
         var thumbnail: ByteArray? = null
 
         try {
-            // Step 1: Encrypt the file
-            encryptedFile = secureFileManager.encryptFile(file, secureDir)
+            // Step 1: Encrypt the file (which is already rotated for photos)
+            encryptedFile = secureFileManager.encryptFile(fileToEncrypt, secureDir)
             android.util.Log.d("MediaRepository", "  Encrypted to: ${encryptedFile.name}")
+
+            // Clean up rotated temp file if we created one
+            if (fileToEncrypt != file && fileToEncrypt.exists()) {
+                fileToEncrypt.delete()
+            }
 
             // Step 2: Generate thumbnail for photos and videos
             thumbnail = when (mediaType) {
@@ -701,6 +713,110 @@ class MediaRepository @Inject constructor(
 
     fun getCategoryDirectory(category: FolderCategory): File {
         return File(secureFileManager.getSecureStorageDir(), category.path).apply { mkdirs() }
+    }
+
+    /**
+     * Rotates photo based on EXIF orientation before encryption (Tella's approach).
+     * Returns a new temp file with rotated bitmap, or the original file if no rotation needed.
+     */
+    private fun rotatePhotoIfNeeded(file: File): File {
+        try {
+            // Read EXIF orientation
+            val exif = androidx.exifinterface.media.ExifInterface(file.absolutePath)
+            val orientation = exif.getAttributeInt(
+                androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+            )
+
+            android.util.Log.d("MediaRepository", "Photo EXIF orientation: $orientation for ${file.name}")
+
+            // If no rotation needed, return original file
+            if (orientation == androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL ||
+                orientation == androidx.exifinterface.media.ExifInterface.ORIENTATION_UNDEFINED) {
+                android.util.Log.d("MediaRepository", "No rotation needed, using original file")
+                return file
+            }
+
+            // Decode bitmap
+            val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                ?: throw IllegalStateException("Failed to decode photo: ${file.absolutePath}")
+
+            // Apply rotation based on EXIF
+            val rotatedBitmap = when (orientation) {
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> {
+                    android.util.Log.d("MediaRepository", "Rotating 90°")
+                    rotateBitmap(bitmap, 90f)
+                }
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> {
+                    android.util.Log.d("MediaRepository", "Rotating 180°")
+                    rotateBitmap(bitmap, 180f)
+                }
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> {
+                    android.util.Log.d("MediaRepository", "Rotating 270°")
+                    rotateBitmap(bitmap, 270f)
+                }
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> {
+                    android.util.Log.d("MediaRepository", "Flipping horizontally")
+                    flipBitmap(bitmap, horizontal = true, vertical = false)
+                }
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+                    android.util.Log.d("MediaRepository", "Flipping vertically")
+                    flipBitmap(bitmap, horizontal = false, vertical = true)
+                }
+                else -> {
+                    android.util.Log.d("MediaRepository", "Unsupported orientation: $orientation, using original")
+                    return file
+                }
+            }
+
+            // Save rotated bitmap to temp file
+            val tempFile = File(context.cacheDir, "rotated_${file.name}")
+            tempFile.outputStream().use { out ->
+                rotatedBitmap.compress(
+                    android.graphics.Bitmap.CompressFormat.JPEG,
+                    100, // Use maximum quality since we'll encrypt it
+                    out
+                )
+            }
+
+            // Clean up bitmaps
+            if (rotatedBitmap != bitmap) {
+                bitmap.recycle()
+            }
+            rotatedBitmap.recycle()
+
+            android.util.Log.d("MediaRepository", "Saved rotated photo to temp file: ${tempFile.name}")
+            return tempFile
+
+        } catch (e: Exception) {
+            android.util.Log.e("MediaRepository", "Failed to rotate photo, using original", e)
+            return file
+        }
+    }
+
+    /**
+     * Rotates a bitmap by the given degrees.
+     */
+    private fun rotateBitmap(bitmap: android.graphics.Bitmap, degrees: Float): android.graphics.Bitmap {
+        val matrix = android.graphics.Matrix()
+        matrix.postRotate(degrees)
+        return android.graphics.Bitmap.createBitmap(
+            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+        )
+    }
+
+    /**
+     * Flips a bitmap horizontally and/or vertically.
+     */
+    private fun flipBitmap(bitmap: android.graphics.Bitmap, horizontal: Boolean, vertical: Boolean): android.graphics.Bitmap {
+        val matrix = android.graphics.Matrix()
+        matrix.preScale(
+            if (horizontal) -1f else 1f,
+            if (vertical) -1f else 1f
+        )
+        return android.graphics.Bitmap.createBitmap(
+            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+        )
     }
 
     /**

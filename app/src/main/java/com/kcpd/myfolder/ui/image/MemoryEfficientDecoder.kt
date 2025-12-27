@@ -9,13 +9,7 @@ import coil.decode.Decoder
 import coil.decode.ImageSource
 import coil.fetch.SourceResult
 import coil.request.Options
-import coil.size.Dimension
-import coil.size.Size
 import coil.size.pxOrElse
-import okio.BufferedSource
-import kotlin.math.ceil
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * Memory-efficient decoder that downsamples large images to fit the target size.
@@ -29,6 +23,8 @@ import kotlin.math.min
  * Performance improvements:
  * - 3.6MB image: 650ms GC blocking → ~100ms decoding
  * - 600KB image: Already fast, no impact
+ *
+ * Note: No EXIF rotation needed here since photos are already rotated before encryption.
  */
 class MemoryEfficientDecoder(
     private val source: ImageSource,

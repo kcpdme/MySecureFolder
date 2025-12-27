@@ -2,6 +2,7 @@ package com.kcpd.myfolder.ui.camera
 
 import android.Manifest
 import android.net.Uri
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -66,6 +67,22 @@ fun CameraScreen(
             Manifest.permission.RECORD_AUDIO
         )
     )
+
+    // VERSION VERIFICATION LOGGING
+    LaunchedEffect(Unit) {
+        android.util.Log.d("CameraScreen", "═══════════════════════════════════════")
+        android.util.Log.d("CameraScreen", "🔴 NEW CAMERA VERSION v2.0 LOADED 🔴")
+        android.util.Log.d("CameraScreen", "Controls Layout: Flash + Flip + Shutter at BOTTOM")
+        android.util.Log.d("CameraScreen", "Zoom Indicator: At TOP")
+        android.util.Log.d("CameraScreen", "Build Time: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+        android.util.Log.d("CameraScreen", "═══════════════════════════════════════")
+
+        android.widget.Toast.makeText(
+            context,
+            "✅ NEW Camera v2.0 - Controls at Bottom",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+    }
 
     LaunchedEffect(Unit) {
         if (!permissionsState.allPermissionsGranted) {
@@ -224,23 +241,36 @@ fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val previewView = remember { PreviewView(context) }
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FIT_CENTER  // Show full sensor area without cropping
+        }
+    }
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+            .build()
+    }
     var recording: Recording? by remember { mutableStateOf(null) }
     var isRecording by remember { mutableStateOf(false) }
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashEnabled by remember { mutableStateOf(false) }
     var zoomRatio by remember { mutableStateOf(1f) }
+    var minZoomRatio by remember { mutableStateOf(1f) }
+    var maxZoomRatio by remember { mutableStateOf(1f) }
 
     DisposableEffect(lensFacing) {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().apply {
-                setSurfaceProvider(previewView.surfaceProvider)
-            }
+            val preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                .build()
+                .apply {
+                    setSurfaceProvider(previewView.surfaceProvider)
+                }
 
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(lensFacing)
@@ -255,6 +285,11 @@ fun CameraPreview(
                     imageCapture
                 )
                 cameraControl = camera.cameraControl
+
+                // Get camera zoom capabilities
+                val cameraInfo = camera.cameraInfo
+                minZoomRatio = cameraInfo.zoomState.value?.minZoomRatio ?: 1f
+                maxZoomRatio = cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
 
                 // Set initial zoom
                 camera.cameraControl.setZoomRatio(zoomRatio)
@@ -294,26 +329,61 @@ fun CameraPreview(
             factory = { previewView },
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput(minZoomRatio, maxZoomRatio) {
                     detectTransformGestures { _, _, zoom, _ ->
-                        val newZoom = (zoomRatio * zoom).coerceIn(0.5f, 5f)
+                        val newZoom = (zoomRatio * zoom).coerceIn(minZoomRatio, maxZoomRatio)
                         zoomRatio = newZoom
                     }
                 }
         )
 
-        // Top controls bar
+        // Zoom indicator at top
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "v2.0 ✓",
+                color = Color.Green,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.7f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${String.format("%.1f", zoomRatio)}x",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+
+        // VERSION 2.0: Bottom camera controls - centered row with buttons close together
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 40.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Flash toggle
+            android.util.Log.d("CameraPreview", "🟢 RENDERING BOTTOM CONTROLS - Flash, Flip, Shutter at BottomCenter")
+
+            // Flash button
             IconButton(
                 onClick = { flashEnabled = !flashEnabled },
                 modifier = Modifier
+                    .size(56.dp)
                     .background(
                         Color.Black.copy(alpha = 0.5f),
                         shape = CircleShape
@@ -322,11 +392,12 @@ fun CameraPreview(
                 Icon(
                     if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
                     contentDescription = "Flash",
-                    tint = Color.White
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
-            // Camera flip
+            // Camera flip button
             IconButton(
                 onClick = {
                     lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
@@ -336,6 +407,7 @@ fun CameraPreview(
                     }
                 },
                 modifier = Modifier
+                    .size(56.dp)
                     .background(
                         Color.Black.copy(alpha = 0.5f),
                         shape = CircleShape
@@ -344,91 +416,60 @@ fun CameraPreview(
                 Icon(
                     Icons.Default.FlipCameraAndroid,
                     contentDescription = "Flip Camera",
-                    tint = Color.White
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
                 )
             }
-        }
 
-        // Zoom controls (horizontal, Samsung-style)
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 180.dp)
-                .background(
-                    Color.Black.copy(alpha = 0.5f),
-                    shape = MaterialTheme.shapes.medium
-                )
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val zoomLevels = listOf(0.5f, 1f, 2f, 5f)
+            // Shutter button (larger, centered)
+            FloatingActionButton(
+                onClick = {
+                    when (captureMode) {
+                        CaptureMode.PHOTO -> {
+                            val photoFile = createMediaFile(context, "jpg")
+                            val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
-            zoomLevels.forEach { level ->
-                TextButton(
-                    onClick = { zoomRatio = level },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = if (zoomRatio == level) Color.Yellow else Color.White
-                    )
-                ) {
-                    Text(
-                        text = if (level < 1f) "${level}x" else "${level.toInt()}x",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
-
-        FloatingActionButton(
-            onClick = {
-                when (captureMode) {
-                    CaptureMode.PHOTO -> {
-                        val photoFile = createMediaFile(context, "jpg")
-                        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
-                        imageCapture.takePicture(
-                            outputOptions,
-                            androidx.core.content.ContextCompat.getMainExecutor(context),
-                            object : ImageCapture.OnImageSavedCallback {
-                                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                    onPhotoCaptured(photoFile)
+                            imageCapture.takePicture(
+                                outputOptions,
+                                androidx.core.content.ContextCompat.getMainExecutor(context),
+                                object : ImageCapture.OnImageSavedCallback {
+                                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                        onPhotoCaptured(photoFile)
+                                    }
+                                    override fun onError(exception: ImageCaptureException) {
+                                        exception.printStackTrace()
+                                    }
                                 }
-                                override fun onError(exception: ImageCaptureException) {
-                                    exception.printStackTrace()
-                                }
-                            }
-                        )
-                    }
-                    CaptureMode.VIDEO -> {
-                        if (isRecording) {
-                            recording?.stop()
-                            isRecording = false
-                        } else {
-                            val videoFile = createMediaFile(context, "mp4")
-                            onVideoRecordingStart()
-                            isRecording = true
+                            )
                         }
+                        CaptureMode.VIDEO -> {
+                            if (isRecording) {
+                                recording?.stop()
+                                isRecording = false
+                            } else {
+                                val videoFile = createMediaFile(context, "mp4")
+                                onVideoRecordingStart()
+                                isRecording = true
+                            }
+                        }
+                        else -> {}
                     }
-                    else -> {}
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 100.dp)
-                .size(72.dp),
-            containerColor = if (isRecording) Color.Red else Color.White,
-            shape = CircleShape
-        ) {
-            Icon(
-                when (captureMode) {
-                    CaptureMode.PHOTO -> Icons.Default.PhotoCamera
-                    CaptureMode.VIDEO -> if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord
-                    else -> Icons.Default.PhotoCamera
                 },
-                contentDescription = "Capture",
-                tint = if (isRecording) Color.White else Color.Black,
-                modifier = Modifier.size(32.dp)
-            )
+                modifier = Modifier.size(72.dp),
+                containerColor = if (isRecording) Color.Red else Color.White,
+                shape = CircleShape
+            ) {
+                Icon(
+                    when (captureMode) {
+                        CaptureMode.PHOTO -> Icons.Default.PhotoCamera
+                        CaptureMode.VIDEO -> if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord
+                        else -> Icons.Default.PhotoCamera
+                    },
+                    contentDescription = "Capture",
+                    tint = if (isRecording) Color.White else Color.Black,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
         }
     }
 }

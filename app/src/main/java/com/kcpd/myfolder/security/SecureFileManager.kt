@@ -418,6 +418,8 @@ class SecureFileManager @Inject constructor(
      * This allows fast grid loading without decrypting full images.
      * Uses streaming decryption to avoid OutOfMemoryError with large images.
      *
+     * Note: No EXIF rotation needed here since photos are already rotated before encryption.
+     *
      * @param encryptedFile The encrypted image file
      * @return Thumbnail as JPEG byte array, or null if generation fails
      */

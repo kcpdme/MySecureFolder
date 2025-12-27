@@ -203,38 +203,6 @@ fun VideoRecorderPreview(
                 }
         )
 
-        // Top controls bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Spacer(modifier = Modifier.width(48.dp))
-
-            IconButton(
-                onClick = {
-                    lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
-                        CameraSelector.LENS_FACING_FRONT
-                    } else {
-                        CameraSelector.LENS_FACING_BACK
-                    }
-                },
-                modifier = Modifier
-                    .background(
-                        Color.Black.copy(alpha = 0.5f),
-                        shape = CircleShape
-                    )
-            ) {
-                Icon(
-                    Icons.Default.FlipCameraAndroid,
-                    contentDescription = "Flip Camera",
-                    tint = Color.White
-                )
-            }
-        }
-
         // Recording duration indicator
         if (isRecording) {
             Row(
@@ -293,45 +261,78 @@ fun VideoRecorderPreview(
             }
         }
 
-        FloatingActionButton(
-            onClick = {
-                if (isRecording) {
-                    recording?.stop()
-                    isRecording = false
-                } else {
-                    val videoFile = createMediaFile(context, "mp4")
-                    val outputOptions = FileOutputOptions.Builder(videoFile).build()
-
-                    recording = videoCapture?.output
-                        ?.prepareRecording(context, outputOptions)
-                        ?.withAudioEnabled()
-                        ?.start(ContextCompat.getMainExecutor(context)) { recordEvent ->
-                            when (recordEvent) {
-                                is VideoRecordEvent.Finalize -> {
-                                    if (recordEvent.hasError()) {
-                                        recordEvent.cause?.printStackTrace()
-                                    } else {
-                                        onVideoRecorded(videoFile)
-                                    }
-                                }
-                            }
-                        }
-                    isRecording = true
-                }
-            },
+        // Bottom Controls Row: Shutter | Flip
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 40.dp)
-                .size(72.dp),
-            containerColor = if (isRecording) Color.Red else Color.White,
-            shape = CircleShape
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord,
-                contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
-                tint = if (isRecording) Color.White else Color.Red,
-                modifier = Modifier.size(32.dp)
-            )
+            // Spacer to balance layout (since we don't have Flash here)
+            Spacer(modifier = Modifier.size(48.dp))
+
+            FloatingActionButton(
+                onClick = {
+                    if (isRecording) {
+                        recording?.stop()
+                        isRecording = false
+                    } else {
+                        val videoFile = createMediaFile(context, "mp4")
+                        val outputOptions = FileOutputOptions.Builder(videoFile).build()
+
+                        recording = videoCapture?.output
+                            ?.prepareRecording(context, outputOptions)
+                            ?.withAudioEnabled()
+                            ?.start(ContextCompat.getMainExecutor(context)) { recordEvent ->
+                                when (recordEvent) {
+                                    is VideoRecordEvent.Finalize -> {
+                                        if (recordEvent.hasError()) {
+                                            recordEvent.cause?.printStackTrace()
+                                        } else {
+                                            onVideoRecorded(videoFile)
+                                        }
+                                    }
+                                }
+                            }
+                        isRecording = true
+                    }
+                },
+                modifier = Modifier.size(72.dp),
+                containerColor = if (isRecording) Color.Red else Color.White,
+                shape = CircleShape
+            ) {
+                Icon(
+                    if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord,
+                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                    tint = if (isRecording) Color.White else Color.Red,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            // Flip Camera Button
+            IconButton(
+                onClick = {
+                    lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        CameraSelector.LENS_FACING_FRONT
+                    } else {
+                        CameraSelector.LENS_FACING_BACK
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    Icons.Default.FlipCameraAndroid,
+                    contentDescription = "Flip Camera",
+                    tint = Color.White
+                )
+            }
         }
     }
 }
