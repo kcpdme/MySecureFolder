@@ -148,6 +148,95 @@ class S3SyncViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Upload all files in a category to S3.
+     * Shows progress and marks all as uploaded on success.
+     */
+    fun uploadAllFiles(category: FolderCategory) {
+        viewModelScope.launch {
+            // Mark as uploading
+            updateSyncState(category) {
+                it.copy(
+                    isUploading = true,
+                    uploadProgress = 0f,
+                    currentUploadIndex = 0,
+                    error = null
+                )
+            }
+
+            try {
+                // Get all files in this category
+                val allFiles = mediaRepository.getFilesForCategory(category).first()
+                val filesToUpload = allFiles.filter { !it.isUploaded }
+
+                if (filesToUpload.isEmpty()) {
+                    updateSyncState(category) {
+                        it.copy(
+                            isUploading = false,
+                            uploadProgress = 1f
+                        )
+                    }
+                    android.util.Log.d("S3SyncViewModel", "${category.displayName}: All files already uploaded")
+                    return@launch
+                }
+
+                android.util.Log.d("S3SyncViewModel", "${category.displayName}: Uploading ${filesToUpload.size} files")
+
+                updateSyncState(category) {
+                    it.copy(totalFilesToUpload = filesToUpload.size)
+                }
+
+                // Upload each file
+                var successCount = 0
+                filesToUpload.forEachIndexed { index, mediaFile ->
+                    val progress = (index + 1).toFloat() / filesToUpload.size
+
+                    updateSyncState(category) {
+                        it.copy(
+                            currentUploadIndex = index + 1,
+                            uploadProgress = progress
+                        )
+                    }
+
+                    android.util.Log.d("S3SyncViewModel", "Uploading ${mediaFile.fileName} (${index + 1}/${filesToUpload.size})")
+
+                    val result = s3Repository.uploadFile(mediaFile)
+                    result.onSuccess { url ->
+                        mediaRepository.markAsUploaded(mediaFile.id, url)
+                        successCount++
+                        android.util.Log.d("S3SyncViewModel", "Uploaded: ${mediaFile.fileName}")
+                    }.onFailure { error ->
+                        android.util.Log.e("S3SyncViewModel", "Failed to upload ${mediaFile.fileName}", error)
+                    }
+                }
+
+                android.util.Log.d("S3SyncViewModel", "${category.displayName}: Upload complete - $successCount/${filesToUpload.size} succeeded")
+
+                // Reload counts and update state
+                val updatedFiles = mediaRepository.getFilesForCategory(category).first()
+                val uploadedCount = updatedFiles.count { it.isUploaded }
+
+                updateSyncState(category) {
+                    it.copy(
+                        isUploading = false,
+                        uploadProgress = 1f,
+                        uploadedFiles = uploadedCount,
+                        totalFiles = updatedFiles.size
+                    )
+                }
+
+            } catch (e: Exception) {
+                android.util.Log.e("S3SyncViewModel", "Upload failed for ${category.displayName}", e)
+                updateSyncState(category) {
+                    it.copy(
+                        isUploading = false,
+                        error = e.message ?: "Upload failed"
+                    )
+                }
+            }
+        }
+    }
+
     private fun updateSyncState(category: FolderCategory, update: (SyncState) -> SyncState) {
         _syncStates.value = _syncStates.value.toMutableMap().apply {
             this[category] = update(this[category] ?: SyncState())
@@ -222,7 +311,8 @@ fun S3SyncScreen(
                 CategorySyncCard(
                     category = category,
                     syncState = syncStates[category] ?: S3SyncViewModel.SyncState(),
-                    onSyncClick = { viewModel.syncCategory(category) }
+                    onSyncClick = { viewModel.syncCategory(category) },
+                    onUploadClick = { viewModel.uploadAllFiles(category) }
                 )
             }
         }
@@ -233,19 +323,21 @@ fun S3SyncScreen(
 fun CategorySyncCard(
     category: FolderCategory,
     syncState: S3SyncViewModel.SyncState,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    onUploadClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !syncState.isLoading) { onSyncClick() }
+            .clickable(enabled = !syncState.isLoading && !syncState.isUploading) { onSyncClick() }
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             // Category icon
             Icon(
                 imageVector = category.icon,
@@ -268,7 +360,13 @@ fun CategorySyncCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // Status text
-                if (syncState.isLoading) {
+                if (syncState.isUploading) {
+                    Text(
+                        text = "Uploading ${syncState.currentUploadIndex}/${syncState.totalFilesToUpload}...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else if (syncState.isLoading) {
                     Text(
                         text = "Syncing...",
                         style = MaterialTheme.typography.bodySmall,
@@ -310,20 +408,58 @@ fun CategorySyncCard(
                 }
             }
 
-            // Sync button
-            if (syncState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                IconButton(onClick = onSyncClick) {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync ${category.displayName}",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                // Buttons: Upload and Sync
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Upload all button
+                    if (syncState.isUploading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(
+                            onClick = onUploadClick,
+                            enabled = !syncState.isLoading
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudUpload,
+                                contentDescription = "Upload All ${category.displayName}",
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+
+                    // Sync/verify button
+                    if (syncState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(
+                            onClick = onSyncClick,
+                            enabled = !syncState.isUploading
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = "Sync ${category.displayName}",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
+            }
+
+            // Progress bar for upload
+            if (syncState.isUploading && syncState.uploadProgress > 0f) {
+                LinearProgressIndicator(
+                    progress = { syncState.uploadProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
         }
     }
