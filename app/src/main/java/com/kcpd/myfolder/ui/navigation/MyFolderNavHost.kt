@@ -23,7 +23,6 @@ import com.kcpd.myfolder.ui.auth.PasswordChangeScreen
 import com.kcpd.myfolder.ui.auth.PasswordSetupScreen
 import com.kcpd.myfolder.ui.auth.VaultUnlockScreen
 import com.kcpd.myfolder.ui.camera.AudioRecorderScreen
-import com.kcpd.myfolder.ui.camera.CameraScreen
 import com.kcpd.myfolder.ui.camera.PhotoCameraScreen
 import com.kcpd.myfolder.ui.camera.VideoRecorderScreen
 import com.kcpd.myfolder.ui.folder.FolderScreen
@@ -196,7 +195,8 @@ fun MyFolderNavHost(
             )
         ) { backStackEntry ->
             val folderId = backStackEntry.arguments?.getString("folderId")
-            CameraScreen(navController = navController, folderId = folderId)
+            // Fallback to PhotoCameraScreen if CameraScreen is removed
+            PhotoCameraScreen(navController = navController, folderId = folderId)
         }
 
         composable(
