@@ -183,6 +183,20 @@ fun VideoRecorderPreview(
 
         onDispose {
             recording?.stop()
+            // Cleanup camera resources to prevent device lock
+            try {
+                val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
+                cameraProviderFuture.addListener({
+                    try {
+                        cameraProviderFuture.get().unbindAll()
+                        android.util.Log.d("VideoRecorder", "Camera unbound successfully")
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoRecorder", "Failed to unbind camera", e)
+                    }
+                }, ContextCompat.getMainExecutor(context))
+            } catch (e: Exception) {
+                android.util.Log.e("VideoRecorder", "Failed to cleanup camera", e)
+            }
         }
     }
 

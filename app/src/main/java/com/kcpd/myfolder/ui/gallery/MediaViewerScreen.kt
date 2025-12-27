@@ -102,13 +102,15 @@ fun MediaViewerScreen(
                 MediaType.VIDEO -> {
                     VideoPlayer(
                         mediaFile = mediaFile,
-                        onTap = { showControls = !showControls }
+                        onTap = { showControls = !showControls },
+                        isCurrentPage = pagerState.currentPage == page
                     )
                 }
                 MediaType.AUDIO -> {
                     AudioPlayer(
                         mediaFile = mediaFile,
-                        onTap = { showControls = !showControls }
+                        onTap = { showControls = !showControls },
+                        isCurrentPage = pagerState.currentPage == page
                     )
                 }
                 MediaType.NOTE -> {
@@ -277,12 +279,21 @@ fun ZoomableImage(
 fun VideoPlayer(
     mediaFile: MediaFile,
     onTap: () -> Unit,
+    isCurrentPage: Boolean,
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+
+    LaunchedEffect(isCurrentPage, exoPlayer) {
+        if (isCurrentPage) {
+            exoPlayer?.playWhenReady = true
+        } else {
+            exoPlayer?.pause()
+        }
+    }
 
     // Decrypt the video file
     LaunchedEffect(mediaFile.id) {
@@ -372,7 +383,8 @@ fun VideoPlayer(
 @Composable
 fun AudioPlayer(
     mediaFile: MediaFile,
-    onTap: () -> Unit
+    onTap: () -> Unit,
+    isCurrentPage: Boolean
 ) {
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(false) }
@@ -398,8 +410,15 @@ fun AudioPlayer(
         }
     }
 
-    LaunchedEffect(exoPlayer) {
-        while (true) {
+    // Pause when not current page
+    LaunchedEffect(isCurrentPage) {
+        if (!isCurrentPage) {
+            exoPlayer.pause()
+        }
+    }
+
+    LaunchedEffect(exoPlayer, isCurrentPage) {
+        while (isCurrentPage && exoPlayer != null) {
             currentPosition = exoPlayer.currentPosition
             kotlinx.coroutines.delay(100)
         }

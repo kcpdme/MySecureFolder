@@ -30,6 +30,7 @@ fun FolderScreenContent(
     onFolderLongClick: (UserFolder) -> Unit,
     onMediaClick: (Int) -> Unit,
     onMediaLongClick: (MediaFile) -> Unit,
+    onUploadClick: ((MediaFile) -> Unit)? = null,
     contentPadding: PaddingValues
 ) {
     val context = LocalContext.current
@@ -75,7 +76,10 @@ fun FolderScreenContent(
                     onLongClick = { onMediaLongClick(mediaFile) },
                     isUploading = isUploading(mediaFile.id),
                     isSelected = selectedFiles.contains(mediaFile.id),
-                    isMultiSelectMode = isMultiSelectMode
+                    isMultiSelectMode = isMultiSelectMode,
+                    onUploadClick = if (onUploadClick != null) {
+                        { onUploadClick(mediaFile) }
+                    } else null
                 )
             }
         }
@@ -111,7 +115,10 @@ fun FolderScreenContent(
                     onLongClick = { onMediaLongClick(mediaFile) },
                     isSelected = selectedFiles.contains(mediaFile.id),
                     isMultiSelectMode = isMultiSelectMode,
-                    isUploading = isUploading(mediaFile.id)
+                    isUploading = isUploading(mediaFile.id),
+                    onUploadClick = if (onUploadClick != null) {
+                        { onUploadClick(mediaFile) }
+                    } else null
                 )
             }
         }

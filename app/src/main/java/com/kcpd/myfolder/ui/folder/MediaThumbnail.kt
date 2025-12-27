@@ -37,7 +37,8 @@ fun MediaThumbnail(
     onLongClick: () -> Unit = {},
     isUploading: Boolean,
     isSelected: Boolean = false,
-    isMultiSelectMode: Boolean = false
+    isMultiSelectMode: Boolean = false,
+    onUploadClick: (() -> Unit)? = null
 ) {
     android.util.Log.d("MediaThumbnail", "Rendering thumbnail for: ${mediaFile.fileName}, type: ${mediaFile.mediaType}")
 
@@ -193,33 +194,68 @@ fun MediaThumbnail(
             }
         }
 
-        if (mediaFile.isUploaded) {
-            Icon(
-                Icons.Default.CloudDone,
-                contentDescription = "Uploaded",
-                tint = Color.White,
-                modifier = Modifier
-                    .padding(4.dp)
-                    .size(20.dp)
-                    .align(Alignment.TopEnd)
-                    .background(
-                        Color.Black.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(4.dp)
-                    )
-                    .padding(2.dp)
-            )
-        }
-
+        // Upload status indicator (top-end corner)
         if (isUploading) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
+                    .padding(6.dp)
+                    .size(32.dp)
+                    .align(Alignment.TopEnd)
+                    .background(
+                        Color.Black.copy(alpha = 0.7f),
+                        shape = CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
                     color = Color.White,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        } else if (mediaFile.isUploaded) {
+            // Already uploaded - show checkmark (not clickable)
+            Box(
+                modifier = Modifier
+                    .padding(6.dp)
+                    .size(32.dp)
+                    .align(Alignment.TopEnd)
+                    .background(
+                        Color(0xFF4CAF50).copy(alpha = 0.85f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.CloudDone,
+                    contentDescription = "Uploaded",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else if (onUploadClick != null && !isMultiSelectMode) {
+            // Not uploaded - show clickable upload icon
+            Box(
+                modifier = Modifier
+                    .padding(6.dp)
+                    .size(32.dp)
+                    .align(Alignment.TopEnd)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                        shape = CircleShape
+                    )
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onUploadClick() }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.CloudUpload,
+                    contentDescription = "Upload to cloud",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

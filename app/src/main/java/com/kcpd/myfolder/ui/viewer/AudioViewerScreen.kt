@@ -208,7 +208,7 @@ fun AudioPlayer(
 
     LaunchedEffect(exoPlayer) {
         if (exoPlayer != null) {
-            while (true) {
+            while (isCurrentPage && exoPlayer != null) {
                 currentPosition = exoPlayer.currentPosition
                 kotlinx.coroutines.delay(100)
             }

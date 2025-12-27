@@ -481,7 +481,8 @@ fun FolderScreen(
                                     selectedFiles = setOf(mediaFile.id)
                                 }
                             },
-                            isUploading = viewModel.isUploading(mediaFile.id)
+                            isUploading = viewModel.isUploading(mediaFile.id),
+                            onUploadClick = { viewModel.uploadFile(mediaFile) }
                         )
                     }
                 }
@@ -542,7 +543,8 @@ fun FolderScreen(
                                     isMultiSelectMode = true
                                     selectedFiles = setOf(mediaFile.id)
                                 }
-                            }
+                            },
+                            onUploadClick = { viewModel.uploadFile(mediaFile) }
                         )
                     }
                 }

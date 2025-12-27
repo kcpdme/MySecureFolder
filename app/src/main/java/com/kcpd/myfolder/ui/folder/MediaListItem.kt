@@ -8,7 +8,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,7 +41,8 @@ fun FolderMediaListItem(
     onLongClick: () -> Unit = {},
     isSelected: Boolean = false,
     isMultiSelectMode: Boolean = false,
-    isUploading: Boolean = false
+    isUploading: Boolean = false,
+    onUploadClick: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier
@@ -149,36 +157,44 @@ fun FolderMediaListItem(
                         }
                     }
 
+                    // Upload status on thumbnail
                     if (isUploading) {
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f)),
+                                .size(20.dp)
+                                .align(Alignment.TopEnd)
+                                .padding(2.dp)
+                                .background(
+                                    Color.Black.copy(alpha = 0.7f),
+                                    shape = CircleShape
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
                                 color = Color.White,
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 1.5.dp
                             )
                         }
-                    }
-
-                    if (mediaFile.isUploaded) {
-                        Icon(
-                            Icons.Default.CloudDone,
-                            contentDescription = "Uploaded",
-                            tint = Color.White,
+                    } else if (mediaFile.isUploaded) {
+                        Box(
                             modifier = Modifier
-                                .padding(2.dp)
-                                .size(12.dp)
+                                .size(18.dp)
                                 .align(Alignment.TopEnd)
+                                .padding(2.dp)
                                 .background(
-                                    Color.Black.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(2.dp)
-                                )
-                                .padding(1.dp)
-                        )
+                                    Color(0xFF4CAF50).copy(alpha = 0.85f),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.CloudDone,
+                                contentDescription = "Uploaded",
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -203,8 +219,9 @@ fun FolderMediaListItem(
                 )
             }
 
-            // Selection indicator - modern circular design
+            // Right side: upload button or selection indicator
             if (isMultiSelectMode) {
+                // Selection indicator - modern circular design
                 if (isSelected) {
                     Box(
                         modifier = Modifier
@@ -232,6 +249,56 @@ fun FolderMediaListItem(
                                 shape = CircleShape
                             )
                     )
+                }
+            } else if (onUploadClick != null) {
+                // Upload button in list view
+                if (isUploading) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.1f),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                } else if (mediaFile.isUploaded) {
+                    // Show uploaded status
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                Color(0xFF4CAF50).copy(alpha = 0.2f),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.CloudDone,
+                            contentDescription = "Uploaded",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    // Clickable upload button
+                    IconButton(
+                        onClick = onUploadClick,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CloudUpload,
+                            contentDescription = "Upload to cloud",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }

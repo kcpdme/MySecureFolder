@@ -24,7 +24,8 @@ private val Context.dataStore by preferencesDataStore(name = "s3_config")
 
 @Singleton
 class S3Repository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val sessionManager: dagger.Lazy<S3SessionManager> // Lazy to avoid circular dependency
 ) {
     private val endpointKey = stringPreferencesKey("endpoint")
     private val accessKeyKey = stringPreferencesKey("access_key")
@@ -63,15 +64,31 @@ class S3Repository @Inject constructor(
 
     suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val config = s3Config.first() ?: return@withContext Result.failure(
-                Exception("S3 configuration not found. Please configure S3 settings first.")
-            )
+            // Try to use cached session first
+            val cachedClient = sessionManager.get().getClient()
+            val cachedConfig = sessionManager.get().getConfig()
 
-            val minioClient = MinioClient.builder()
-                .endpoint(config.endpoint)
-                .credentials(config.accessKey, config.secretKey)
-                .region(config.region)
-                .build()
+            val minioClient: MinioClient
+            val config: S3Config
+
+            if (cachedClient != null && cachedConfig != null) {
+                // Use cached session
+                Log.d("S3Repository", "Using cached S3 session")
+                minioClient = cachedClient
+                config = cachedConfig
+            } else {
+                // No cached session - create new client
+                Log.d("S3Repository", "No cached session, creating new MinIO client")
+                config = s3Config.first() ?: return@withContext Result.failure(
+                    Exception("S3 configuration not found. Please configure S3 settings first.")
+                )
+
+                minioClient = MinioClient.builder()
+                    .endpoint(config.endpoint)
+                    .credentials(config.accessKey, config.secretKey)
+                    .region(config.region)
+                    .build()
+            }
 
             val file = File(mediaFile.filePath)
             val category = FolderCategory.fromMediaType(mediaFile.mediaType)

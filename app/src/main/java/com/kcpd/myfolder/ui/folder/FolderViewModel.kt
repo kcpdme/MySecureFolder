@@ -24,6 +24,7 @@ class FolderViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val folderRepository: FolderRepository,
     private val s3Repository: S3Repository,
+    private val s3SessionManager: com.kcpd.myfolder.data.repository.S3SessionManager,
     private val importMediaUseCase: com.kcpd.myfolder.domain.usecase.ImportMediaUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -125,12 +126,17 @@ class FolderViewModel @Inject constructor(
         viewModelScope.launch {
             _uploadingFiles.value = _uploadingFiles.value + mediaFile.id
             try {
-                s3Repository.uploadFile(mediaFile)
-                val updatedFile = mediaFile.copy(isUploaded = true)
-                mediaRepository.updateMediaFile(updatedFile)
+                val result = s3Repository.uploadFile(mediaFile)
+                result.onSuccess { url ->
+                    val updatedFile = mediaFile.copy(isUploaded = true, s3Url = url)
+                    mediaRepository.updateMediaFile(updatedFile)
+                    android.util.Log.d("FolderViewModel", "File uploaded successfully: ${mediaFile.fileName} -> $url")
+                }.onFailure { error ->
+                    android.util.Log.e("FolderViewModel", "Upload failed for ${mediaFile.fileName}", error)
+                    // Upload failed - could show toast or error state here
+                }
             } catch (e: Exception) {
-                // Handle upload error
-                e.printStackTrace()
+                android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
             } finally {
                 _uploadingFiles.value = _uploadingFiles.value - mediaFile.id
             }
