@@ -35,6 +35,12 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class CaptureQuality(val title: String, val jpegQuality: Int) {
+    LOW("2MP", 85),
+    MEDIUM("5MP", 90),
+    HIGH("MAX", 100)
+}
+
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoCameraScreen(
@@ -126,6 +132,7 @@ fun PhotoCameraPreview(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var aspectRatio by remember { mutableStateOf(AspectRatio.RATIO_4_3) }
+    var captureQuality by remember { mutableStateOf(CaptureQuality.MEDIUM) }
 
     val previewView = remember { 
         PreviewView(context).apply {
@@ -141,20 +148,12 @@ fun PhotoCameraPreview(
     var minZoom by remember { mutableStateOf(1f) }
     var maxZoom by remember { mutableStateOf(1f) }
 
-    DisposableEffect(lensFacing, aspectRatio) {
+    DisposableEffect(lensFacing, aspectRatio, captureQuality) {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             
-            // Configure Resolution based on Ratio
-            // Increased to ~5MP (Standard High Quality) to satisfy S23 Ultra users while saving space vs 12MP
-            val targetResolution = if (aspectRatio == AspectRatio.RATIO_16_9) {
-                Size(1440, 2560) // 16:9 (QHD/3.7MP)
-            } else {
-                Size(1920, 2560) // 4:3 (5MP)
-            }
-
             val preview = Preview.Builder()
                 .setTargetAspectRatio(aspectRatio)
                 .build()
@@ -162,11 +161,27 @@ fun PhotoCameraPreview(
                     setSurfaceProvider(previewView.surfaceProvider)
                 }
 
-            val newImageCapture = ImageCapture.Builder()
-                .setTargetResolution(targetResolution)
+            // Build ImageCapture based on Quality setting
+            val imageCaptureBuilder = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setJpegQuality(85)
-                .build()
+                .setJpegQuality(captureQuality.jpegQuality)
+
+            if (captureQuality == CaptureQuality.HIGH) {
+                // HIGH = Max resolution (using Aspect Ratio)
+                imageCaptureBuilder.setTargetAspectRatio(aspectRatio)
+            } else {
+                // LOW/MEDIUM = Specific resolution target
+                val targetResolution = if (captureQuality == CaptureQuality.MEDIUM) {
+                    // 5MP Class
+                    if (aspectRatio == AspectRatio.RATIO_16_9) Size(1440, 2560) else Size(1920, 2560)
+                } else {
+                    // 2MP Class (LOW)
+                    if (aspectRatio == AspectRatio.RATIO_16_9) Size(1080, 1920) else Size(1200, 1600)
+                }
+                imageCaptureBuilder.setTargetResolution(targetResolution)
+            }
+
+            val newImageCapture = imageCaptureBuilder.build()
             imageCapture = newImageCapture
 
             val cameraSelector = CameraSelector.Builder()
@@ -228,36 +243,60 @@ fun PhotoCameraPreview(
                 }
         )
 
-        // Top controls bar (Ratio Toggle + Close)
+        // Top controls bar (Ratio Toggle + Quality + Close)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding() // Respect notch/pinhole
-                .padding(top = 5.dp, start = 16.dp, end = 16.dp) // Extra margin
+                .padding(top = 16.dp, start = 16.dp, end = 16.dp) // Extra margin
                 .align(Alignment.TopCenter),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Aspect Ratio Toggle
-            TextButton(
-                onClick = {
-                    aspectRatio = if (aspectRatio == AspectRatio.RATIO_4_3) {
-                        AspectRatio.RATIO_16_9
-                    } else {
-                        AspectRatio.RATIO_4_3
-                    }
-                },
-                modifier = Modifier
-                    .background(
-                        Color.Black.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.small
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Aspect Ratio Toggle
+                TextButton(
+                    onClick = {
+                        aspectRatio = if (aspectRatio == AspectRatio.RATIO_4_3) {
+                            AspectRatio.RATIO_16_9
+                        } else {
+                            AspectRatio.RATIO_4_3
+                        }
+                    },
+                    modifier = Modifier
+                        .background(
+                            Color.Black.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.small
+                        )
+                ) {
+                    Text(
+                        text = if (aspectRatio == AspectRatio.RATIO_4_3) "4:3" else "16:9",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge
                     )
-            ) {
-                Text(
-                    text = if (aspectRatio == AspectRatio.RATIO_4_3) "4:3" else "16:9",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelLarge
-                )
+                }
+
+                // Quality Toggle
+                TextButton(
+                    onClick = {
+                        captureQuality = when (captureQuality) {
+                            CaptureQuality.LOW -> CaptureQuality.MEDIUM
+                            CaptureQuality.MEDIUM -> CaptureQuality.HIGH
+                            CaptureQuality.HIGH -> CaptureQuality.LOW
+                        }
+                    },
+                    modifier = Modifier
+                        .background(
+                            Color.Black.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.small
+                        )
+                ) {
+                    Text(
+                        text = captureQuality.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
 
             IconButton(
@@ -281,10 +320,6 @@ fun PhotoCameraPreview(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 140.dp)
-                .background(
-                    Color.Black.copy(alpha = 0.5f),
-                    shape = MaterialTheme.shapes.medium
-                )
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
