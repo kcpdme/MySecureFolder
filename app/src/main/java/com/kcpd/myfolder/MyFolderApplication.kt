@@ -24,6 +24,12 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
 
+        // Configure StAX for MinIO (Android doesn't have a default StAX provider)
+        // This fixes javax.xml.stream.FactoryConfigurationError: Provider com.bea.xml.stream.MXParserFactory not found
+        System.setProperty("javax.xml.stream.XMLInputFactory", "com.ctc.wstx.stax.WstxInputFactory")
+        System.setProperty("javax.xml.stream.XMLOutputFactory", "com.ctc.wstx.stax.WstxOutputFactory")
+        System.setProperty("javax.xml.stream.XMLEventFactory", "com.ctc.wstx.stax.WstxEventFactory")
+
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(this)
 

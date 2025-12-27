@@ -109,6 +109,15 @@ dependencies {
     // Minio S3 SDK (Latest)
     implementation("io.minio:minio:8.5.14")
 
+    // XML parsing for MinIO on Android (Based on Zimly's approach)
+    // These provide the javax.xml.stream classes needed by MinIO SDK
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.18.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
+    implementation("javax.xml.stream:stax-api:1.0-2")
+    // Explicitly add Woodstox for StAX implementation on Android
+    implementation("com.fasterxml.woodstox:woodstox-core:6.6.2")
+    implementation("org.codehaus.woodstox:stax2-api:4.2.2")
+
     // OkHttp (Latest stable)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

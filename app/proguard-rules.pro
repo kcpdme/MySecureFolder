@@ -19,6 +19,22 @@
 -dontwarn okio.**
 
 # ===================================
+# XML Parsing (MinIO / Jackson / Woodstox)
+# ===================================
+-keep class javax.xml.stream.** { *; }
+-keep class com.fasterxml.jackson.** { *; }
+-keep class org.codehaus.stax2.** { *; }
+-keep class com.ctc.wstx.** { *; }
+-dontwarn com.ctc.wstx.**
+-dontwarn org.codehaus.stax2.**
+
+# Keep SimpleXML (used by MinIO)
+-keep class org.simpleframework.xml.** { *; }
+-keep class org.simpleframework.xml.core.** { *; }
+-keep class org.simpleframework.xml.stream.** { *; }
+-dontwarn org.simpleframework.xml.stream.**
+
+# ===================================
 # AndroidX Security Crypto
 # ===================================
 -keep class androidx.security.crypto.** { *; }
