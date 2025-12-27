@@ -65,15 +65,6 @@ class S3Repository @Inject constructor(
     }
 
     override suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
-        // Optimization: Check if file already exists on S3 before attempting upload
-        // This acts as a sync mechanism, preventing re-uploads of existing files
-        val existsResult = verifyFileExists(mediaFile)
-        val existingUrl = existsResult.getOrNull()
-        if (existingUrl != null) {
-            Log.d("S3Repository", "File already exists on S3, skipping upload: $existingUrl")
-            return@withContext Result.success(existingUrl)
-        }
-
         var tempDecryptedFile: File? = null
         try {
             // Step 1: Decrypt the encrypted file to a temporary file (do this once)
@@ -94,7 +85,7 @@ class S3Repository @Inject constructor(
                     // Attempt 1: Try to use cached session
                     // Attempts > 1: Force new client to handle potential stale connections (Broken pipe)
                     val useCached = attempt == 1
-                    
+
                     var cachedClient: MinioClient? = null
                     var cachedConfig: S3Config? = null
 
@@ -128,9 +119,9 @@ class S3Repository @Inject constructor(
                             .build()
                     }
 
-                    // Step 2: Upload the decrypted file to S3
+                    // Step 2: Upload the decrypted file to S3 with uniform path structure
                     val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-                    val objectName = "${category.path}/${mediaFile.fileName}"
+                    val objectName = "MyFolderPrivate/${category.displayName}/${mediaFile.fileName}"
 
                     minioClient.putObject(
                         PutObjectArgs.builder()
@@ -172,84 +163,6 @@ class S3Repository @Inject constructor(
         }
     }
 
-    /**
-     * Verify if a file exists on S3.
-     * Returns URL if file exists, null if deleted or not found.
-     */
-    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<String?> = withContext(Dispatchers.IO) {
-        try {
-            // Get S3 client (must get session manager on main thread first)
-            val cachedClient = withContext(Dispatchers.Main) {
-                sessionManager.get().getClient()
-            }
-            val cachedConfig = withContext(Dispatchers.Main) {
-                sessionManager.get().getConfig()
-            }
-
-            // Now do S3 operations (already on IO dispatcher)
-            val minioClient: MinioClient
-            val config: S3Config
-
-            if (cachedClient != null && cachedConfig != null) {
-                minioClient = cachedClient
-                config = cachedConfig
-            } else {
-                config = s3Config.first() ?: return@withContext Result.failure(
-                    Exception("S3 configuration not found")
-                )
-
-                minioClient = MinioClient.builder()
-                    .endpoint(config.endpoint)
-                    .credentials(config.accessKey, config.secretKey)
-                    .region(config.region)
-                    .build()
-            }
-
-            // Check if file exists on S3
-            val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-            val objectName = "${category.path}/${mediaFile.fileName}"
-
-            try {
-                minioClient.statObject(
-                    StatObjectArgs.builder()
-                        .bucket(config.bucketName)
-                        .`object`(objectName)
-                        .build()
-                )
-                // File exists
-                Log.d("S3Repository", "File exists on S3: ${mediaFile.fileName}")
-                val url = "${config.endpoint}/${config.bucketName}/$objectName"
-                Result.success(url)
-            } catch (e: Exception) {
-                // File not found (deleted from S3)
-                Log.w("S3Repository", "File not found on S3: ${mediaFile.fileName}")
-                Result.success(null)
-            }
-        } catch (e: Exception) {
-            Log.e("S3Repository", "Error verifying file existence", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Verify multiple files exist on S3.
-     * Returns map of fileId -> URL (if found).
-     */
-    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, String?> = withContext(Dispatchers.IO) {
-        val results = mutableMapOf<String, String?>()
-
-        mediaFiles.forEach { mediaFile ->
-            val result = verifyFileExists(mediaFile)
-            result.onSuccess { url ->
-                results[mediaFile.id] = url
-            }.onFailure { e ->
-                // On error, do not include in results to avoid marking as missing
-                Log.w("S3Repository", "Failed to verify file ${mediaFile.fileName}", e)
-            }
-        }
-
-        results
-    }
 
     private fun getContentType(fileName: String): String {
         return when (fileName.substringAfterLast('.').lowercase()) {

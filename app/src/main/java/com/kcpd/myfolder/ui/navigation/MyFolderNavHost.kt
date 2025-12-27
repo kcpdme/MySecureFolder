@@ -287,10 +287,6 @@ fun MyFolderNavHost(
             S3ConfigScreen(navController = navController)
         }
 
-        composable("remote_sync") {
-            com.kcpd.myfolder.ui.settings.RemoteSyncScreen(navController = navController)
-        }
-
         composable(
             route = "media_viewer/{index}?category={category}&fileId={fileId}",
             arguments = listOf(

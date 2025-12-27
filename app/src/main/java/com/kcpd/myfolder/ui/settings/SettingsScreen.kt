@@ -462,14 +462,6 @@ fun SettingsScreen(
                 )
             }
 
-            SettingsItem(
-                icon = Icons.Default.Sync,
-                title = "Sync Upload Status",
-                description = "Verify which files still exist on remote storage",
-                onClick = {
-                    navController.navigate("remote_sync")
-                }
-            )
         }
     }
 

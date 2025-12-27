@@ -55,14 +55,4 @@ class RemoteRepositoryManager @Inject constructor(
     override suspend fun uploadFile(mediaFile: MediaFile): Result<String> {
         return getActiveRepository().uploadFile(mediaFile)
     }
-
-    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<String?> {
-        // Verify against the currently active repository to support migrating/syncing to new provider.
-        return getActiveRepository().verifyFileExists(mediaFile)
-    }
-
-    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, String?> {
-        // Verify against the currently active repository to support migrating/syncing to new provider.
-        return getActiveRepository().verifyMultipleFiles(mediaFiles)
-    }
 }
