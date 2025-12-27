@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -168,6 +169,15 @@ fun FolderCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val iconColor = when (category) {
+        FolderCategory.ALL_FILES -> Color(0xFFFFC107) // Mustard
+        FolderCategory.PHOTOS -> Color(0xFF4CAF50) // Green
+        FolderCategory.VIDEOS -> Color(0xFF2196F3) // Blue
+        FolderCategory.RECORDINGS -> Color(0xFFF44336) // Crimson
+        FolderCategory.NOTES -> Color.White
+        FolderCategory.PDFS -> Color(0xFFE57373) // Light Red
+    }
+
     Card(
         onClick = onClick,
         modifier = modifier.height(80.dp),
@@ -193,7 +203,7 @@ fun FolderCard(
                     imageVector = category.icon,
                     contentDescription = category.displayName,
                     modifier = Modifier.size(40.dp),
-                    tint = androidx.compose.ui.graphics.Color.White
+                    tint = iconColor
                 )
                 Column {
                     Text(

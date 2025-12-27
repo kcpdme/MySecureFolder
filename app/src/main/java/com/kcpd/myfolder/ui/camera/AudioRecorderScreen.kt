@@ -171,6 +171,8 @@ fun AudioRecordingContent(
                             setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
                             setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
                             setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                            setAudioEncodingBitRate(128000) // 128kbps for good quality
+                            setAudioSamplingRate(44100) // 44.1kHz standard quality
                             setOutputFile(audioFile?.absolutePath)
                             prepare()
                             start()

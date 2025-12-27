@@ -174,7 +174,13 @@ fun AudioPlayer(
 
     val exoPlayer = remember(decryptedFile) {
         decryptedFile?.let { file ->
+            val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
+                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build()
             ExoPlayer.Builder(context).build().apply {
+                setAudioAttributes(audioAttributes, true)
+                setVolume(1.0f) // Set to maximum volume
                 val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
                 setMediaItem(mediaItem)
                 prepare()
