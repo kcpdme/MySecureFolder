@@ -28,6 +28,7 @@ class GoogleDriveRepository @Inject constructor(
 
     private var driveService: Drive? = null
     private var signedInAccount: GoogleSignInAccount? = null
+    private val folderIdCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     init {
         // Check if already signed in
@@ -75,8 +76,10 @@ class GoogleDriveRepository @Inject constructor(
             val encryptedFile = File(mediaFile.filePath)
             tempDecryptedFile = secureFileManager.decryptFile(encryptedFile)
             
+            // Create folder structure: MyFolderPrivate/Category
+            val rootFolderId = getOrCreateFolder("MyFolderPrivate")
             val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-            val parentFolderId = getOrCreateFolder(category.displayName)
+            val parentFolderId = getOrCreateFolder(category.displayName, rootFolderId)
             
             val fileMetadata = com.google.api.services.drive.model.File()
             fileMetadata.name = mediaFile.fileName
@@ -113,17 +116,25 @@ class GoogleDriveRepository @Inject constructor(
         val driveId = mediaFile.s3Url?.removePrefix("drive://") ?: return@withContext Result.success(false)
         
         try {
-            driveService!!.files().get(driveId).setFields("id, trashed").execute()
-            // If we get here and it's not trashed, it exists.
-            // Note: get() might throw 404 if not found.
-             val file = driveService!!.files().get(driveId)
-                .setFields("trashed")
+            // Get file with parents
+            val file = driveService!!.files().get(driveId)
+                .setFields("id, trashed, parents")
                 .execute()
                 
             if (file.trashed == true) {
-                Result.success(false)
-            } else {
+                return@withContext Result.success(false)
+            }
+
+            // Verify folder structure
+            val category = FolderCategory.fromMediaType(mediaFile.mediaType)
+            val rootId = getFolderId("MyFolderPrivate")
+            val expectedParentId = getFolderId(category.displayName, rootId)
+
+            if (file.parents != null && file.parents.contains(expectedParentId)) {
                 Result.success(true)
+            } else {
+                Log.w("GoogleDriveRepository", "File $driveId exists but in wrong folder. Marked as missing for re-upload.")
+                Result.success(false)
             }
         } catch (e: Exception) {
             Log.w("GoogleDriveRepository", "File check failed or not found: $driveId", e)
@@ -142,11 +153,24 @@ class GoogleDriveRepository @Inject constructor(
         results
     }
 
-    private fun getOrCreateFolder(folderName: String): String {
+    private fun getFolderId(name: String, parentId: String? = null): String {
+        val key = "${parentId ?: "root"}/$name"
+        folderIdCache[key]?.let { return it }
+        
+        val id = getOrCreateFolder(name, parentId)
+        folderIdCache[key] = id
+        return id
+    }
+
+    private fun getOrCreateFolder(folderName: String, parentId: String? = null): String {
         // Search for folder
-        val query = "mimeType = 'application/vnd.google-apps.folder' and name = '$folderName' and trashed = false"
+        val queryBuilder = StringBuilder("mimeType = 'application/vnd.google-apps.folder' and name = '$folderName' and trashed = false")
+        if (parentId != null) {
+            queryBuilder.append(" and '$parentId' in parents")
+        }
+        
         val fileList = driveService!!.files().list()
-            .setQ(query)
+            .setQ(queryBuilder.toString())
             .setSpaces("drive")
             .setFields("files(id, name)")
             .execute()
@@ -159,6 +183,9 @@ class GoogleDriveRepository @Inject constructor(
         val folderMetadata = com.google.api.services.drive.model.File()
         folderMetadata.name = folderName
         folderMetadata.mimeType = "application/vnd.google-apps.folder"
+        if (parentId != null) {
+            folderMetadata.parents = listOf(parentId)
+        }
         
         val folder = driveService!!.files().create(folderMetadata)
             .setFields("id")
