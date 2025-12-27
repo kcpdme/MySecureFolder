@@ -159,11 +159,15 @@ class FolderViewModel @Inject constructor(
     fun verifyUploadStatus(mediaFile: MediaFile) {
         viewModelScope.launch {
             val result = remoteStorageRepository.verifyFileExists(mediaFile)
-            result.onSuccess { exists ->
-                if (!exists && mediaFile.isUploaded) {
+            result.onSuccess { foundUrl ->
+                if (foundUrl == null && mediaFile.isUploaded) {
                     // File was deleted from S3 - mark as not uploaded
                     mediaRepository.markAsNotUploaded(mediaFile.id)
                     android.util.Log.d("FolderViewModel", "File deleted from S3, marked for re-upload: ${mediaFile.fileName}")
+                } else if (foundUrl != null && foundUrl != mediaFile.s3Url) {
+                    // URL changed (or recovered)
+                    val updated = mediaFile.copy(s3Url = foundUrl)
+                    mediaRepository.updateMediaFile(updated)
                 }
             }.onFailure { error ->
                 android.util.Log.e("FolderViewModel", "Failed to verify upload status for ${mediaFile.fileName}", error)
@@ -187,10 +191,16 @@ class FolderViewModel @Inject constructor(
             val results = remoteStorageRepository.verifyMultipleFiles(uploadedFiles)
 
             var markedCount = 0
-            results.forEach { (fileId, exists) ->
-                if (!exists) {
+            results.forEach { (fileId, foundUrl) ->
+                if (foundUrl == null) {
                     mediaRepository.markAsNotUploaded(fileId)
                     markedCount++
+                } else {
+                     // Check if URL update is needed
+                     val file = uploadedFiles.find { it.id == fileId }
+                     if (file != null && file.s3Url != foundUrl) {
+                         mediaRepository.markAsUploaded(fileId, foundUrl)
+                     }
                 }
             }
 

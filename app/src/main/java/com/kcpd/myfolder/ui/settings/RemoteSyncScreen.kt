@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class S3SyncViewModel @Inject constructor(
+class RemoteSyncViewModel @Inject constructor(
     application: Application,
     private val mediaRepository: MediaRepository,
     private val remoteStorageRepository: RemoteStorageRepository,
@@ -55,18 +55,25 @@ class S3SyncViewModel @Inject constructor(
     )
 
     init {
-        // Load initial states
-        loadCategoryCounts()
+        // Observe remote type changes to reset state
+        viewModelScope.launch {
+            activeRemoteType.collect {
+                // Reset states when remote type changes
+                _syncStates.value = emptyMap()
+                loadCategoryCounts()
+            }
+        }
     }
 
     private fun loadCategoryCounts() {
         viewModelScope.launch {
             val states = mutableMapOf<FolderCategory, SyncState>()
+            val type = activeRemoteType.first()
 
             FolderCategory.entries.forEach { category ->
                 if (category != FolderCategory.ALL_FILES) {
                     val files = mediaRepository.getFilesForCategory(category).first()
-                    val uploadedCount = files.count { it.isUploaded }
+                    val uploadedCount = files.count { isFileOnRemote(it, type) }
 
                     states[category] = SyncState(
                         totalFiles = files.size,
@@ -79,6 +86,15 @@ class S3SyncViewModel @Inject constructor(
         }
     }
 
+    private fun isFileOnRemote(file: com.kcpd.myfolder.data.model.MediaFile, type: com.kcpd.myfolder.data.model.RemoteType): Boolean {
+        if (!file.isUploaded) return false
+        val isDriveUrl = file.s3Url?.startsWith("drive://") == true
+        return when (type) {
+            com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE -> isDriveUrl
+            com.kcpd.myfolder.data.model.RemoteType.S3_MINIO -> !isDriveUrl && file.s3Url != null
+        }
+    }
+
     fun syncCategory(category: FolderCategory) {
         viewModelScope.launch {
             // Mark as loading
@@ -87,9 +103,12 @@ class S3SyncViewModel @Inject constructor(
             try {
                 // Get all files for this category
                 val allFiles = mediaRepository.getFilesForCategory(category).first()
-                val uploadedFiles = allFiles.filter { it.isUploaded }
+                val type = activeRemoteType.first()
+                
+                // Verify ALL uploaded files against the active remote to support recovery/status sync
+                val filesToVerify = allFiles.filter { it.isUploaded }
 
-                if (uploadedFiles.isEmpty()) {
+                if (filesToVerify.isEmpty()) {
                     updateSyncState(category) {
                         it.copy(
                             isLoading = false,
@@ -101,39 +120,51 @@ class S3SyncViewModel @Inject constructor(
                     return@launch
                 }
 
-                android.util.Log.d("S3SyncViewModel", "Syncing ${category.displayName}: ${uploadedFiles.size} uploaded files")
+                android.util.Log.d("RemoteSyncViewModel", "Syncing ${category.displayName}: Verifying ${filesToVerify.size} files")
 
-                // Verify all uploaded files
-                val results = remoteStorageRepository.verifyMultipleFiles(uploadedFiles)
+                // Verify files against current remote
+                val results = remoteStorageRepository.verifyMultipleFiles(filesToVerify)
 
                 var deletedCount = 0
                 var verifiedCount = 0
+                var recoveredCount = 0
 
-                results.forEach { (fileId, exists) ->
-                    if (exists) {
+                results.forEach { (fileId, foundUrl) ->
+                    if (foundUrl != null) {
                         verifiedCount++
+                        // If URL is different (e.g. recovered from GDrive or S3), update it
+                        val file = filesToVerify.find { it.id == fileId }
+                        if (file != null && file.s3Url != foundUrl) {
+                            mediaRepository.markAsUploaded(fileId, foundUrl)
+                            recoveredCount++
+                        }
                     } else {
-                        // File deleted from S3 - mark as not uploaded
-                        mediaRepository.markAsNotUploaded(fileId)
-                        deletedCount++
+                        // Not found on CURRENT remote.
+                        // Only mark as "deleted/missing" if it was supposed to be on THIS remote.
+                        val file = filesToVerify.find { it.id == fileId }
+                        if (file != null && isFileOnRemote(file, type)) {
+                            mediaRepository.markAsNotUploaded(fileId)
+                            deletedCount++
+                        }
                     }
                 }
 
-                android.util.Log.d("S3SyncViewModel", "${category.displayName}: Verified $verifiedCount, Deleted $deletedCount")
+                android.util.Log.d("RemoteSyncViewModel", "${category.displayName}: Verified $verifiedCount, Recovered $recoveredCount, Deleted $deletedCount")
 
-                // Update state with results
+                // Update state with results immediately using calculated counts
+                // We use verifiedCount as the new uploadedCount since we verified ALL uploaded files against the current remote
                 updateSyncState(category) {
                     it.copy(
                         isLoading = false,
                         verifiedFiles = verifiedCount,
                         deletedFromS3 = deletedCount,
-                        uploadedFiles = it.uploadedFiles - deletedCount, // Update uploaded count
+                        uploadedFiles = verifiedCount,
                         lastSynced = System.currentTimeMillis()
                     )
                 }
 
             } catch (e: Exception) {
-                android.util.Log.e("S3SyncViewModel", "Sync failed for ${category.displayName}", e)
+                android.util.Log.e("RemoteSyncViewModel", "Sync failed for ${category.displayName}", e)
                 updateSyncState(category) {
                     it.copy(
                         isLoading = false,
@@ -171,7 +202,8 @@ class S3SyncViewModel @Inject constructor(
             try {
                 // Get all files in this category
                 val allFiles = mediaRepository.getFilesForCategory(category).first()
-                val filesToUpload = allFiles.filter { !it.isUploaded }
+                val type = activeRemoteType.first()
+                val filesToUpload = allFiles.filter { !isFileOnRemote(it, type) }
 
                 if (filesToUpload.isEmpty()) {
                     updateSyncState(category) {
@@ -180,11 +212,11 @@ class S3SyncViewModel @Inject constructor(
                             uploadProgress = 1f
                         )
                     }
-                    android.util.Log.d("S3SyncViewModel", "${category.displayName}: All files already uploaded")
+                    android.util.Log.d("RemoteSyncViewModel", "${category.displayName}: All files already uploaded")
                     return@launch
                 }
 
-                android.util.Log.d("S3SyncViewModel", "${category.displayName}: Uploading ${filesToUpload.size} files")
+                android.util.Log.d("RemoteSyncViewModel", "${category.displayName}: Uploading ${filesToUpload.size} files")
 
                 updateSyncState(category) {
                     it.copy(totalFilesToUpload = filesToUpload.size)
@@ -202,23 +234,23 @@ class S3SyncViewModel @Inject constructor(
                         )
                     }
 
-                    android.util.Log.d("S3SyncViewModel", "Uploading ${mediaFile.fileName} (${index + 1}/${filesToUpload.size})")
+                    android.util.Log.d("RemoteSyncViewModel", "Uploading ${mediaFile.fileName} (${index + 1}/${filesToUpload.size})")
 
                     val result = remoteStorageRepository.uploadFile(mediaFile)
                     result.onSuccess { url ->
                         mediaRepository.markAsUploaded(mediaFile.id, url)
                         successCount++
-                        android.util.Log.d("S3SyncViewModel", "Uploaded: ${mediaFile.fileName}")
+                        android.util.Log.d("RemoteSyncViewModel", "Uploaded: ${mediaFile.fileName}")
                     }.onFailure { error ->
-                        android.util.Log.e("S3SyncViewModel", "Failed to upload ${mediaFile.fileName}", error)
+                        android.util.Log.e("RemoteSyncViewModel", "Failed to upload ${mediaFile.fileName}", error)
                     }
                 }
 
-                android.util.Log.d("S3SyncViewModel", "${category.displayName}: Upload complete - $successCount/${filesToUpload.size} succeeded")
+                android.util.Log.d("RemoteSyncViewModel", "${category.displayName}: Upload complete - $successCount/${filesToUpload.size} succeeded")
 
                 // Reload counts and update state
                 val updatedFiles = mediaRepository.getFilesForCategory(category).first()
-                val uploadedCount = updatedFiles.count { it.isUploaded }
+                val uploadedCount = updatedFiles.count { isFileOnRemote(it, type) }
 
                 updateSyncState(category) {
                     it.copy(
@@ -230,7 +262,7 @@ class S3SyncViewModel @Inject constructor(
                 }
 
             } catch (e: Exception) {
-                android.util.Log.e("S3SyncViewModel", "Upload failed for ${category.displayName}", e)
+                android.util.Log.e("RemoteSyncViewModel", "Upload failed for ${category.displayName}", e)
                 updateSyncState(category) {
                     it.copy(
                         isUploading = false,
@@ -250,9 +282,9 @@ class S3SyncViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun S3SyncScreen(
+fun RemoteSyncScreen(
     navController: NavController,
-    viewModel: S3SyncViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    viewModel: RemoteSyncViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val syncStates by viewModel.syncStates.collectAsState()
     val activeRemoteType by viewModel.activeRemoteType.collectAsState(initial = com.kcpd.myfolder.data.model.RemoteType.S3_MINIO)
@@ -317,7 +349,7 @@ fun S3SyncScreen(
             ) { category ->
                 CategorySyncCard(
                     category = category,
-                    syncState = syncStates[category] ?: S3SyncViewModel.SyncState(),
+                    syncState = syncStates[category] ?: RemoteSyncViewModel.SyncState(),
                     onSyncClick = { viewModel.syncCategory(category) },
                     onUploadClick = { viewModel.uploadAllFiles(category) },
                     remoteName = remoteName
@@ -330,7 +362,7 @@ fun S3SyncScreen(
 @Composable
 fun CategorySyncCard(
     category: FolderCategory,
-    syncState: S3SyncViewModel.SyncState,
+    syncState: RemoteSyncViewModel.SyncState,
     onSyncClick: () -> Unit,
     onUploadClick: () -> Unit,
     remoteName: String
@@ -371,7 +403,7 @@ fun CategorySyncCard(
                 // Status text
                 if (syncState.isUploading) {
                     Text(
-                        text = "Uploading ${syncState.currentUploadIndex}/${syncState.totalFilesToUpload}...",
+                        text = "Processing ${syncState.currentUploadIndex}/${syncState.totalFilesToUpload}...",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )

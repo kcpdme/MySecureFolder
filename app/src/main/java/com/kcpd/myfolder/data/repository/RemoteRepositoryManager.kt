@@ -44,7 +44,9 @@ class RemoteRepositoryManager @Inject constructor(
     }
 
     private suspend fun getActiveRepository(): RemoteStorageRepository {
-        return when (activeRemoteType.first()) {
+        val type = activeRemoteType.first()
+        android.util.Log.d("RemoteRepoManager", "Active repository type: $type")
+        return when (type) {
             RemoteType.S3_MINIO -> s3Repository
             RemoteType.GOOGLE_DRIVE -> googleDriveRepository
         }
@@ -54,12 +56,12 @@ class RemoteRepositoryManager @Inject constructor(
         return getActiveRepository().uploadFile(mediaFile)
     }
 
-    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<Boolean> {
+    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<String?> {
         // Verify against the currently active repository to support migrating/syncing to new provider.
         return getActiveRepository().verifyFileExists(mediaFile)
     }
 
-    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, Boolean> {
+    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, String?> {
         // Verify against the currently active repository to support migrating/syncing to new provider.
         return getActiveRepository().verifyMultipleFiles(mediaFiles)
     }

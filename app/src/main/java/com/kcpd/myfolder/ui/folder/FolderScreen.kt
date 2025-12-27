@@ -306,7 +306,7 @@ fun FolderScreen(
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Icon(Icons.Default.FileUpload, "Import Files")
+                                Icon(Icons.Default.FileDownload, "Import Files")
                             }
                         }
                         // Don't allow folder creation in ALL_FILES category

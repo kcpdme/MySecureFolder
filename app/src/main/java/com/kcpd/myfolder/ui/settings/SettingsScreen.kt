@@ -68,6 +68,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setRemoteType(type: com.kcpd.myfolder.data.model.RemoteType) {
         viewModelScope.launch {
+            // Always sign out of Google when switching remotes to ensure a fresh session/clean state
+            signOutGoogleSuspend(context)
             remoteRepositoryManager.setRemoteType(type)
         }
     }
@@ -90,6 +92,12 @@ class SettingsViewModel @Inject constructor(
     }
     
     fun signOutGoogle(context: android.content.Context) {
+        viewModelScope.launch {
+            signOutGoogleSuspend(context)
+        }
+    }
+
+    private suspend fun signOutGoogleSuspend(context: android.content.Context) = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
         val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
             com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
         ).requestEmail().build()
@@ -98,6 +106,9 @@ class SettingsViewModel @Inject constructor(
         client.signOut().addOnCompleteListener {
             _googleAccountEmail.value = null
             googleDriveRepository.setSignedInAccount(null)
+            if (cont.isActive) {
+                cont.resume(Unit) {}
+            }
         }
     }
 
@@ -456,7 +467,7 @@ fun SettingsScreen(
                 title = "Sync Upload Status",
                 description = "Verify which files still exist on remote storage",
                 onClick = {
-                    navController.navigate("s3_sync")
+                    navController.navigate("remote_sync")
                 }
             )
         }

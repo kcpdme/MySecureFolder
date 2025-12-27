@@ -65,6 +65,15 @@ class S3Repository @Inject constructor(
     }
 
     override suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
+        // Optimization: Check if file already exists on S3 before attempting upload
+        // This acts as a sync mechanism, preventing re-uploads of existing files
+        val existsResult = verifyFileExists(mediaFile)
+        val existingUrl = existsResult.getOrNull()
+        if (existingUrl != null) {
+            Log.d("S3Repository", "File already exists on S3, skipping upload: $existingUrl")
+            return@withContext Result.success(existingUrl)
+        }
+
         var tempDecryptedFile: File? = null
         try {
             // Step 1: Decrypt the encrypted file to a temporary file (do this once)
@@ -165,9 +174,9 @@ class S3Repository @Inject constructor(
 
     /**
      * Verify if a file exists on S3.
-     * Returns true if file exists, false if deleted or not found.
+     * Returns URL if file exists, null if deleted or not found.
      */
-    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<Boolean> = withContext(Dispatchers.IO) {
+    override suspend fun verifyFileExists(mediaFile: MediaFile): Result<String?> = withContext(Dispatchers.IO) {
         try {
             // Get S3 client (must get session manager on main thread first)
             val cachedClient = withContext(Dispatchers.Main) {
@@ -209,11 +218,12 @@ class S3Repository @Inject constructor(
                 )
                 // File exists
                 Log.d("S3Repository", "File exists on S3: ${mediaFile.fileName}")
-                Result.success(true)
+                val url = "${config.endpoint}/${config.bucketName}/$objectName"
+                Result.success(url)
             } catch (e: Exception) {
                 // File not found (deleted from S3)
                 Log.w("S3Repository", "File not found on S3: ${mediaFile.fileName}")
-                Result.success(false)
+                Result.success(null)
             }
         } catch (e: Exception) {
             Log.e("S3Repository", "Error verifying file existence", e)
@@ -223,18 +233,18 @@ class S3Repository @Inject constructor(
 
     /**
      * Verify multiple files exist on S3.
-     * Returns map of fileId -> exists status.
+     * Returns map of fileId -> URL (if found).
      */
-    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, Boolean> = withContext(Dispatchers.IO) {
-        val results = mutableMapOf<String, Boolean>()
+    override suspend fun verifyMultipleFiles(mediaFiles: List<MediaFile>): Map<String, String?> = withContext(Dispatchers.IO) {
+        val results = mutableMapOf<String, String?>()
 
         mediaFiles.forEach { mediaFile ->
             val result = verifyFileExists(mediaFile)
-            result.onSuccess { exists ->
-                results[mediaFile.id] = exists
-            }.onFailure {
-                // On error, assume file doesn't exist to be safe
-                results[mediaFile.id] = false
+            result.onSuccess { url ->
+                results[mediaFile.id] = url
+            }.onFailure { e ->
+                // On error, do not include in results to avoid marking as missing
+                Log.w("S3Repository", "Failed to verify file ${mediaFile.fileName}", e)
             }
         }
 
