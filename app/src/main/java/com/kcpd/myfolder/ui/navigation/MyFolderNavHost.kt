@@ -108,6 +108,12 @@ fun MyFolderNavHost(
                 },
                 onSettingsClick = {
                     navController.navigate("settings")
+                },
+                onCameraClick = {
+                    navController.navigate("photo_camera")
+                },
+                onRecorderClick = {
+                    navController.navigate("audio_recorder")
                 }
             )
         }

@@ -26,6 +26,8 @@ import com.kcpd.myfolder.data.model.FolderCategory
 fun HomeScreen(
     onFolderClick: (FolderCategory) -> Unit,
     onSettingsClick: () -> Unit,
+    onCameraClick: () -> Unit,
+    onRecorderClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -61,6 +63,8 @@ fun HomeScreen(
         )
     }
 
+    var selectedItem by remember { mutableStateOf("Folders") }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -76,58 +80,82 @@ fun HomeScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Folder, contentDescription = "Folders") },
+                    label = { Text("Folders") },
+                    selected = selectedItem == "Folders",
+                    onClick = { selectedItem = "Folders" }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.CameraAlt, contentDescription = "Camera") },
+                    label = { Text("Camera") },
+                    selected = selectedItem == "Camera",
+                    onClick = { onCameraClick() }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Mic, contentDescription = "Recorder") },
+                    label = { Text("Recorder") },
+                    selected = selectedItem == "Recorder",
+                    onClick = { onRecorderClick() }
+                )
+            }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Landscape tiles like Tella
-            FolderCard(
-                category = FolderCategory.ALL_FILES,
-                count = allFilesCount,
-                size = viewModel.formatFileSize(allFilesSize),
-                onClick = { onFolderClick(FolderCategory.ALL_FILES) },
-                modifier = Modifier.fillMaxWidth()
-            )
-            FolderCard(
-                category = FolderCategory.PHOTOS,
-                count = photosCount,
-                size = viewModel.formatFileSize(photosSize),
-                onClick = { onFolderClick(FolderCategory.PHOTOS) },
-                modifier = Modifier.fillMaxWidth()
-            )
-            FolderCard(
-                category = FolderCategory.VIDEOS,
-                count = videosCount,
-                size = viewModel.formatFileSize(videosSize),
-                onClick = { onFolderClick(FolderCategory.VIDEOS) },
-                modifier = Modifier.fillMaxWidth()
-            )
-            FolderCard(
-                category = FolderCategory.RECORDINGS,
-                count = recordingsCount,
-                size = viewModel.formatFileSize(recordingsSize),
-                onClick = { onFolderClick(FolderCategory.RECORDINGS) },
-                modifier = Modifier.fillMaxWidth()
-            )
-            FolderCard(
-                category = FolderCategory.NOTES,
-                count = notesCount,
-                size = viewModel.formatFileSize(notesSize),
-                onClick = { onFolderClick(FolderCategory.NOTES) },
-                modifier = Modifier.fillMaxWidth()
-            )
-            FolderCard(
-                category = FolderCategory.PDFS,
-                count = pdfsCount,
-                size = viewModel.formatFileSize(pdfsSize),
-                onClick = { onFolderClick(FolderCategory.PDFS) },
-                modifier = Modifier.fillMaxWidth()
-            )
+        if (selectedItem == "Folders") {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Landscape tiles like Tella
+                FolderCard(
+                    category = FolderCategory.ALL_FILES,
+                    count = allFilesCount,
+                    size = viewModel.formatFileSize(allFilesSize),
+                    onClick = { onFolderClick(FolderCategory.ALL_FILES) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                FolderCard(
+                    category = FolderCategory.PHOTOS,
+                    count = photosCount,
+                    size = viewModel.formatFileSize(photosSize),
+                    onClick = { onFolderClick(FolderCategory.PHOTOS) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                FolderCard(
+                    category = FolderCategory.VIDEOS,
+                    count = videosCount,
+                    size = viewModel.formatFileSize(videosSize),
+                    onClick = { onFolderClick(FolderCategory.VIDEOS) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                FolderCard(
+                    category = FolderCategory.RECORDINGS,
+                    count = recordingsCount,
+                    size = viewModel.formatFileSize(recordingsSize),
+                    onClick = { onFolderClick(FolderCategory.RECORDINGS) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                FolderCard(
+                    category = FolderCategory.NOTES,
+                    count = notesCount,
+                    size = viewModel.formatFileSize(notesSize),
+                    onClick = { onFolderClick(FolderCategory.NOTES) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                FolderCard(
+                    category = FolderCategory.PDFS,
+                    count = pdfsCount,
+                    size = viewModel.formatFileSize(pdfsSize),
+                    onClick = { onFolderClick(FolderCategory.PDFS) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
