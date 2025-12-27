@@ -126,6 +126,8 @@ class SecureFileManager @Inject constructor(
      * Uses CipherInputStream for true chunk-by-chunk decryption without loading
      * the entire file into memory.
      *
+     * Uses AES/CTR/NoPadding (like Tella) for streaming compatibility.
+     *
      * This approach:
      * - Minimizes memory usage (only buffers 8KB chunks)
      * - Reduces battery consumption (streaming vs batch processing)
@@ -139,10 +141,10 @@ class SecureFileManager @Inject constructor(
         val fileInputStream = FileInputStream(encryptedFile)
 
         try {
-            // Read IV from the first 12 bytes
-            val iv = ByteArray(12)
+            // Read IV (16 bytes for CTR mode)
+            val iv = ByteArray(16)
             val bytesRead = fileInputStream.read(iv)
-            if (bytesRead != 12) {
+            if (bytesRead != 16) {
                 fileInputStream.close()
                 throw IllegalStateException("Failed to read IV from encrypted file")
             }
@@ -150,10 +152,10 @@ class SecureFileManager @Inject constructor(
             // Use key from SecurityManager (supports password-derived key)
             val key = securityManager.getFileEncryptionKey()
 
-            // Initialize cipher for decryption
-            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-            val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
-            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, gcmSpec)
+            // Initialize cipher for decryption - use CTR mode (like Tella)
+            val cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding")
+            val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, ivSpec)
 
             // Return CipherInputStream that decrypts chunks on-the-fly
             return javax.crypto.CipherInputStream(fileInputStream, cipher)
@@ -174,7 +176,8 @@ class SecureFileManager @Inject constructor(
      * This is memory-efficient for large files - encrypts chunks as they're written
      * rather than buffering the entire file in memory.
      *
-     * Uses CipherOutputStream for true chunk-by-chunk encryption.
+     * Uses AES/CTR/NoPadding (like Tella) instead of AES/GCM to avoid OutOfMemoryError
+     * during close() with large files. CTR mode is ideal for streaming.
      */
     fun getStreamingEncryptionOutputStream(targetFile: File): java.io.OutputStream {
         targetFile.parentFile?.mkdirs()
@@ -185,16 +188,22 @@ class SecureFileManager @Inject constructor(
             // Use key from SecurityManager (supports password-derived key)
             val key = securityManager.getFileEncryptionKey()
 
-            // Initialize cipher for encryption
-            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
+            // Initialize cipher for encryption - use CTR mode for streaming (like Tella)
+            val cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding")
 
-            // Write IV to file first (12 bytes for GCM)
-            val iv = cipher.iv
+            // Generate random IV (16 bytes for CTR mode)
+            val iv = ByteArray(16)
+            SecureRandom().nextBytes(iv)
+            val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
+
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key, ivSpec)
+
+            // Write IV to file first (16 bytes for CTR)
             fileOutputStream.write(iv)
             fileOutputStream.flush()
 
             // Return CipherOutputStream that encrypts chunks on-the-fly
+            // CTR mode doesn't have the close() memory issue that GCM has
             return javax.crypto.CipherOutputStream(fileOutputStream, cipher)
         } catch (e: Exception) {
             // Clean up on error

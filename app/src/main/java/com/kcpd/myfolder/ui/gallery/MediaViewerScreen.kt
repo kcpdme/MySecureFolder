@@ -259,42 +259,84 @@ fun ZoomableImage(
 @Composable
 fun VideoPlayer(
     mediaFile: MediaFile,
-    onTap: () -> Unit
+    onTap: () -> Unit,
+    viewModel: GalleryViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.fromFile(java.io.File(mediaFile.filePath)))
-            setMediaItem(mediaItem)
-            prepare()
-            playWhenReady = true
-            repeatMode = Player.REPEAT_MODE_OFF
+    // Decrypt the video file
+    LaunchedEffect(mediaFile.id) {
+        try {
+            val file = viewModel.decryptForPlayback(mediaFile)
+            decryptedFile = file
+            android.util.Log.d("VideoPlayer", "Decrypted video to: ${file.absolutePath}")
+        } catch (e: Exception) {
+            error = "Failed to load video: ${e.message}"
+            android.util.Log.e("VideoPlayer", "Failed to decrypt video", e)
         }
     }
 
-    DisposableEffect(mediaFile.filePath) {
+    val exoPlayer = remember(decryptedFile) {
+        decryptedFile?.let { file ->
+            ExoPlayer.Builder(context).build().apply {
+                val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
+                setMediaItem(mediaItem)
+                prepare()
+                playWhenReady = true
+                repeatMode = Player.REPEAT_MODE_OFF
+            }
+        }
+    }
+
+    DisposableEffect(mediaFile.filePath, decryptedFile) {
         onDispose {
-            exoPlayer.release()
+            exoPlayer?.release()
+            // Clean up decrypted temp file
+            decryptedFile?.let { file ->
+                try {
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoPlayer", "Failed to delete temp file", e)
+                }
+            }
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = true
-                    controllerAutoShow = true
-                    controllerShowTimeoutMs = 3000
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+        when {
+            error != null -> {
+                Text(
+                    text = error ?: "Unknown error",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            exoPlayer == null -> {
+                CircularProgressIndicator(color = Color.White)
+            }
+            else -> {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = exoPlayer
+                            useController = true
+                            controllerAutoShow = true
+                            controllerShowTimeoutMs = 3000
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }
 
@@ -471,9 +513,40 @@ fun PdfViewer(
         }
     }
 
-    // Clean up decrypted file on dispose
-    DisposableEffect(mediaFile.filePath) {
+    // Open PDF renderer once (like Tella does) - keeps it open for entire session
+    val pdfRenderer = remember(decryptedFile) {
+        decryptedFile?.let { file ->
+            try {
+                if (!file.exists()) {
+                    android.util.Log.e("PdfViewer", "File does not exist: ${file.absolutePath}")
+                    errorMessage = "PDF file not found"
+                    return@let null
+                }
+
+                android.util.Log.d("PdfViewer", "Opening PDF renderer...")
+                val renderer = android.graphics.pdf.PdfRenderer(
+                    android.os.ParcelFileDescriptor.open(
+                        file,
+                        android.os.ParcelFileDescriptor.MODE_READ_ONLY
+                    )
+                )
+                pageCount = renderer.pageCount
+                android.util.Log.d("PdfViewer", "PDF has $pageCount pages")
+                renderer
+            } catch (e: Exception) {
+                android.util.Log.e("PdfViewer", "Failed to open PDF", e)
+                errorMessage = "Failed to open PDF: ${e.message}"
+                null
+            }
+        }
+    }
+
+    // Clean up renderer and decrypted file on dispose
+    DisposableEffect(pdfRenderer, decryptedFile) {
         onDispose {
+            pdfRenderer?.close()
+            android.util.Log.d("PdfViewer", "PDF renderer closed")
+
             decryptedFile?.let { file ->
                 if (file.exists()) {
                     android.util.Log.d("PdfViewer", "Cleaning up decrypted PDF...")
@@ -484,36 +557,17 @@ fun PdfViewer(
         }
     }
 
-    // Load PDF page
-    LaunchedEffect(decryptedFile, currentPage) {
-        val file = decryptedFile ?: return@LaunchedEffect
+    // Render current page (like Tella's page-by-page approach)
+    LaunchedEffect(pdfRenderer, currentPage) {
+        val renderer = pdfRenderer ?: return@LaunchedEffect
 
         try {
-            android.util.Log.d("PdfViewer", "Loading PDF page $currentPage...")
-
-            if (!file.exists()) {
-                android.util.Log.e("PdfViewer", "File does not exist: ${file.absolutePath}")
-                errorMessage = "PDF file not found"
-                return@LaunchedEffect
-            }
-
-            android.util.Log.d("PdfViewer", "Opening PDF renderer...")
-            val pdfRenderer = android.graphics.pdf.PdfRenderer(
-                android.os.ParcelFileDescriptor.open(
-                    file,
-                    android.os.ParcelFileDescriptor.MODE_READ_ONLY
-                )
-            )
-
-            pageCount = pdfRenderer.pageCount
-            android.util.Log.d("PdfViewer", "PDF has $pageCount pages")
-
             if (currentPage >= pageCount) {
                 currentPage = pageCount - 1
             }
 
             android.util.Log.d("PdfViewer", "Rendering page ${currentPage + 1}/$pageCount...")
-            val page = pdfRenderer.openPage(currentPage)
+            val page = renderer.openPage(currentPage)
 
             // Create bitmap with good quality (2x scale for crisp rendering)
             val bitmap = android.graphics.Bitmap.createBitmap(
@@ -538,10 +592,9 @@ fun PdfViewer(
             android.util.Log.d("PdfViewer", "Page rendered successfully")
 
             page.close()
-            pdfRenderer.close()
         } catch (e: Exception) {
-            android.util.Log.e("PdfViewer", "Failed to render PDF", e)
-            errorMessage = "Failed to load PDF: ${e.message}"
+            android.util.Log.e("PdfViewer", "Failed to render PDF page", e)
+            errorMessage = "Failed to load page: ${e.message}"
         }
     }
 
