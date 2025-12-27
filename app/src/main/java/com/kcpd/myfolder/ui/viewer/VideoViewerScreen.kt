@@ -202,11 +202,11 @@ fun VideoPlayer(
     DisposableEffect(mediaFile.filePath) {
         onDispose {
             // Clean up temp file securely
-            // We use the current value of decryptedFile
             decryptedFile?.let { file ->
                 try {
                     if (file.exists()) {
-                        file.delete()
+                        file.delete()  // Temp file - regular delete is acceptable for cache dir
+                        android.util.Log.d("VideoPlayer", "Cleaned up temp decrypted file: ${file.name}")
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("VideoPlayer", "Failed to delete temp file", e)

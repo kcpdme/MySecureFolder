@@ -162,22 +162,30 @@ fun AudioRecordingContent(
                         audioFile?.let { onRecordingComplete(it) }
                     } else {
                         audioFile = createMediaFile(context, "m4a")
-                        mediaRecorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                            android.media.MediaRecorder(context)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            android.media.MediaRecorder()
-                        }.apply {
-                            setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
-                            setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
-                            setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
-                            setAudioEncodingBitRate(128000) // 128kbps for good quality
-                            setAudioSamplingRate(44100) // 44.1kHz standard quality
-                            setOutputFile(audioFile?.absolutePath)
-                            prepare()
-                            start()
+                        try {
+                            mediaRecorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                android.media.MediaRecorder(context)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                android.media.MediaRecorder()
+                            }.apply {
+                                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                                setAudioEncodingBitRate(128000) // 128kbps for good quality
+                                setAudioSamplingRate(44100) // 44.1kHz standard quality
+                                setOutputFile(audioFile?.absolutePath)
+                                prepare()
+                                start()
+                            }
+                            isRecording = true
+                        } catch (e: Exception) {
+                            android.util.Log.e("AudioRecorder", "Failed to start recording", e)
+                            mediaRecorder?.release()  // Cleanup on error
+                            mediaRecorder = null
+                            isRecording = false
+                            audioFile = null
                         }
-                        isRecording = true
                     }
                 },
                 modifier = Modifier.size(72.dp),

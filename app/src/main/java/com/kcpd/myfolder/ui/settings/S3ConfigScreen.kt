@@ -33,6 +33,7 @@ fun S3ConfigScreen(
     var bucketName by remember { mutableStateOf("") }
     var region by remember { mutableStateOf("us-east-1") }
     var showSecretKey by remember { mutableStateOf(false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(s3Config) {
         s3Config?.let { config ->
@@ -42,6 +43,28 @@ fun S3ConfigScreen(
             bucketName = config.bucketName
             region = config.region
         }
+    }
+
+    /**
+     * Validates S3 configuration before saving
+     */
+    fun validateConfig(): Boolean {
+        validationError = when {
+            endpoint.isBlank() -> "Endpoint required"
+            !endpoint.startsWith("http://") && !endpoint.startsWith("https://") -> 
+                "Endpoint must start with http:// or https://"
+            endpoint.length < 10 -> "Endpoint appears invalid"
+            accessKey.isBlank() -> "Access Key required"
+            accessKey.length < 10 -> "Access Key too short (should be at least 10 chars)"
+            secretKey.isBlank() -> "Secret Key required"
+            secretKey.length < 10 -> "Secret Key too short (should be at least 10 chars)"
+            bucketName.isBlank() -> "Bucket Name required"
+            !bucketName.matches(Regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")) ->
+                "Bucket name invalid (lowercase, numbers, dots, hyphens only)"
+            region.isBlank() -> "Region required"
+            else -> null
+        }
+        return validationError == null
     }
 
     Scaffold(
@@ -179,16 +202,45 @@ fun S3ConfigScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (validationError != null) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Configuration Error",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            validationError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             Button(
                 onClick = {
-                    viewModel.saveConfig(
-                        endpoint = endpoint,
-                        accessKey = accessKey,
-                        secretKey = secretKey,
-                        bucketName = bucketName,
-                        region = region
-                    )
-                    navController.navigateUp()
+                    if (validateConfig()) {
+                        viewModel.saveConfig(
+                            endpoint = endpoint,
+                            accessKey = accessKey,
+                            secretKey = secretKey,
+                            bucketName = bucketName,
+                            region = region
+                        )
+                        navController.navigateUp()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = endpoint.isNotBlank() && accessKey.isNotBlank() &&

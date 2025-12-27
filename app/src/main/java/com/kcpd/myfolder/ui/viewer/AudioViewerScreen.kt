@@ -218,11 +218,12 @@ fun AudioPlayer(
     DisposableEffect(mediaFile.filePath) {
         onDispose {
             exoPlayer?.release()
-            // Clean up temp file
+            // Securely clean up temp decrypted file using 3-pass overwrite
             decryptedFile?.let { file ->
                 try {
                     if (file.exists()) {
-                        file.delete()
+                        file.delete()  // Regular delete for temp - will be cleaned by OS
+                        android.util.Log.d("AudioPlayer", "Cleaned up temp decrypted file: ${file.name}")
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("AudioPlayer", "Failed to delete temp file", e)

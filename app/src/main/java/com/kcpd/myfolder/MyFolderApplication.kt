@@ -27,8 +27,29 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(this)
 
+        // Setup crash handler for secure cleanup
+        setupCrashHandler()
+
         // Clean up any orphaned temp files from cache directory
         cleanupTempFiles()
+    }
+
+    /**
+     * Sets up uncaught exception handler to clean up temp files on crash.
+     * Ensures decrypted files don't persist on disk after unexpected app termination.
+     */
+    private fun setupCrashHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("MyFolderApp", "Uncaught exception - cleaning up temp files before crash", throwable)
+            try {
+                cleanupTempFiles()
+            } catch (e: Exception) {
+                android.util.Log.e("MyFolderApp", "Failed to cleanup during crash", e)
+            }
+            // Let default handler continue
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
     }
 
     /**

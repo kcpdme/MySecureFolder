@@ -130,6 +130,13 @@ class ImportMediaUseCase @Inject constructor(
                 val id = UUID.randomUUID().toString()
                 android.util.Log.d("ImportMediaUseCase", "  Generated ID: $id")
 
+                // Extract duration for audio/video files
+                val duration = if (mediaType == MediaType.VIDEO || mediaType == MediaType.AUDIO) {
+                    extractMediaDuration(tempFile.absolutePath)
+                } else {
+                    null
+                }
+
                 val entity = MediaFileEntity(
                     id = id,
                     originalFileName = fileName,
@@ -138,7 +145,7 @@ class ImportMediaUseCase @Inject constructor(
                     mediaType = mediaType.name,
                     encryptedThumbnailPath = null,
                     thumbnail = thumbnail,
-                    duration = null, // TODO: Extract duration for audio/video
+                    duration = duration,
                     size = encryptedFile.length(),
                     createdAt = System.currentTimeMillis(),
                     isUploaded = false,
@@ -445,4 +452,23 @@ private fun MediaFileEntity.toMediaFile(): MediaFile {
         folderId = folderId,
         mimeType = mimeType
     )
+}
+
+/**
+ * Extracts duration from audio or video file using MediaMetadataRetriever.
+ * Returns duration in milliseconds, or null if extraction fails.
+ */
+fun extractMediaDuration(filePath: String): Long? {
+    return try {
+        val retriever = android.media.MediaMetadataRetriever()
+        retriever.setDataSource(filePath)
+        val durationStr = retriever.extractMetadata(
+            android.media.MediaMetadataRetriever.METADATA_KEY_DURATION
+        )
+        retriever.release()
+        durationStr?.toLongOrNull()
+    } catch (e: Exception) {
+        android.util.Log.e("ImportMediaUseCase", "Failed to extract duration from $filePath", e)
+        null
+    }
 }
