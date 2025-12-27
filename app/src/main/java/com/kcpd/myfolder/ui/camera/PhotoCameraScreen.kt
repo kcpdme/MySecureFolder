@@ -1,6 +1,8 @@
 package com.kcpd.myfolder.ui.camera
 
 import android.Manifest
+import android.util.Size
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -123,21 +125,46 @@ fun PhotoCameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val previewView = remember { PreviewView(context) }
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    var aspectRatio by remember { mutableStateOf(AspectRatio.RATIO_4_3) }
+
+    val previewView = remember { 
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FIT_CENTER 
+        }
+    }
+    
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashEnabled by remember { mutableStateOf(false) }
     var zoomRatio by remember { mutableStateOf(1f) }
 
-    DisposableEffect(lensFacing) {
+    DisposableEffect(lensFacing, aspectRatio) {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().apply {
-                setSurfaceProvider(previewView.surfaceProvider)
+            
+            // Configure Resolution based on Ratio (approx 2MP to save space)
+            val targetResolution = if (aspectRatio == AspectRatio.RATIO_16_9) {
+                Size(1080, 1920) // 16:9
+            } else {
+                Size(1200, 1600) // 4:3
             }
+
+            val preview = Preview.Builder()
+                .setTargetAspectRatio(aspectRatio)
+                .build()
+                .apply {
+                    setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+            val newImageCapture = ImageCapture.Builder()
+                .setTargetResolution(targetResolution)
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setJpegQuality(85)
+                .build()
+            imageCapture = newImageCapture
 
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(lensFacing)
@@ -149,16 +176,16 @@ fun PhotoCameraPreview(
                     lifecycleOwner,
                     cameraSelector,
                     preview,
-                    imageCapture
+                    newImageCapture
                 )
                 cameraControl = camera.cameraControl
 
                 camera.cameraControl.setZoomRatio(zoomRatio)
 
                 if (flashEnabled) {
-                    imageCapture.flashMode = ImageCapture.FLASH_MODE_ON
+                    newImageCapture.flashMode = ImageCapture.FLASH_MODE_ON
                 } else {
-                    imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF
+                    newImageCapture.flashMode = ImageCapture.FLASH_MODE_OFF
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -168,8 +195,8 @@ fun PhotoCameraPreview(
         onDispose { }
     }
 
-    LaunchedEffect(flashEnabled) {
-        imageCapture.flashMode = if (flashEnabled) {
+    LaunchedEffect(flashEnabled, imageCapture) {
+        imageCapture?.flashMode = if (flashEnabled) {
             ImageCapture.FLASH_MODE_ON
         } else {
             ImageCapture.FLASH_MODE_OFF
@@ -193,17 +220,40 @@ fun PhotoCameraPreview(
                 }
         )
 
-        // Top controls bar (Only Close button)
-        Box(
+        // Top controls bar (Ratio Toggle + Close)
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .align(Alignment.TopCenter)
+                .align(Alignment.TopCenter),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Aspect Ratio Toggle
+            TextButton(
+                onClick = {
+                    aspectRatio = if (aspectRatio == AspectRatio.RATIO_4_3) {
+                        AspectRatio.RATIO_16_9
+                    } else {
+                        AspectRatio.RATIO_4_3
+                    }
+                },
+                modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.small
+                    )
+            ) {
+                Text(
+                    text = if (aspectRatio == AspectRatio.RATIO_4_3) "4:3" else "16:9",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
             IconButton(
                 onClick = onClose,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
                     .background(
                         Color.Black.copy(alpha = 0.5f),
                         shape = CircleShape
@@ -276,10 +326,11 @@ fun PhotoCameraPreview(
             // Shutter Button
             FloatingActionButton(
                 onClick = {
+                    val capture = imageCapture ?: return@FloatingActionButton
                     val photoFile = createMediaFile(context, "jpg")
                     val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
-                    imageCapture.takePicture(
+                    capture.takePicture(
                         outputOptions,
                         androidx.core.content.ContextCompat.getMainExecutor(context),
                         object : ImageCapture.OnImageSavedCallback {
