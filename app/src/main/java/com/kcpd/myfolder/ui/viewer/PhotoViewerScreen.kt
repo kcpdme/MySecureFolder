@@ -41,6 +41,10 @@ import com.kcpd.myfolder.data.model.MediaType
 import com.kcpd.myfolder.ui.gallery.GalleryViewModel
 import com.kcpd.myfolder.ui.util.ScreenSecureEffect
 
+enum class EditMode {
+    ROTATE, CROP
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoViewerScreen(
@@ -90,7 +94,9 @@ fun PhotoViewerScreen(
         pageCount = { photoFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }
-    var showCropMode by remember { mutableStateOf(false) }
+    var editMode by remember { mutableStateOf<EditMode?>(null) }
+    var rotationAngle by remember { mutableIntStateOf(0) } // 0, 90, 180, 270
+    var editCropRect by remember { mutableStateOf<Rect?>(null) }
 
     android.util.Log.d("PhotoViewerScreen", "PagerState: initialPage=${initialIndex.coerceIn(0, (photoFiles.size - 1).coerceAtLeast(0))}, pageCount=${photoFiles.size}")
 
@@ -126,17 +132,17 @@ fun PhotoViewerScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        if (photoFiles.isNotEmpty()) {
-                            viewModel.rotatePhoto(photoFiles[pagerState.currentPage]) { newFile ->
-                                // Photo rotated and saved as new file
-                                // The pager will update automatically when mediaFiles updates
-                            }
-                        }
+                        // Enter rotate edit mode
+                        editMode = EditMode.ROTATE
+                        rotationAngle = 0
+                        showControls = false
                     }) {
                         Icon(Icons.Default.RotateRight, "Rotate")
                     }
                     IconButton(onClick = {
-                        showCropMode = true
+                        // Enter crop edit mode
+                        editMode = EditMode.CROP
+                        editCropRect = null
                         showControls = false
                     }) {
                         Icon(Icons.Default.Crop, "Crop")
@@ -183,18 +189,54 @@ fun PhotoViewerScreen(
             )
         }
 
-        // Crop mode overlay
-        if (showCropMode && photoFiles.isNotEmpty()) {
-            CropModeOverlay(
+        // Edit mode overlay
+        if (editMode != null && photoFiles.isNotEmpty()) {
+            EditModeOverlay(
                 mediaFile = photoFiles[pagerState.currentPage],
-                onCropConfirm = { cropRect ->
-                    viewModel.cropPhoto(photoFiles[pagerState.currentPage], cropRect) { newFile ->
-                        showCropMode = false
-                        showControls = true
+                editMode = editMode!!,
+                initialRotation = rotationAngle,
+                initialCropRect = editCropRect,
+                onRotationChange = { newAngle -> rotationAngle = newAngle },
+                onCropRectChange = { newRect -> editCropRect = newRect },
+                onSave = { finalRotation, finalCropRect ->
+                    val currentFile = photoFiles[pagerState.currentPage]
+                    when (editMode!!) {
+                        EditMode.ROTATE -> {
+                            // Apply rotation (may need multiple 90-degree rotations)
+                            val rotations = finalRotation / 90
+                            var fileToRotate = currentFile
+                            for (i in 0 until rotations) {
+                                viewModel.rotatePhoto(fileToRotate) { newFile ->
+                                    if (newFile != null && i == rotations - 1) {
+                                        // Final rotation complete
+                                        editMode = null
+                                        rotationAngle = 0
+                                        showControls = true
+                                    }
+                                    fileToRotate = newFile ?: fileToRotate
+                                }
+                            }
+                            if (rotations == 0) {
+                                // No rotation needed
+                                editMode = null
+                                showControls = true
+                            }
+                        }
+                        EditMode.CROP -> {
+                            if (finalCropRect != null) {
+                                viewModel.cropPhoto(currentFile, finalCropRect) { newFile ->
+                                    editMode = null
+                                    editCropRect = null
+                                    showControls = true
+                                }
+                            }
+                        }
                     }
                 },
-                onCropCancel = {
-                    showCropMode = false
+                onCancel = {
+                    editMode = null
+                    rotationAngle = 0
+                    editCropRect = null
                     showControls = true
                 }
             )
@@ -318,6 +360,412 @@ fun ZoomableImage(
 }
 
 @Composable
+fun EditModeOverlay(
+    mediaFile: MediaFile,
+    editMode: EditMode,
+    initialRotation: Int,
+    initialCropRect: Rect?,
+    onRotationChange: (Int) -> Unit,
+    onCropRectChange: (Rect?) -> Unit,
+    onSave: (rotation: Int, cropRect: Rect?) -> Unit,
+    onCancel: () -> Unit
+) {
+    var rotationAngle by remember(mediaFile.id) { mutableIntStateOf(initialRotation) }
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var imageSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // Crop rectangle in screen coordinates
+    var cropRect by remember(mediaFile.id) {
+        mutableStateOf<androidx.compose.ui.geometry.Rect?>(initialCropRect?.let {
+            androidx.compose.ui.geometry.Rect(
+                it.left.toFloat(),
+                it.top.toFloat(),
+                it.right.toFloat(),
+                it.bottom.toFloat()
+            )
+        })
+    }
+
+    var isDragging by remember { mutableStateOf(false) }
+    var dragHandle by remember { mutableStateOf<DragHandle?>(null) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onSizeChanged { size ->
+                containerSize = size
+                // Initialize crop rect when container size is known
+                if (editMode == EditMode.CROP && cropRect == null && size.width > 0) {
+                    // Default to a square at center, roughly half the screen size
+                    val minDim = minOf(size.width, size.height).toFloat()
+                    val side = minDim * 0.5f
+                    val left = (size.width - side) / 2f
+                    val top = (size.height - side) / 2f
+                    
+                    cropRect = androidx.compose.ui.geometry.Rect(
+                        left = left,
+                        top = top,
+                        right = left + side,
+                        bottom = top + side
+                    )
+                }
+            }
+    ) {
+        // Image preview with rotation/crop
+        val context = LocalContext.current
+        val imageModel = remember(mediaFile.id) {
+            ImageRequest.Builder(context)
+                .data(mediaFile)
+                .memoryCacheKey(mediaFile.id)
+                .diskCacheKey(mediaFile.id)
+                .build()
+        }
+
+        var imagePainter by remember { mutableStateOf<AsyncImagePainter?>(null) }
+
+        AsyncImage(
+            model = imageModel,
+            contentDescription = mediaFile.fileName,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .align(Alignment.Center)
+                .graphicsLayer {
+                    rotationZ = rotationAngle.toFloat()
+                },
+            onState = { state ->
+                if (state is AsyncImagePainter.State.Success) {
+                    imagePainter = state.painter as? AsyncImagePainter
+                    val intrinsicSize = state.painter.intrinsicSize
+                    if (intrinsicSize.width > 0 && intrinsicSize.height > 0) {
+                        val containerAspect = containerSize.width.toFloat() / containerSize.height
+                        val imageAspect = intrinsicSize.width / intrinsicSize.height
+
+                        imageSize = if (imageAspect > containerAspect) {
+                            IntSize(
+                                width = containerSize.width,
+                                height = (containerSize.width / imageAspect).toInt()
+                            )
+                        } else {
+                            IntSize(
+                                width = (containerSize.height * imageAspect).toInt(),
+                                height = containerSize.height
+                            )
+                        }
+                    }
+                }
+            }
+        )
+
+        // Crop overlay (only in crop mode)
+        if (editMode == EditMode.CROP && cropRect != null) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                isDragging = true
+                                // Larger touch target (80dp) for easier dragging
+                                dragHandle = getDragHandle(offset, cropRect!!, 80f)
+                            },
+                            onDrag = { change, dragAmount ->
+                                if (isDragging && cropRect != null) {
+                                    val minSize = 100f // Minimum crop size
+                                    cropRect = when (dragHandle) {
+                                        DragHandle.TOP_LEFT -> cropRect!!.copy(
+                                            left = (cropRect!!.left + dragAmount.x).coerceIn(0f, cropRect!!.right - minSize),
+                                            top = (cropRect!!.top + dragAmount.y).coerceIn(0f, cropRect!!.bottom - minSize)
+                                        )
+                                        DragHandle.TOP_RIGHT -> cropRect!!.copy(
+                                            right = (cropRect!!.right + dragAmount.x).coerceIn(cropRect!!.left + minSize, containerSize.width.toFloat()),
+                                            top = (cropRect!!.top + dragAmount.y).coerceIn(0f, cropRect!!.bottom - minSize)
+                                        )
+                                        DragHandle.BOTTOM_LEFT -> cropRect!!.copy(
+                                            left = (cropRect!!.left + dragAmount.x).coerceIn(0f, cropRect!!.right - minSize),
+                                            bottom = (cropRect!!.bottom + dragAmount.y).coerceIn(cropRect!!.top + minSize, containerSize.height.toFloat())
+                                        )
+                                        DragHandle.BOTTOM_RIGHT -> cropRect!!.copy(
+                                            right = (cropRect!!.right + dragAmount.x).coerceIn(cropRect!!.left + minSize, containerSize.width.toFloat()),
+                                            bottom = (cropRect!!.bottom + dragAmount.y).coerceIn(cropRect!!.top + minSize, containerSize.height.toFloat())
+                                        )
+                                        // Add edge handles for easier resizing
+                                        DragHandle.TOP_EDGE -> cropRect!!.copy(
+                                            top = (cropRect!!.top + dragAmount.y).coerceIn(0f, cropRect!!.bottom - minSize)
+                                        )
+                                        DragHandle.BOTTOM_EDGE -> cropRect!!.copy(
+                                            bottom = (cropRect!!.bottom + dragAmount.y).coerceIn(cropRect!!.top + minSize, containerSize.height.toFloat())
+                                        )
+                                        DragHandle.LEFT_EDGE -> cropRect!!.copy(
+                                            left = (cropRect!!.left + dragAmount.x).coerceIn(0f, cropRect!!.right - minSize)
+                                        )
+                                        DragHandle.RIGHT_EDGE -> cropRect!!.copy(
+                                            right = (cropRect!!.right + dragAmount.x).coerceIn(cropRect!!.left + minSize, containerSize.width.toFloat())
+                                        )
+                                        DragHandle.CENTER -> {
+                                            val newLeft = (cropRect!!.left + dragAmount.x).coerceIn(0f, containerSize.width - cropRect!!.width)
+                                            val newTop = (cropRect!!.top + dragAmount.y).coerceIn(0f, containerSize.height - cropRect!!.height)
+                                            cropRect!!.copy(
+                                                left = newLeft,
+                                                top = newTop,
+                                                right = newLeft + cropRect!!.width,
+                                                bottom = newTop + cropRect!!.height
+                                            )
+                                        }
+                                        null -> cropRect!!
+                                    }
+                                }
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                dragHandle = null
+                            }
+                        )
+                    }
+            ) {
+                val rect = cropRect!!
+                // Draw darkened overlay outside crop area
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    topLeft = Offset.Zero,
+                    size = Size(size.width, rect.top)
+                )
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    topLeft = Offset(0f, rect.bottom),
+                    size = Size(size.width, size.height - rect.bottom)
+                )
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    topLeft = Offset(0f, rect.top),
+                    size = Size(rect.left, rect.height)
+                )
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    topLeft = Offset(rect.right, rect.top),
+                    size = Size(size.width - rect.right, rect.height)
+                )
+
+                // Draw crop rectangle border
+                drawRect(
+                    color = Color.White.copy(alpha = 0.5f),
+                    topLeft = Offset(rect.left, rect.top),
+                    size = Size(rect.width, rect.height),
+                    style = Stroke(width = 2f)
+                )
+
+                // Draw grid lines (thirds)
+                val thirdWidth = rect.width / 3f
+                val thirdHeight = rect.height / 3f
+
+                // Vertical grid lines
+                drawLine(
+                    color = Color.White.copy(alpha = 0.3f),
+                    start = Offset(rect.left + thirdWidth, rect.top),
+                    end = Offset(rect.left + thirdWidth, rect.bottom),
+                    strokeWidth = 1f
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.3f),
+                    start = Offset(rect.left + thirdWidth * 2, rect.top),
+                    end = Offset(rect.left + thirdWidth * 2, rect.bottom),
+                    strokeWidth = 1f
+                )
+
+                // Horizontal grid lines
+                drawLine(
+                    color = Color.White.copy(alpha = 0.3f),
+                    start = Offset(rect.left, rect.top + thirdHeight),
+                    end = Offset(rect.right, rect.top + thirdHeight),
+                    strokeWidth = 1f
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.3f),
+                    start = Offset(rect.left, rect.top + thirdHeight * 2),
+                    end = Offset(rect.right, rect.top + thirdHeight * 2),
+                    strokeWidth = 1f
+                )
+
+                // Draw thick corner handles (L-shape) like Google Photos
+                val cornerLength = 60f
+                val cornerThickness = 8f
+                val cornerColor = Color.White
+
+                // Top Left
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.left - cornerThickness/2, rect.top),
+                    end = Offset(rect.left + cornerLength, rect.top),
+                    strokeWidth = cornerThickness
+                )
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.left, rect.top - cornerThickness/2),
+                    end = Offset(rect.left, rect.top + cornerLength),
+                    strokeWidth = cornerThickness
+                )
+
+                // Top Right
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.right - cornerLength, rect.top),
+                    end = Offset(rect.right + cornerThickness/2, rect.top),
+                    strokeWidth = cornerThickness
+                )
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.right, rect.top - cornerThickness/2),
+                    end = Offset(rect.right, rect.top + cornerLength),
+                    strokeWidth = cornerThickness
+                )
+
+                // Bottom Left
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.left - cornerThickness/2, rect.bottom),
+                    end = Offset(rect.left + cornerLength, rect.bottom),
+                    strokeWidth = cornerThickness
+                )
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.left, rect.bottom - cornerLength),
+                    end = Offset(rect.left, rect.bottom + cornerThickness/2),
+                    strokeWidth = cornerThickness
+                )
+
+                // Bottom Right
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.right - cornerLength, rect.bottom),
+                    end = Offset(rect.right + cornerThickness/2, rect.bottom),
+                    strokeWidth = cornerThickness
+                )
+                drawLine(
+                    color = cornerColor,
+                    start = Offset(rect.right, rect.bottom - cornerLength),
+                    end = Offset(rect.right, rect.bottom + cornerThickness/2),
+                    strokeWidth = cornerThickness
+                )
+
+                // Draw edge handles (rectangular indicators at midpoint of each edge)
+                val edgeHandleWidth = 60f
+                val edgeHandleThickness = 8f
+                val edgeColor = Color.White
+
+                // Top edge handle
+                drawLine(
+                    color = edgeColor,
+                    start = Offset(rect.left + rect.width / 2 - edgeHandleWidth / 2, rect.top),
+                    end = Offset(rect.left + rect.width / 2 + edgeHandleWidth / 2, rect.top),
+                    strokeWidth = edgeHandleThickness
+                )
+
+                // Bottom edge handle
+                drawLine(
+                    color = edgeColor,
+                    start = Offset(rect.left + rect.width / 2 - edgeHandleWidth / 2, rect.bottom),
+                    end = Offset(rect.left + rect.width / 2 + edgeHandleWidth / 2, rect.bottom),
+                    strokeWidth = edgeHandleThickness
+                )
+
+                // Left edge handle
+                drawLine(
+                    color = edgeColor,
+                    start = Offset(rect.left, rect.top + rect.height / 2 - edgeHandleWidth / 2),
+                    end = Offset(rect.left, rect.top + rect.height / 2 + edgeHandleWidth / 2),
+                    strokeWidth = edgeHandleThickness
+                )
+
+                // Right edge handle
+                drawLine(
+                    color = edgeColor,
+                    start = Offset(rect.right, rect.top + rect.height / 2 - edgeHandleWidth / 2),
+                    end = Offset(rect.right, rect.top + rect.height / 2 + edgeHandleWidth / 2),
+                    strokeWidth = edgeHandleThickness
+                )
+            }
+        }
+
+        // Controls at bottom
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .background(
+                    Color.Black.copy(alpha = 0.8f),
+                    shape = MaterialTheme.shapes.medium
+                )
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Rotate button (only in rotate mode)
+            if (editMode == EditMode.ROTATE) {
+                Button(
+                    onClick = {
+                        rotationAngle = (rotationAngle + 90) % 360
+                        onRotationChange(rotationAngle)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.RotateRight, "Rotate", modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Rotate 90°")
+                }
+            }
+
+            // Save and Cancel buttons
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Button(
+                    onClick = onCancel,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = {
+                        when (editMode) {
+                            EditMode.ROTATE -> {
+                                onSave(rotationAngle, null)
+                            }
+                            EditMode.CROP -> {
+                                // Convert screen coordinates to image coordinates
+                                if (imageSize.width > 0 && imageSize.height > 0 && containerSize.width > 0 && cropRect != null) {
+                                    val imageLeft = (containerSize.width - imageSize.width) / 2f
+                                    val imageTop = (containerSize.height - imageSize.height) / 2f
+
+                                    val intrinsicWidth = imagePainter?.intrinsicSize?.width ?: 0f
+                                    val intrinsicHeight = imagePainter?.intrinsicSize?.height ?: 0f
+                                    val scaleX = if (imageSize.width > 0 && intrinsicWidth > 0) intrinsicWidth / imageSize.width else 1f
+                                    val scaleY = if (imageSize.height > 0 && intrinsicHeight > 0) intrinsicHeight / imageSize.height else 1f
+
+                                    val imageCropRect = Rect(
+                                        ((cropRect!!.left - imageLeft) * scaleX).toInt().coerceAtLeast(0),
+                                        ((cropRect!!.top - imageTop) * scaleY).toInt().coerceAtLeast(0),
+                                        ((cropRect!!.right - imageLeft) * scaleX).toInt(),
+                                        ((cropRect!!.bottom - imageTop) * scaleY).toInt()
+                                    )
+
+                                    onSave(0, imageCropRect)
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Save")
+                }
+            }
+        }
+    }
+}
+
+// Keep old function signature for compatibility, but redirect to new implementation
+@Deprecated("Use EditModeOverlay instead")
+@Composable
 fun CropModeOverlay(
     mediaFile: MediaFile,
     onCropConfirm: (Rect) -> Unit,
@@ -435,6 +883,18 @@ fun CropModeOverlay(
                                         right = (cropRect.right + dragAmount.x).coerceIn(cropRect.left + 50f, containerSize.width.toFloat()),
                                         bottom = (cropRect.bottom + dragAmount.y).coerceIn(cropRect.top + 50f, containerSize.height.toFloat())
                                     )
+                                    DragHandle.TOP_EDGE -> cropRect.copy(
+                                        top = (cropRect.top + dragAmount.y).coerceIn(0f, cropRect.bottom - 50f)
+                                    )
+                                    DragHandle.BOTTOM_EDGE -> cropRect.copy(
+                                        bottom = (cropRect.bottom + dragAmount.y).coerceIn(cropRect.top + 50f, containerSize.height.toFloat())
+                                    )
+                                    DragHandle.LEFT_EDGE -> cropRect.copy(
+                                        left = (cropRect.left + dragAmount.x).coerceIn(0f, cropRect.right - 50f)
+                                    )
+                                    DragHandle.RIGHT_EDGE -> cropRect.copy(
+                                        right = (cropRect.right + dragAmount.x).coerceIn(cropRect.left + 50f, containerSize.width.toFloat())
+                                    )
                                     DragHandle.CENTER -> {
                                         val newLeft = (cropRect.left + dragAmount.x).coerceIn(0f, containerSize.width - cropRect.width)
                                         val newTop = (cropRect.top + dragAmount.y).coerceIn(0f, containerSize.height - cropRect.height)
@@ -551,7 +1011,9 @@ fun CropModeOverlay(
 }
 
 private enum class DragHandle {
-    TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CENTER
+    TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT,
+    LEFT_EDGE, RIGHT_EDGE, TOP_EDGE, BOTTOM_EDGE,
+    CENTER
 }
 
 private fun getDragHandle(
@@ -559,19 +1021,38 @@ private fun getDragHandle(
     cropRect: androidx.compose.ui.geometry.Rect,
     handleSize: Float
 ): DragHandle? {
+    // Check corners first with the provided handle size (should be large for easy touch)
+    // We use a slightly larger area for corners to prioritize them over edges
+    val cornerHitSize = handleSize * 1.5f
+
     return when {
+        // Corners
+        offset.x in (cropRect.left - cornerHitSize)..(cropRect.left + cornerHitSize) &&
+        offset.y in (cropRect.top - cornerHitSize)..(cropRect.top + cornerHitSize) -> DragHandle.TOP_LEFT
+
+        offset.x in (cropRect.right - cornerHitSize)..(cropRect.right + cornerHitSize) &&
+        offset.y in (cropRect.top - cornerHitSize)..(cropRect.top + cornerHitSize) -> DragHandle.TOP_RIGHT
+
+        offset.x in (cropRect.left - cornerHitSize)..(cropRect.left + cornerHitSize) &&
+        offset.y in (cropRect.bottom - cornerHitSize)..(cropRect.bottom + cornerHitSize) -> DragHandle.BOTTOM_LEFT
+
+        offset.x in (cropRect.right - cornerHitSize)..(cropRect.right + cornerHitSize) &&
+        offset.y in (cropRect.bottom - cornerHitSize)..(cropRect.bottom + cornerHitSize) -> DragHandle.BOTTOM_RIGHT
+
+        // Edges
         offset.x in (cropRect.left - handleSize)..(cropRect.left + handleSize) &&
-        offset.y in (cropRect.top - handleSize)..(cropRect.top + handleSize) -> DragHandle.TOP_LEFT
+        offset.y in cropRect.top..cropRect.bottom -> DragHandle.LEFT_EDGE
 
         offset.x in (cropRect.right - handleSize)..(cropRect.right + handleSize) &&
-        offset.y in (cropRect.top - handleSize)..(cropRect.top + handleSize) -> DragHandle.TOP_RIGHT
+        offset.y in cropRect.top..cropRect.bottom -> DragHandle.RIGHT_EDGE
 
-        offset.x in (cropRect.left - handleSize)..(cropRect.left + handleSize) &&
-        offset.y in (cropRect.bottom - handleSize)..(cropRect.bottom + handleSize) -> DragHandle.BOTTOM_LEFT
+        offset.y in (cropRect.top - handleSize)..(cropRect.top + handleSize) &&
+        offset.x in cropRect.left..cropRect.right -> DragHandle.TOP_EDGE
 
-        offset.x in (cropRect.right - handleSize)..(cropRect.right + handleSize) &&
-        offset.y in (cropRect.bottom - handleSize)..(cropRect.bottom + handleSize) -> DragHandle.BOTTOM_RIGHT
+        offset.y in (cropRect.bottom - handleSize)..(cropRect.bottom + handleSize) &&
+        offset.x in cropRect.left..cropRect.right -> DragHandle.BOTTOM_EDGE
 
+        // Center
         offset.x in cropRect.left..cropRect.right &&
         offset.y in cropRect.top..cropRect.bottom -> DragHandle.CENTER
 
