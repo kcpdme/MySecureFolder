@@ -47,6 +47,9 @@ class HomeViewModel @Inject constructor(
     val pdfsCount: StateFlow<Int> =
         mediaRepository.getFileCountForCategory(FolderCategory.PDFS)
 
+    val otherCount: StateFlow<Int> =
+        mediaRepository.getFileCountForCategory(FolderCategory.OTHER)
+
     // File sizes (in bytes)
     val allFilesSize: StateFlow<Long> = mediaRepository.mediaFiles.map { files ->
         files.sumOf { it.size }
@@ -71,6 +74,9 @@ class HomeViewModel @Inject constructor(
     val pdfsSize: StateFlow<Long> =
         mediaRepository.getFileSizeForCategory(FolderCategory.PDFS)
 
+    val otherSize: StateFlow<Long> =
+        mediaRepository.getFileSizeForCategory(FolderCategory.OTHER)
+
     fun getCountForCategory(category: FolderCategory): StateFlow<Int> {
         return when (category) {
             FolderCategory.ALL_FILES -> allFilesCount
@@ -79,6 +85,7 @@ class HomeViewModel @Inject constructor(
             FolderCategory.RECORDINGS -> recordingsCount
             FolderCategory.NOTES -> notesCount
             FolderCategory.PDFS -> pdfsCount
+            FolderCategory.OTHER -> otherCount
         }
     }
 
@@ -90,6 +97,7 @@ class HomeViewModel @Inject constructor(
             FolderCategory.RECORDINGS -> recordingsSize
             FolderCategory.NOTES -> notesSize
             FolderCategory.PDFS -> pdfsSize
+            FolderCategory.OTHER -> otherSize
         }
     }
 

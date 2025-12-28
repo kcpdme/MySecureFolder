@@ -15,7 +15,8 @@ enum class FolderCategory(
     VIDEOS("Videos", Icons.Default.Videocam, "videos", MediaType.VIDEO),
     RECORDINGS("Recordings", Icons.Default.Mic, "recordings", MediaType.AUDIO),
     NOTES("Notes", Icons.Default.Note, "notes", MediaType.NOTE),
-    PDFS("PDFs", Icons.Default.PictureAsPdf, "pdfs", MediaType.PDF);
+    PDFS("PDFs", Icons.Default.PictureAsPdf, "pdfs", MediaType.PDF),
+    OTHER("Other", Icons.Default.InsertDriveFile, "others", MediaType.OTHER);
 
     companion object {
         fun fromMediaType(mediaType: MediaType): FolderCategory {

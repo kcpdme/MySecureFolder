@@ -457,8 +457,8 @@ class ImportMediaUseCase @Inject constructor(
             return MediaType.PDF
         }
 
-        // Default to NOTE for unknown types
-        return MediaType.NOTE
+        // Default to OTHER for unknown types (e.g. .exe, .zip, .docx)
+        return MediaType.OTHER
     }
 
     /**

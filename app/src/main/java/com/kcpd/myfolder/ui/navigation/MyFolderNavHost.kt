@@ -149,6 +149,9 @@ fun MyFolderNavHost(
                             navController.navigate("note_editor$folderParam")
                         com.kcpd.myfolder.data.model.MediaType.PDF ->
                             navController.navigate("document_scanner$folderParam")
+                        com.kcpd.myfolder.data.model.MediaType.OTHER -> {
+                            // Other is import-only (handled via the top bar import action)
+                        }
                         null -> navController.navigate("camera$folderParam")
                     }
                 },
@@ -183,6 +186,11 @@ fun MyFolderNavHost(
                         com.kcpd.myfolder.data.model.MediaType.PDF -> {
                             val route = "media_viewer/$index?category=$category&fileId=${mediaFile.id}"
                             android.util.Log.d("Navigation", "Navigating to PDF viewer: $route")
+                            navController.navigate(route)
+                        }
+                        com.kcpd.myfolder.data.model.MediaType.OTHER -> {
+                            val route = "media_viewer/$index?category=$category&fileId=${mediaFile.id}"
+                            android.util.Log.d("Navigation", "Navigating to generic viewer: $route")
                             navController.navigate(route)
                         }
                     }

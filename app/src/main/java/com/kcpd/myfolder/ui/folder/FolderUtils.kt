@@ -16,6 +16,7 @@ fun getActionIcon(category: FolderCategory): ImageVector = when (category) {
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
     FolderCategory.PDFS -> Icons.Default.Scanner
+    FolderCategory.OTHER -> Icons.Default.Add
     FolderCategory.ALL_FILES -> Icons.Default.Add
 }
 
@@ -29,6 +30,7 @@ fun getEmptyStateMessage(category: FolderCategory): String {
         FolderCategory.RECORDINGS -> "Tap + to record audio"
         FolderCategory.NOTES -> "Tap + to create a note"
         FolderCategory.PDFS -> "Tap + to scan documents or import PDFs"
+        FolderCategory.OTHER -> "Use Import to add files"
         FolderCategory.ALL_FILES -> "Import files to get started"
     }
 }

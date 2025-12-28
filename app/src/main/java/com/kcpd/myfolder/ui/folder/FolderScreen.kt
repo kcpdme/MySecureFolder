@@ -28,6 +28,7 @@ import coil.request.ImageRequest
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
+import com.kcpd.myfolder.util.FileShareHelper
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -257,9 +258,21 @@ fun FolderScreen(
                                 val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
                                 if (selectedMediaFiles.isNotEmpty()) {
                                     if (selectedMediaFiles.size == 1) {
-                                        viewModel.shareMediaFile(selectedMediaFiles[0])
+                                        context.startActivity(
+                                            FileShareHelper.createShareIntent(
+                                                context = context,
+                                                mediaFile = selectedMediaFiles[0],
+                                                chooserTitle = "Share via"
+                                            )
+                                        )
                                     } else {
-                                        FolderActions.shareMultipleFiles(context, selectedMediaFiles)
+                                        context.startActivity(
+                                            FileShareHelper.createMultipleShareIntent(
+                                                context = context,
+                                                mediaFiles = selectedMediaFiles,
+                                                chooserTitle = "Share via"
+                                            )
+                                        )
                                     }
                                 }
                             },
@@ -417,7 +430,15 @@ fun FolderScreen(
             )
         },
         floatingActionButton = {
-            if (viewModel.category != FolderCategory.ALL_FILES) {
+            // Only show FAB for categories with a dedicated capture/creation flow.
+            // OTHER is import-only and ALL_FILES is a mixed view.
+            if (
+                viewModel.category == FolderCategory.PHOTOS ||
+                viewModel.category == FolderCategory.VIDEOS ||
+                viewModel.category == FolderCategory.RECORDINGS ||
+                viewModel.category == FolderCategory.NOTES ||
+                viewModel.category == FolderCategory.PDFS
+            ) {
                 FloatingActionButton(onClick = { onAddClick(currentFolderId) }) {
                     Icon(getActionIcon(viewModel.category), "Add ${viewModel.category.displayName}")
                 }
@@ -595,7 +616,17 @@ fun FolderScreen(
                                     }
                                 } else {
                                     android.util.Log.d("FolderScreen_Grid", "Grid item clicked: index=$index, file=${mediaFile.fileName}")
-                                    onMediaClick(index, mediaFile)
+                                    if (mediaFile.mediaType == MediaType.OTHER) {
+                                        context.startActivity(
+                                            FileShareHelper.createShareIntent(
+                                                context = context,
+                                                mediaFile = mediaFile,
+                                                chooserTitle = "Share via"
+                                            )
+                                        )
+                                    } else {
+                                        onMediaClick(index, mediaFile)
+                                    }
                                 }
                             },
                             onLongClick = {
@@ -672,7 +703,17 @@ fun FolderScreen(
                                     }
                                 } else {
                                     android.util.Log.d("FolderScreen_List", "List item clicked: index=$index, file=${mediaFile.fileName}")
-                                    onMediaClick(index, mediaFile)
+                                    if (mediaFile.mediaType == MediaType.OTHER) {
+                                        context.startActivity(
+                                            FileShareHelper.createShareIntent(
+                                                context = context,
+                                                mediaFile = mediaFile,
+                                                chooserTitle = "Share via"
+                                            )
+                                        )
+                                    } else {
+                                        onMediaClick(index, mediaFile)
+                                    }
                                 }
                             },
                             onLongClick = {

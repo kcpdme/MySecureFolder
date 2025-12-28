@@ -40,6 +40,7 @@ fun HomeScreen(
     val recordingsCount by viewModel.recordingsCount.collectAsState()
     val notesCount by viewModel.notesCount.collectAsState()
     val pdfsCount by viewModel.pdfsCount.collectAsState()
+    val otherCount by viewModel.otherCount.collectAsState()
 
     val allFilesSize by viewModel.allFilesSize.collectAsState()
     val photosSize by viewModel.photosSize.collectAsState()
@@ -47,6 +48,7 @@ fun HomeScreen(
     val recordingsSize by viewModel.recordingsSize.collectAsState()
     val notesSize by viewModel.notesSize.collectAsState()
     val pdfsSize by viewModel.pdfsSize.collectAsState()
+    val otherSize by viewModel.otherSize.collectAsState()
     
     val activeRemoteType by viewModel.activeRemoteType.collectAsState()
 
@@ -167,6 +169,13 @@ fun HomeScreen(
                     onClick = { onFolderClick(FolderCategory.PDFS) },
                     modifier = Modifier.fillMaxWidth()
                 )
+                FolderCard(
+                    category = FolderCategory.OTHER,
+                    count = otherCount,
+                    size = viewModel.formatFileSize(otherSize),
+                    onClick = { onFolderClick(FolderCategory.OTHER) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -187,6 +196,7 @@ fun FolderCard(
         FolderCategory.RECORDINGS -> Color(0xFFF44336) // Crimson
         FolderCategory.NOTES -> Color.White
         FolderCategory.PDFS -> Color(0xFFE57373) // Light Red
+        FolderCategory.OTHER -> Color(0xFFFFC107) // Reuse existing color
     }
 
     Card(
@@ -252,5 +262,6 @@ private fun getActionIcon(category: FolderCategory) = when (category) {
     FolderCategory.RECORDINGS -> Icons.Default.Mic
     FolderCategory.NOTES -> Icons.Default.Edit
     FolderCategory.PDFS -> Icons.Default.FileUpload
+    FolderCategory.OTHER -> Icons.Default.Folder
     FolderCategory.ALL_FILES -> Icons.Default.Folder
 }
