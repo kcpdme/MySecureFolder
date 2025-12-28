@@ -167,6 +167,14 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
+
+    fun setPanicPin(pin: String) {
+        passwordManager.setPanicPin(pin)
+    }
+
+    fun isPanicPinSet(): Boolean {
+        return passwordManager.isPanicPinSet()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -178,6 +186,7 @@ fun SettingsScreen(
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var showStorageDialog by remember { mutableStateOf(false) }
+    var showPanicPinDialog by remember { mutableStateOf(false) }
     val lockTimeout by viewModel.lockTimeout.collectAsState()
     val biometricEnabled by viewModel.biometricEnabled.collectAsState()
     val storageInfo by viewModel.storageInfo.collectAsState()
@@ -228,6 +237,17 @@ fun SettingsScreen(
                 description = "Change your master encryption password",
                 onClick = {
                     navController.navigate("password_change")
+                }
+            )
+
+            HorizontalDivider()
+
+            SettingsItem(
+                icon = Icons.Default.Warning,
+                title = "Panic Wipe Setup",
+                description = if (viewModel.isPanicPinSet()) "Panic PIN is set (enters wipe mode)" else "Set a Panic PIN to instantly wipe data",
+                onClick = {
+                    showPanicPinDialog = true
                 }
             )
 
@@ -635,6 +655,67 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showStorageDialog = false }) {
                     Text("Close")
+                }
+            }
+        )
+    }
+
+    // Panic PIN Dialog
+    if (showPanicPinDialog) {
+        var pin by remember { mutableStateOf("") }
+        var error by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showPanicPinDialog = false },
+            title = { Text("Set Panic PIN") },
+            text = {
+                Column {
+                    Text(
+                        text = "Entering this PIN on the lock screen will INSTANTLY wipe all data and close the app.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = pin,
+                        onValueChange = { 
+                            if (it.length <= 8 && it.all { char -> char.isDigit() }) {
+                                pin = it
+                                error = ""
+                            }
+                        },
+                        label = { Text("Panic PIN (4-8 digits)") },
+                        singleLine = true,
+                        isError = error.isNotEmpty(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                        )
+                    )
+                    if (error.isNotEmpty()) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (pin.length >= 4) {
+                        viewModel.setPanicPin(pin)
+                        showPanicPinDialog = false
+                        android.widget.Toast.makeText(context, "Panic PIN set", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        error = "PIN must be at least 4 digits"
+                    }
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPanicPinDialog = false }) {
+                    Text("Cancel")
                 }
             }
         )

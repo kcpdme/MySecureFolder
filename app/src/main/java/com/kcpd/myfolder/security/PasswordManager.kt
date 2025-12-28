@@ -203,6 +203,41 @@ class PasswordManager @Inject constructor(
         }
     }
 
+    // --- Panic PIN Implementation ---
+
+    /**
+     * Sets the Panic PIN.
+     * We store a simple SHA-256 hash of the PIN since it's just for matching,
+     * and it's stored in EncryptedSharedPreferences.
+     */
+    fun setPanicPin(pin: String) {
+        if (pin.length < 4) throw IllegalArgumentException("Panic PIN must be at least 4 digits")
+        val hash = hashPin(pin)
+        securityManager.storePanicPinHash(hash)
+    }
+
+    /**
+     * Checks if the provided PIN matches the stored Panic PIN.
+     */
+    fun verifyPanicPin(pin: String): Boolean {
+        val storedHash = securityManager.getPanicPinHash() ?: return false
+        val candidateHash = hashPin(pin)
+        return storedHash == candidateHash
+    }
+
+    /**
+     * Checks if a Panic PIN is set.
+     */
+    fun isPanicPinSet(): Boolean {
+        return securityManager.getPanicPinHash() != null
+    }
+
+    private fun hashPin(pin: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(pin.toByteArray(Charsets.UTF_8))
+        return hash.joinToString("") { "%02x".format(it) }
+    }
+
     // --- BIP39 Implementation ---
 
     private fun entropyToMnemonic(entropy: ByteArray): List<String> {

@@ -30,6 +30,7 @@ class SecurityManager @Inject constructor(
         private const val ENCRYPTED_PREFS_NAME = "secure_prefs"
         private const val KEY_STORED_MASTER_KEY = "stored_master_key" // Encrypted by Keystore
         private const val KEY_STORED_SEED_WORDS = "stored_seed_words" // Encrypted by Keystore
+        private const val KEY_PANIC_PIN_HASH = "panic_pin_hash"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val GCM_TAG_LENGTH = 128
         private const val IV_LENGTH = 12
@@ -199,6 +200,54 @@ class SecurityManager @Inject constructor(
     fun wipeKeys() {
         activeMasterKey = null
         encryptedPrefs.edit().clear().apply()
+    }
+
+    /**
+     * Stores the Panic PIN hash.
+     */
+    fun storePanicPinHash(hash: String) {
+        encryptedPrefs.edit().putString(KEY_PANIC_PIN_HASH, hash).apply()
+    }
+
+    /**
+     * Gets the stored Panic PIN hash.
+     */
+    fun getPanicPinHash(): String? {
+        return encryptedPrefs.getString(KEY_PANIC_PIN_HASH, null)
+    }
+
+    /**
+     * Recursively wipes ALL application data (Keys, Files, Database).
+     * This is a destructive operation for Panic functionality.
+     */
+    fun wipeAllData() {
+        // 1. Clear keys from memory
+        activeMasterKey = null
+        
+        // 2. Clear Encrypted SharedPreferences (Keys, Seed Words, Panic PIN)
+        encryptedPrefs.edit().clear().apply()
+
+        // 3. Delete Secure Storage Directory
+        val secureDir = java.io.File(context.filesDir, "secure_media")
+        if (secureDir.exists()) {
+            secureDir.deleteRecursively()
+        }
+
+        // 4. Delete Database(s)
+        context.deleteDatabase("myfolder_encrypted.db")
+        context.deleteDatabase("myfolder_database") // Legacy
+
+        // 5. Delete all shared preferences files
+        val prefsDir = java.io.File(context.applicationInfo.dataDir, "shared_prefs")
+        if (prefsDir.exists()) {
+            prefsDir.deleteRecursively()
+        }
+        
+        // 6. Delete DataStore files
+        val datastoreDir = java.io.File(context.filesDir, "datastore")
+        if (datastoreDir.exists()) {
+            datastoreDir.deleteRecursively()
+        }
     }
 
     /**

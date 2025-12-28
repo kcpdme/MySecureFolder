@@ -81,6 +81,18 @@ class VaultManager @Inject constructor(
             return false
         }
 
+        // Check for Panic PIN first!
+        if (passwordManager.verifyPanicPin(password)) {
+            android.util.Log.e("VaultManager", "PANIC PIN DETECTED! INITIATING DATA WIPE.")
+            // Run wipe on IO dispatcher to ensure file operations complete
+            withContext(Dispatchers.IO) {
+                securityManager.wipeAllData()
+            }
+            // Close app immediately
+            System.exit(0)
+            return false
+        }
+
         val isValid = passwordManager.verifyPassword(password)
         if (isValid) {
             _vaultState.value = VaultState.Unlocked(
