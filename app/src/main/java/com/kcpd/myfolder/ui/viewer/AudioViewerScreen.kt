@@ -1,30 +1,35 @@
 package com.kcpd.myfolder.ui.viewer
 
-import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.NavController
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
+import com.kcpd.myfolder.ui.audio.AudioPlaybackManager
 import com.kcpd.myfolder.ui.gallery.GalleryViewModel
+import com.kcpd.myfolder.ui.theme.TellaAccent
+import com.kcpd.myfolder.ui.theme.TellaPurple
+import com.kcpd.myfolder.ui.theme.TellaPurpleLight
 import com.kcpd.myfolder.ui.util.ScreenSecureEffect
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +42,8 @@ fun AudioViewerScreen(
 ) {
     // Prevent screenshots and screen recording for security
     ScreenSecureEffect()
-
+    
+    val context = LocalContext.current
     val allMediaFiles by viewModel.mediaFiles.collectAsState()
 
     // Filter to show only audio files
@@ -65,35 +71,77 @@ fun AudioViewerScreen(
         initialPage = actualIndex.coerceIn(0, (audioFiles.size - 1).coerceAtLeast(0)),
         pageCount = { audioFiles.size }
     )
-    var showControls by remember { mutableStateOf(true) }
+    
+    // Initialize AudioPlaybackManager with playlist
+    LaunchedEffect(audioFiles) {
+        AudioPlaybackManager.initialize(context)
+        AudioPlaybackManager.setPlaylist(audioFiles)
+    }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(TellaPurple)
+    ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
             val audioFile = audioFiles[page]
-            AudioPlayer(
+            AudioPlayerContent(
                 mediaFile = audioFile,
-                onTap = { showControls = !showControls },
-                isCurrentPage = page == pagerState.currentPage
+                isCurrentPage = page == pagerState.currentPage,
+                viewModel = viewModel
             )
         }
 
-        // Top app bar
-        if (showControls) {
+        // Top app bar with gradient overlay
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            TellaPurple.copy(alpha = 0.95f),
+                            TellaPurple.copy(alpha = 0.8f),
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = 200f
+                    )
+                )
+                .align(Alignment.TopCenter)
+        ) {
             TopAppBar(
                 title = {
-                    Text(
-                        if (audioFiles.isNotEmpty())
-                            audioFiles[pagerState.currentPage].fileName
-                        else
-                            ""
-                    )
+                    if (audioFiles.isNotEmpty()) {
+                        Column {
+                            Text(
+                                text = audioFiles[pagerState.currentPage].fileName,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            if (audioFiles.size > 1) {
+                                Text(
+                                    text = "${pagerState.currentPage + 1} of ${audioFiles.size}",
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                    IconButton(onClick = { 
+                        navController.navigateUp() 
+                    }) {
+                        Icon(
+                            Icons.Default.ArrowBack, 
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
                     }
                 },
                 actions = {
@@ -102,64 +150,61 @@ fun AudioViewerScreen(
                             viewModel.shareMediaFile(audioFiles[pagerState.currentPage])
                         }
                     }) {
-                        Icon(Icons.Default.Share, "Share")
+                        Icon(
+                            Icons.Default.Share, 
+                            contentDescription = "Share",
+                            tint = Color.White
+                        )
                     }
                     IconButton(onClick = {
                         if (audioFiles.isNotEmpty()) {
-                            viewModel.deleteMediaFile(audioFiles[pagerState.currentPage])
+                            val currentFile = audioFiles[pagerState.currentPage]
+                            // Stop if deleting currently playing file
+                            if (AudioPlaybackManager.playbackState.value.currentMediaFile?.id == currentFile.id) {
+                                AudioPlaybackManager.stop()
+                            }
+                            viewModel.deleteMediaFile(currentFile)
                             navController.navigateUp()
                         }
                     }) {
-                        Icon(Icons.Default.Delete, "Delete")
+                        Icon(
+                            Icons.Default.Delete, 
+                            contentDescription = "Delete",
+                            tint = Color.White
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
-        }
-
-        // Page indicator
-        if (showControls && audioFiles.size > 1) {
-            Text(
-                text = "${pagerState.currentPage + 1} / ${audioFiles.size}",
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        shape = MaterialTheme.shapes.small
-                    )
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    containerColor = Color.Transparent,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
+                )
             )
         }
     }
 }
 
 @Composable
-fun AudioPlayer(
+fun AudioPlayerContent(
     mediaFile: MediaFile,
-    onTap: () -> Unit,
-    isCurrentPage: Boolean
+    isCurrentPage: Boolean,
+    viewModel: GalleryViewModel
 ) {
     val context = LocalContext.current
-    val viewModel: GalleryViewModel = hiltViewModel()
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0L) }
     var duration by remember { mutableStateOf(0L) }
     var decryptedFile by remember { mutableStateOf<java.io.File?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var isInitialized by remember { mutableStateOf(false) }
 
     // Decrypt file on first composition
     LaunchedEffect(mediaFile.id) {
         isLoading = true
         error = null
+        isInitialized = false
         try {
             decryptedFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 viewModel.decryptForPlayback(mediaFile)
@@ -172,174 +217,207 @@ fun AudioPlayer(
         }
     }
 
-    val exoPlayer = remember(decryptedFile) {
+    // Set up audio playback when decrypted file is ready
+    LaunchedEffect(decryptedFile, isCurrentPage) {
         decryptedFile?.let { file ->
-            val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
-                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
-                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
-                .build()
-            ExoPlayer.Builder(context).build().apply {
-                setAudioAttributes(audioAttributes, true)
-                setVolume(1.0f) // Set to maximum volume
-                val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
-                setMediaItem(mediaItem)
-                prepare()
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_READY) {
-                            duration = this@apply.duration
-                        }
-                    }
-
-                    override fun onIsPlayingChanged(playing: Boolean) {
-                        isPlaying = playing
-                    }
-                })
+            if (isCurrentPage && !isInitialized) {
+                AudioPlaybackManager.play(mediaFile, file, context)
+                isInitialized = true
+            } else if (!isCurrentPage) {
+                AudioPlaybackManager.pause()
             }
+        }
+    }
+    
+    // Update position periodically
+    LaunchedEffect(isCurrentPage) {
+        while (isCurrentPage) {
+            AudioPlaybackManager.updatePosition()
+            currentPosition = AudioPlaybackManager.currentPosition.value
+            duration = AudioPlaybackManager.duration.value
+            isPlaying = AudioPlaybackManager.playbackState.value.isPlaying
+            delay(100)
         }
     }
 
     // Pause when not current page
     LaunchedEffect(isCurrentPage) {
         if (!isCurrentPage) {
-            exoPlayer?.pause()
-        }
-    }
-
-    LaunchedEffect(exoPlayer) {
-        if (exoPlayer != null) {
-            while (isCurrentPage && exoPlayer != null) {
-                currentPosition = exoPlayer.currentPosition
-                kotlinx.coroutines.delay(100)
-            }
-        }
-    }
-
-    DisposableEffect(mediaFile.filePath) {
-        onDispose {
-            exoPlayer?.release()
-            // Securely clean up temp decrypted file using 3-pass overwrite
-            decryptedFile?.let { file ->
-                try {
-                    if (file.exists()) {
-                        file.delete()  // Regular delete for temp - will be cleaned by OS
-                        android.util.Log.d("AudioPlayer", "Cleaned up temp decrypted file: ${file.name}")
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("AudioPlayer", "Failed to delete temp file", e)
-                }
-            }
+            AudioPlaybackManager.pause()
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onTap() })
-            },
+            .background(TellaPurple),
         contentAlignment = Alignment.Center
     ) {
         when {
             isLoading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
-            error != null -> {
-                Text(
-                    text = error!!,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp)
-                )
-            }
-            exoPlayer != null -> {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = TellaAccent,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Loading audio...",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            error != null -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.padding(32.dp)
                 ) {
                     Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = "Audio",
-                        modifier = Modifier.size(120.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        Icons.Default.Error,
+                        contentDescription = "Error",
+                        modifier = Modifier.size(64.dp),
+                        tint = Color.White.copy(alpha = 0.5f)
                     )
+                    Text(
+                        text = error!!,
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            else -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(32.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp, vertical = 80.dp)
+                ) {
+                    Spacer(modifier = Modifier.weight(0.5f))
+                    
+                    // Album art placeholder with music icon
+                    Box(
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(TellaPurpleLight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = "Audio",
+                            modifier = Modifier.size(100.dp),
+                            tint = TellaAccent
+                        )
+                    }
 
+                    // File name
                     Text(
                         text = mediaFile.fileName,
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
 
-                    // Progress slider
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.weight(0.5f))
+
+                    // Progress section
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Progress slider
                         Slider(
                             value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                            onValueChange = {
-                                exoPlayer.seekTo((it * duration).toLong())
+                            onValueChange = { newValue ->
+                                val newPosition = (newValue * duration).toLong()
+                                AudioPlaybackManager.seekTo(newPosition)
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = SliderDefaults.colors(
+                                thumbColor = TellaAccent,
+                                activeTrackColor = TellaAccent,
+                                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                            )
                         )
 
+                        // Time labels
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
                                 text = formatDuration(currentPosition),
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
                             )
                             Text(
                                 text = formatDuration(duration),
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
                             )
                         }
                     }
 
                     // Playback controls
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 16.dp)
                     ) {
-                        IconButton(onClick = {
-                            exoPlayer.seekTo((currentPosition - 10000).coerceAtLeast(0))
-                        }) {
+                        // Rewind button
+                        IconButton(
+                            onClick = { AudioPlaybackManager.seekBackward() },
+                            modifier = Modifier.size(56.dp)
+                        ) {
                             Icon(
                                 Icons.Default.Replay10,
-                                contentDescription = "Rewind",
-                                modifier = Modifier.size(32.dp)
+                                contentDescription = "Rewind 10 seconds",
+                                modifier = Modifier.size(36.dp),
+                                tint = Color.White
                             )
                         }
 
+                        // Play/Pause button
                         FloatingActionButton(
-                            onClick = {
-                                if (isPlaying) {
-                                    exoPlayer.pause()
-                                } else {
-                                    exoPlayer.play()
-                                }
-                            }
+                            onClick = { AudioPlaybackManager.togglePlayPause() },
+                            containerColor = TellaAccent,
+                            contentColor = Color.White,
+                            modifier = Modifier.size(72.dp),
+                            shape = CircleShape
                         ) {
                             Icon(
                                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = if (isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(40.dp)
                             )
                         }
 
-                        IconButton(onClick = {
-                            exoPlayer.seekTo((currentPosition + 10000).coerceAtMost(duration))
-                        }) {
+                        // Forward button
+                        IconButton(
+                            onClick = { AudioPlaybackManager.seekForward() },
+                            modifier = Modifier.size(56.dp)
+                        ) {
                             Icon(
                                 Icons.Default.Forward10,
-                                contentDescription = "Forward",
-                                modifier = Modifier.size(32.dp)
+                                contentDescription = "Forward 10 seconds",
+                                modifier = Modifier.size(36.dp),
+                                tint = Color.White
                             )
                         }
                     }
+                    
+                    Spacer(modifier = Modifier.weight(0.3f))
                 }
             }
         }
