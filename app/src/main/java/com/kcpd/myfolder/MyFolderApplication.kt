@@ -30,6 +30,16 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
         System.setProperty("javax.xml.stream.XMLOutputFactory", "com.ctc.wstx.stax.WstxOutputFactory")
         System.setProperty("javax.xml.stream.XMLEventFactory", "com.ctc.wstx.stax.WstxEventFactory")
 
+        // Verify Woodstox is available (critical for S3 multipart uploads)
+        try {
+            // Force load the class to ensure ProGuard hasn't stripped it
+            val factoryClass = Class.forName("com.ctc.wstx.stax.WstxInputFactory")
+            val factory = factoryClass.getDeclaredConstructor().newInstance()
+            android.util.Log.d("MyFolderApp", "Woodstox XML loaded successfully: ${factory.javaClass.name}")
+        } catch (e: Throwable) {
+            android.util.Log.e("MyFolderApp", "CRITICAL: Failed to load Woodstox XML provider. S3 uploads may fail.", e)
+        }
+
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(this)
 

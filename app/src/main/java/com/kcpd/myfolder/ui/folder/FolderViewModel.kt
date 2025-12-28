@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
@@ -123,16 +124,40 @@ class FolderViewModel @Inject constructor(
     }
 
     /**
+     * Upload all files in the current view (including subfolders recursively).
+     */
+    fun uploadAllFilesInCurrentFolder() {
+        viewModelScope.launch {
+            val currentId = _currentFolderId.value
+            val filesToUpload = if (category == FolderCategory.ALL_FILES) {
+                mediaFiles.value
+            } else {
+                if (currentId == null) {
+                    // Root view of a category: Upload ALL files of this category (including those in folders)
+                    // mediaRepository.getFilesForCategory returns all files of that type, regardless of folder
+                    mediaRepository.getFilesForCategory(category).first()
+                } else {
+                    // Inside a specific folder: Upload recursively
+                    getFilesFromFolders(setOf(currentId))
+                }
+            }
+            uploadFiles(filesToUpload)
+        }
+    }
+
+    /**
      * Get all files from selected folders (recursively includes subfolders).
      * Returns a list of MediaFile objects that are within the specified folder IDs and their subfolders.
      */
     suspend fun getFilesFromFolders(folderIds: Set<String>): List<MediaFile> {
         val allFiles = mutableListOf<MediaFile>()
         val processedFolders = mutableSetOf<String>()
+        // Get snapshot of all folders for traversal
+        val allFolders = folderRepository.folders.first()
 
         // Process each folder recursively
         folderIds.forEach { folderId ->
-            collectFilesRecursively(folderId, allFiles, processedFolders)
+            collectFilesRecursively(folderId, allFiles, processedFolders, allFolders)
         }
 
         android.util.Log.d("FolderViewModel", "getFilesFromFolders: Collected ${allFiles.size} files from ${folderIds.size} folders (including ${processedFolders.size} subfolders)")
@@ -145,7 +170,8 @@ class FolderViewModel @Inject constructor(
     private suspend fun collectFilesRecursively(
         folderId: String,
         allFiles: MutableList<MediaFile>,
-        processedFolders: MutableSet<String>
+        processedFolders: MutableSet<String>,
+        allFolders: List<UserFolder>
     ) {
         // Avoid processing the same folder twice
         if (folderId in processedFolders) return
@@ -156,13 +182,13 @@ class FolderViewModel @Inject constructor(
         allFiles.addAll(filesInFolder)
         android.util.Log.d("FolderViewModel", "Folder $folderId: Found ${filesInFolder.size} files")
 
-        // Find all subfolders
-        val subfolders = folders.value.filter { it.parentFolderId == folderId }
+        // Find all subfolders using the full list
+        val subfolders = allFolders.filter { it.parentFolderId == folderId }
         android.util.Log.d("FolderViewModel", "Folder $folderId: Found ${subfolders.size} subfolders")
 
         // Recursively process each subfolder
         subfolders.forEach { subfolder ->
-            collectFilesRecursively(subfolder.id, allFiles, processedFolders)
+            collectFilesRecursively(subfolder.id, allFiles, processedFolders, allFolders)
         }
     }
 

@@ -401,7 +401,7 @@ fun FolderScreen(
                                         },
                                         onClick = {
                                             showMenu = false
-                                            viewModel.uploadFiles(mediaFiles)
+                                            viewModel.uploadAllFilesInCurrentFolder()
                                             showUploadQueue = true
                                         }
                                     )

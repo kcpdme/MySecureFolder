@@ -22,11 +22,18 @@
 # XML Parsing (MinIO / Jackson / Woodstox)
 # ===================================
 -keep class javax.xml.stream.** { *; }
+-keep interface javax.xml.stream.** { *; }
 -keep class com.fasterxml.jackson.** { *; }
 -keep class org.codehaus.stax2.** { *; }
 -keep class com.ctc.wstx.** { *; }
+# Explicitly keep the factories referenced by reflection/system property
+-keep class com.ctc.wstx.stax.WstxInputFactory { *; }
+-keep class com.ctc.wstx.stax.WstxOutputFactory { *; }
+-keep class com.ctc.wstx.stax.WstxEventFactory { *; }
+
 -dontwarn com.ctc.wstx.**
 -dontwarn org.codehaus.stax2.**
+-dontwarn javax.xml.stream.**
 
 # Keep SimpleXML (used by MinIO)
 -keep class org.simpleframework.xml.** { *; }
