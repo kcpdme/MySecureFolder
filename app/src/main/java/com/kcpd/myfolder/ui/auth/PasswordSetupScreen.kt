@@ -40,39 +40,64 @@ fun PasswordSetupScreen(
     var confirmVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showRestoreScreen by remember { mutableStateOf(false) }
+    var showSeedGenerationScreen by remember { mutableStateOf(false) }
+    var pendingPassword by remember { mutableStateOf("") }
+    var generatedSeedWords by remember { mutableStateOf<List<String>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
     val passwordStrength = viewModel.getPasswordStrength(password)
 
-    if (showRestoreScreen) {
-        RestoreBackupScreen(
-            onBack = { showRestoreScreen = false },
-            onRestore = { code, pwd ->
-                scope.launch {
-                    if (viewModel.recoverFromBackup(pwd, code)) {
-                        showRestoreScreen = false
-                        onPasswordSet()
-                    } else {
-                        errorMessage = "Restore failed. Invalid code or password."
+    when {
+        showSeedGenerationScreen -> {
+            SeedGenerationScreen(
+                password = pendingPassword,
+                onSeedGenerated = { seedWords ->
+                    generatedSeedWords = seedWords
+                },
+                onComplete = {
+                    // Now actually setup the password with the generated seed
+                    scope.launch {
+                        if (viewModel.setupPasswordWithSeed(pendingPassword, generatedSeedWords)) {
+                            onPasswordSet()
+                        } else {
+                            showSeedGenerationScreen = false
+                            errorMessage = "Failed to setup password. Please try again."
+                        }
+                    }
+                },
+                generateSeedWords = { viewModel.generateSeedWords() }
+            )
+        }
+        showRestoreScreen -> {
+            RestoreBackupScreen(
+                onBack = { showRestoreScreen = false },
+                onRestore = { code, pwd ->
+                    scope.launch {
+                        if (viewModel.recoverFromBackup(pwd, code)) {
+                            showRestoreScreen = false
+                            onPasswordSet()
+                        } else {
+                            errorMessage = "Restore failed. Invalid code or password."
+                        }
                     }
                 }
-            }
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .imePadding() // Handle keyboard
-        ) {
-            Column(
+            )
+        }
+        else -> {
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .background(MaterialTheme.colorScheme.background)
+                    .imePadding() // Handle keyboard
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 Spacer(modifier = Modifier.height(48.dp))
 
                 // Lock icon
@@ -225,13 +250,9 @@ fun PasswordSetupScreen(
                                 errorMessage = "Password is too short"
                             }
                             else -> {
-                                scope.launch {
-                                    if (viewModel.setupPassword(password)) {
-                                        onPasswordSet()
-                                    } else {
-                                        errorMessage = "Failed to setup password. Please try again."
-                                    }
-                                }
+                                // Save password for later and show seed generation
+                                pendingPassword = password
+                                showSeedGenerationScreen = true
                             }
                         }
                     },
@@ -242,7 +263,7 @@ fun PasswordSetupScreen(
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Text(
-                        "Create Password & Encrypt Data",
+                        "Continue",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -273,6 +294,7 @@ fun PasswordSetupScreen(
             }
         }
     }
+}
 }
 
 /**
@@ -544,12 +566,14 @@ fun PasswordStrengthIndicator(strength: PasswordStrength) {
         }
 
         LinearProgressIndicator(
-            progress = { when (strength) {
-                PasswordStrength.TOO_SHORT -> 0.1f
-                PasswordStrength.WEAK -> 0.33f
-                PasswordStrength.MEDIUM -> 0.66f
-                PasswordStrength.STRONG -> 1.0f
-            } },
+            progress = {
+                when (strength) {
+                    PasswordStrength.TOO_SHORT -> 0.1f
+                    PasswordStrength.WEAK -> 0.33f
+                    PasswordStrength.MEDIUM -> 0.66f
+                    PasswordStrength.STRONG -> 1.0f
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             color = color,
             trackColor = MaterialTheme.colorScheme.surfaceVariant

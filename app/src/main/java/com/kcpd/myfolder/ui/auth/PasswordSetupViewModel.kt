@@ -29,6 +29,22 @@ class PasswordSetupViewModel @Inject constructor(
         return passwordManager.isPasswordSet()
     }
 
+    /**
+     * Generate new seed words without setting up the password yet.
+     * Used in the seed generation screen.
+     */
+    fun generateSeedWords(): List<String> {
+        return passwordManager.generateSeedWords()
+    }
+
+    /**
+     * Setup password with pre-generated seed words.
+     * Called after user has backed up their seed words.
+     */
+    suspend fun setupPasswordWithSeed(password: String, seedWords: List<String>): Boolean {
+        return passwordManager.setupPassword(password, seedWords)
+    }
+
     suspend fun setupPassword(password: String): Boolean {
         // Generate new seed words for fresh setup
         val seedWords = passwordManager.generateSeedWords()
