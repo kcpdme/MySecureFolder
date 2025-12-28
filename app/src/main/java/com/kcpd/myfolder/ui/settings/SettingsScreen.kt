@@ -10,6 +10,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -579,61 +581,128 @@ fun SettingsScreen(
         val seedWords = viewModel.getSeedWords()
         AlertDialog(
             onDismissRequest = { showBackupDialog = false },
-            title = { Text("Recovery Seed Words") },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "Recovery Seed Words",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
             text = {
                 Column {
-                    Text(
-                        text = "These 12 words are the ONLY way to recover your data if you lose your password or device. Write them down and keep them safe.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "⚠️ These 12 words are the ONLY way to recover your data. Keep them safe and never share!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                    
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     if (seedWords != null && seedWords.isNotEmpty()) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = MaterialTheme.shapes.small
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                seedWords.chunked(3).forEachIndexed { rowIndex, row ->
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                // Display in 2 columns, 6 rows for better readability
+                                for (row in 0 until 6) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        row.forEachIndexed { colIndex, word ->
-                                            val index = rowIndex * 3 + colIndex + 1
-                                            Text(
-                                                text = "$index. $word",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                modifier = Modifier.width(100.dp)
-                                            )
+                                        for (col in 0 until 2) {
+                                            val index = row * 2 + col
+                                            if (index < seedWords.size) {
+                                                Surface(
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = MaterialTheme.shapes.small,
+                                                    color = MaterialTheme.colorScheme.surface
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "${index + 1}.",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.width(24.dp)
+                                                        )
+                                                        Text(
+                                                            text = seedWords[index],
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
                                 }
                             }
                         }
                     } else {
-                        Text("Error: Could not retrieve seed words. Is the vault unlocked?")
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Error: Could not retrieve seed words. Is the vault unlocked?",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showBackupDialog = false }) {
-                    Text("Close")
+                Button(onClick = { showBackupDialog = false }) {
+                    Text("Done")
                 }
             },
             dismissButton = {
                 if (seedWords != null) {
-                    TextButton(onClick = {
+                    OutlinedButton(onClick = {
                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         val clip = android.content.ClipData.newPlainText("Seed Words", seedWords.joinToString(" "))
                         clipboard.setPrimaryClip(clip)
                     }) {
-                        Text("Copy to Clipboard")
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Copy")
                     }
                 }
             }
