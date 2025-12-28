@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -372,7 +373,43 @@ fun EditModeOverlay(
 ) {
     var rotationAngle by remember(mediaFile.id) { mutableIntStateOf(initialRotation) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    var imageSize by remember { mutableStateOf(IntSize.Zero) }
+    var imagePainter by remember { mutableStateOf<Painter?>(null) }
+
+    // Derive imageSize from containerSize and imagePainter to handle race conditions
+    val imageSize = remember(containerSize, imagePainter) {
+        val painter = imagePainter
+        android.util.Log.d("PhotoViewer", "Calculating imageSize. Container: $containerSize, Painter: ${painter != null}")
+        
+        if (painter != null && containerSize.width > 0 && containerSize.height > 0) {
+            val intrinsicSize = painter.intrinsicSize
+            android.util.Log.d("PhotoViewer", "Intrinsic size: $intrinsicSize")
+            
+            if (intrinsicSize.width > 0 && intrinsicSize.height > 0) {
+                val containerAspect = containerSize.width.toFloat() / containerSize.height
+                val imageAspect = intrinsicSize.width / intrinsicSize.height
+
+                val size = if (imageAspect > containerAspect) {
+                    IntSize(
+                        width = containerSize.width,
+                        height = (containerSize.width / imageAspect).toInt()
+                    )
+                } else {
+                    IntSize(
+                        width = (containerSize.height * imageAspect).toInt(),
+                        height = containerSize.height
+                    )
+                }
+                android.util.Log.d("PhotoViewer", "Calculated imageSize: $size")
+                size
+            } else {
+                android.util.Log.w("PhotoViewer", "Invalid intrinsic size")
+                IntSize.Zero
+            }
+        } else {
+            android.util.Log.w("PhotoViewer", "Missing dependencies for imageSize")
+            IntSize.Zero
+        }
+    }
 
     // Crop rectangle in screen coordinates
     var cropRect by remember(mediaFile.id) {
@@ -422,8 +459,6 @@ fun EditModeOverlay(
                 .build()
         }
 
-        var imagePainter by remember { mutableStateOf<AsyncImagePainter?>(null) }
-
         AsyncImage(
             model = imageModel,
             contentDescription = mediaFile.fileName,
@@ -435,25 +470,12 @@ fun EditModeOverlay(
                     rotationZ = rotationAngle.toFloat()
                 },
             onState = { state ->
+                android.util.Log.d("PhotoViewer", "AsyncImage state: $state")
                 if (state is AsyncImagePainter.State.Success) {
-                    imagePainter = state.painter as? AsyncImagePainter
-                    val intrinsicSize = state.painter.intrinsicSize
-                    if (intrinsicSize.width > 0 && intrinsicSize.height > 0) {
-                        val containerAspect = containerSize.width.toFloat() / containerSize.height
-                        val imageAspect = intrinsicSize.width / intrinsicSize.height
-
-                        imageSize = if (imageAspect > containerAspect) {
-                            IntSize(
-                                width = containerSize.width,
-                                height = (containerSize.width / imageAspect).toInt()
-                            )
-                        } else {
-                            IntSize(
-                                width = (containerSize.height * imageAspect).toInt(),
-                                height = containerSize.height
-                            )
-                        }
-                    }
+                    android.util.Log.d("PhotoViewer", "Image loaded successfully. Painter: ${state.painter}")
+                    imagePainter = state.painter
+                } else if (state is AsyncImagePainter.State.Error) {
+                    android.util.Log.e("PhotoViewer", "Image load failed: ${state.result.throwable}")
                 }
             }
         )
@@ -725,39 +747,53 @@ fun EditModeOverlay(
                 ) {
                     Text("Cancel")
                 }
-                Button(
-                    onClick = {
-                        when (editMode) {
-                            EditMode.ROTATE -> {
-                                onSave(rotationAngle, null)
-                            }
-                            EditMode.CROP -> {
-                                // Convert screen coordinates to image coordinates
-                                if (imageSize.width > 0 && imageSize.height > 0 && containerSize.width > 0 && cropRect != null) {
-                                    val imageLeft = (containerSize.width - imageSize.width) / 2f
-                                    val imageTop = (containerSize.height - imageSize.height) / 2f
+                    val context = LocalContext.current
+                    Button(
+                        onClick = {
+                            when (editMode) {
+                                EditMode.ROTATE -> {
+                                    onSave(rotationAngle, null)
+                                }
+                                EditMode.CROP -> {
+                                    // Convert screen coordinates to image coordinates
+                                    if (imageSize.width > 0 && imageSize.height > 0 && containerSize.width > 0 && cropRect != null) {
+                                        val imageLeft = (containerSize.width - imageSize.width) / 2f
+                                        val imageTop = (containerSize.height - imageSize.height) / 2f
 
-                                    val intrinsicWidth = imagePainter?.intrinsicSize?.width ?: 0f
-                                    val intrinsicHeight = imagePainter?.intrinsicSize?.height ?: 0f
-                                    val scaleX = if (imageSize.width > 0 && intrinsicWidth > 0) intrinsicWidth / imageSize.width else 1f
-                                    val scaleY = if (imageSize.height > 0 && intrinsicHeight > 0) intrinsicHeight / imageSize.height else 1f
+                                        val intrinsicWidth = imagePainter?.intrinsicSize?.width ?: 0f
+                                        val intrinsicHeight = imagePainter?.intrinsicSize?.height ?: 0f
+                                        
+                                        // Ensure we have valid dimensions
+                                        if (intrinsicWidth > 0 && intrinsicHeight > 0) {
+                                            val scaleX = intrinsicWidth / imageSize.width
+                                            val scaleY = intrinsicHeight / imageSize.height
 
-                                    val imageCropRect = Rect(
-                                        ((cropRect!!.left - imageLeft) * scaleX).toInt().coerceAtLeast(0),
-                                        ((cropRect!!.top - imageTop) * scaleY).toInt().coerceAtLeast(0),
-                                        ((cropRect!!.right - imageLeft) * scaleX).toInt(),
-                                        ((cropRect!!.bottom - imageTop) * scaleY).toInt()
-                                    )
+                                            val imageCropRect = Rect(
+                                                ((cropRect!!.left - imageLeft) * scaleX).toInt().coerceAtLeast(0),
+                                                ((cropRect!!.top - imageTop) * scaleY).toInt().coerceAtLeast(0),
+                                                ((cropRect!!.right - imageLeft) * scaleX).toInt(),
+                                                ((cropRect!!.bottom - imageTop) * scaleY).toInt()
+                                            )
 
-                                    onSave(0, imageCropRect)
+                                            onSave(0, imageCropRect)
+                                        } else {
+                                            // Fallback or error if intrinsic size is missing
+                                            android.util.Log.e("PhotoViewer", "Cannot save: Image intrinsic size invalid or not loaded")
+                                            android.widget.Toast.makeText(context, "Image not fully loaded, please wait", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        android.util.Log.e("PhotoViewer", "Cannot save: Invalid state. imageSize=$imageSize, cropRect=$cropRect")
+                                        if (imageSize.width <= 0 || imageSize.height <= 0) {
+                                            android.widget.Toast.makeText(context, "Image not loaded", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Save")
-                }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Save")
+                    }
             }
         }
     }
