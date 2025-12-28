@@ -93,10 +93,18 @@ class GoogleDriveRepository @Inject constructor(
                 Log.d("GoogleDriveRepository", "Created folder hierarchy: ${userFolderPath.joinToString("/")}")
             }
 
+            // SECURITY: Use encrypted filename (UUID) to prevent metadata leakage on Google Drive
+            // The original filename is already encrypted INSIDE the file's metadata
+            // Using the encrypted filename (UUID.enc) instead of original name prevents:
+            // - Filename-based content identification by Drive admins/attackers
+            // - Metadata leakage to Google's servers
+            // - Pattern analysis of file types and naming conventions
+            val encryptedFileName = fileToUpload.name  // e.g., "a1b2c3d4-e5f6-7890-abcd-ef1234567890.enc"
+
             val fileMetadata = com.google.api.services.drive.model.File()
-            fileMetadata.name = mediaFile.fileName
+            fileMetadata.name = encryptedFileName  // Use encrypted filename, not original
             fileMetadata.parents = listOf(parentFolderId)
-            
+
             val mediaContent = FileContent("application/octet-stream", fileToUpload)
             
             val uploadedFile = driveService!!.files().create(fileMetadata, mediaContent)

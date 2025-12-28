@@ -120,15 +120,23 @@ class S3Repository @Inject constructor(
                             .build()
                     }
 
-                    // Step 2: Upload the decrypted file to S3 with uniform path structure
+                    // Step 2: Upload the encrypted file to S3 with uniform path structure
                     val category = FolderCategory.fromMediaType(mediaFile.mediaType)
+
+                    // SECURITY: Use encrypted filename (UUID) to prevent metadata leakage on S3
+                    // The original filename is already encrypted INSIDE the file's metadata
+                    // Using the encrypted filename (UUID.enc) instead of original name prevents:
+                    // - Filename-based content identification by S3 admins/attackers
+                    // - Metadata leakage to cloud storage providers
+                    // - Pattern analysis of file types and naming conventions
+                    val encryptedFileName = fileToUpload.name  // e.g., "a1b2c3d4-e5f6-7890-abcd-ef1234567890.enc"
 
                     // Build folder path if file is in a folder
                     val folderPath = buildFolderPath(mediaFile.folderId)
                     val objectName = if (folderPath.isNotEmpty()) {
-                        "MyFolderPrivate/${category.displayName}/$folderPath/${mediaFile.fileName}"
+                        "MyFolderPrivate/${category.displayName}/$folderPath/$encryptedFileName"
                     } else {
-                        "MyFolderPrivate/${category.displayName}/${mediaFile.fileName}"
+                        "MyFolderPrivate/${category.displayName}/$encryptedFileName"
                     }
 
                     Log.d("S3Repository", "Uploading to S3 path: $objectName")
