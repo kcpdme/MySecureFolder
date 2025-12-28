@@ -84,6 +84,9 @@ class FolderViewModel @Inject constructor(
     private val _uploadQueue = MutableStateFlow<List<String>>(emptyList())
     val uploadQueue: StateFlow<List<String>> = _uploadQueue.asStateFlow()
 
+    private val _uploadResults = MutableStateFlow<Map<String, UploadResult>>(emptyMap())
+    val uploadResults: StateFlow<Map<String, UploadResult>> = _uploadResults.asStateFlow()
+
     // Semaphore to limit concurrent uploads (2 for Google Drive, 3 for B2)
     private val uploadSemaphore = Semaphore(2)
 
@@ -183,6 +186,8 @@ class FolderViewModel @Inject constructor(
         viewModelScope.launch {
             // Add to queue first
             _uploadQueue.value = _uploadQueue.value + mediaFile.id
+            // Clear previous result
+            _uploadResults.value = _uploadResults.value.minus(mediaFile.id)
 
             // Wait for available slot (max 2 concurrent uploads)
             uploadSemaphore.withPermit {
@@ -195,11 +200,16 @@ class FolderViewModel @Inject constructor(
                     val result = remoteStorageRepository.uploadFile(mediaFile)
                     result.onSuccess { url ->
                         android.util.Log.d("FolderViewModel", "File uploaded successfully: ${mediaFile.fileName} -> $url")
+                        _uploadResults.value = _uploadResults.value + (mediaFile.id to UploadResult.Success)
                     }.onFailure { error ->
                         android.util.Log.e("FolderViewModel", "Upload failed for ${mediaFile.fileName}", error)
+                        val errorMessage = error.message ?: "Unknown upload error"
+                        _uploadResults.value = _uploadResults.value + (mediaFile.id to UploadResult.Error(errorMessage))
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
+                    val errorMessage = e.message ?: "Unknown upload error"
+                    _uploadResults.value = _uploadResults.value + (mediaFile.id to UploadResult.Error(errorMessage))
                 } finally {
                     // Remove from uploading set - create new set to trigger StateFlow update
                     _uploadingFiles.value = _uploadingFiles.value.filterNot { it == mediaFile.id }.toSet()
@@ -245,4 +255,13 @@ class FolderViewModel @Inject constructor(
     fun clearSearch() {
         _searchQuery.value = ""
     }
+
+    fun clearUploadResult(fileId: String) {
+        _uploadResults.value = _uploadResults.value.minus(fileId)
+    }
+}
+
+sealed class UploadResult {
+    object Success : UploadResult()
+    data class Error(val message: String) : UploadResult()
 }

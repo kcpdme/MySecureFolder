@@ -5,12 +5,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -26,6 +24,8 @@ fun S3ConfigScreen(
     viewModel: S3ConfigViewModel = hiltViewModel()
 ) {
     val s3Config by viewModel.s3Config.collectAsState(initial = null)
+    val testingConnection by viewModel.testingConnection.collectAsState()
+    val connectionTestResult by viewModel.connectionTestResult.collectAsState()
 
     var endpoint by remember { mutableStateOf("") }
     var accessKey by remember { mutableStateOf("") }
@@ -43,6 +43,12 @@ fun S3ConfigScreen(
             bucketName = config.bucketName
             region = config.region
         }
+    }
+
+    // Clear errors when user modifies fields
+    LaunchedEffect(endpoint, accessKey, secretKey, bucketName, region) {
+        validationError = null
+        viewModel.clearTestResult()
     }
 
     /**
@@ -77,21 +83,34 @@ fun S3ConfigScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            viewModel.saveConfig(
-                                endpoint = endpoint,
-                                accessKey = accessKey,
-                                secretKey = secretKey,
-                                bucketName = bucketName,
-                                region = region
-                            )
-                            navController.navigateUp()
-                        },
-                        enabled = endpoint.isNotBlank() && accessKey.isNotBlank() &&
-                                secretKey.isNotBlank() && bucketName.isNotBlank()
-                    ) {
-                        Icon(Icons.Default.Save, "Save")
+                    if (testingConnection) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(
+                            onClick = {
+                                if (validateConfig()) {
+                                    viewModel.saveConfig(
+                                        endpoint = endpoint,
+                                        accessKey = accessKey,
+                                        secretKey = secretKey,
+                                        bucketName = bucketName,
+                                        region = region,
+                                        onSuccess = {
+                                            navController.navigateUp()
+                                        }
+                                    )
+                                }
+                            },
+                            enabled = endpoint.isNotBlank() && accessKey.isNotBlank() &&
+                                    secretKey.isNotBlank() && bucketName.isNotBlank()
+                        ) {
+                            Icon(Icons.Default.Save, "Save")
+                        }
                     }
                 }
             )
@@ -110,6 +129,83 @@ fun S3ConfigScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            // Show connection test error
+            connectionTestResult?.let { result ->
+                when (result) {
+                    is S3ConfigViewModel.ConnectionTestResult.Error -> {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Connection Failed",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = result.message,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Please check your credentials and try again.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    is S3ConfigViewModel.ConnectionTestResult.Success -> {
+                        // Success handled by navigation
+                    }
+                }
+            }
+
+            // Show validation error
+            validationError?.let { error ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = endpoint,
@@ -237,9 +333,11 @@ fun S3ConfigScreen(
                             accessKey = accessKey,
                             secretKey = secretKey,
                             bucketName = bucketName,
-                            region = region
+                            region = region,
+                            onSuccess = {
+                                navController.navigateUp()
+                            }
                         )
-                        navController.navigateUp()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

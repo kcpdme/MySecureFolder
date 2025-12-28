@@ -52,6 +52,9 @@ fun FolderScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val uploadingFiles by viewModel.uploadingFiles.collectAsState()
     val uploadQueue by viewModel.uploadQueue.collectAsState()
+    val uploadResults by viewModel.uploadResults.collectAsState()
+
+    val scope = rememberCoroutineScope()
 
     // Log media files data
     android.util.Log.d("FolderScreen", "Category: ${viewModel.category}")
@@ -602,7 +605,20 @@ fun FolderScreen(
                                 }
                             },
                             isUploading = uploadingFiles.contains(mediaFile.id),
-                            onUploadClick = { viewModel.uploadFile(mediaFile) }
+                            uploadResult = uploadResults[mediaFile.id],
+                            onUploadClick = { viewModel.uploadFile(mediaFile) },
+                            onErrorClick = { msg ->
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = msg,
+                                        actionLabel = "Retry",
+                                        duration = SnackbarDuration.Long
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.uploadFile(mediaFile)
+                                    }
+                                }
+                            }
                         )
                     }
                 }
@@ -646,6 +662,7 @@ fun FolderScreen(
                             isSelected = selectedFiles.contains(mediaFile.id),
                             isMultiSelectMode = isMultiSelectMode,
                             isUploading = uploadingFiles.contains(mediaFile.id),
+                            uploadResult = uploadResults[mediaFile.id],
                             onClick = {
                                 if (isMultiSelectMode) {
                                     selectedFiles = if (selectedFiles.contains(mediaFile.id)) {
@@ -664,7 +681,19 @@ fun FolderScreen(
                                     selectedFiles = setOf(mediaFile.id)
                                 }
                             },
-                            onUploadClick = { viewModel.uploadFile(mediaFile) }
+                            onUploadClick = { viewModel.uploadFile(mediaFile) },
+                            onErrorClick = { msg ->
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = msg,
+                                        actionLabel = "Retry",
+                                        duration = SnackbarDuration.Long
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.uploadFile(mediaFile)
+                                    }
+                                }
+                            }
                         )
                     }
                 }

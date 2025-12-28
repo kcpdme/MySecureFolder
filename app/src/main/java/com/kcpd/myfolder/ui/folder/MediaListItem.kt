@@ -43,7 +43,9 @@ fun FolderMediaListItem(
     isSelected: Boolean = false,
     isMultiSelectMode: Boolean = false,
     isUploading: Boolean = false,
-    onUploadClick: (() -> Unit)? = null
+    uploadResult: UploadResult? = null,
+    onUploadClick: (() -> Unit)? = null,
+    onErrorClick: ((String) -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier
@@ -250,6 +252,36 @@ fun FolderMediaListItem(
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp
                         )
+                    }
+                } else if (uploadResult != null) {
+                    when (uploadResult) {
+                        is UploadResult.Success -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = "Upload successful",
+                                    tint = Color(0xFF4CAF50), // Green
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        is UploadResult.Error -> {
+                            IconButton(
+                                onClick = { onErrorClick?.invoke(uploadResult.message) },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Error,
+                                    contentDescription = "Upload failed",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
                 } else {
                     // Clickable upload button

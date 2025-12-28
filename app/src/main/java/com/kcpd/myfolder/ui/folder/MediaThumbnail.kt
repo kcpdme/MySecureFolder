@@ -39,7 +39,9 @@ fun MediaThumbnail(
     isUploading: Boolean,
     isSelected: Boolean = false,
     isMultiSelectMode: Boolean = false,
-    onUploadClick: (() -> Unit)? = null
+    uploadResult: UploadResult? = null,
+    onUploadClick: (() -> Unit)? = null,
+    onErrorClick: ((String) -> Unit)? = null
 ) {
     android.util.Log.d("MediaThumbnail", "Rendering thumbnail for: ${mediaFile.fileName}, type: ${mediaFile.mediaType}")
 
@@ -213,6 +215,54 @@ fun MediaThumbnail(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp
                 )
+            }
+        } else if (uploadResult != null && !isMultiSelectMode) {
+            when (uploadResult) {
+                is UploadResult.Success -> {
+                    Box(
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(32.dp)
+                            .align(Alignment.TopEnd)
+                            .background(
+                                Color(0xFF4CAF50).copy(alpha = 0.85f), // Green
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Upload successful",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                is UploadResult.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(32.dp)
+                            .align(Alignment.TopEnd)
+                            .background(
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                                shape = CircleShape
+                            )
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = { onErrorClick?.invoke(uploadResult.message) }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Error,
+                            contentDescription = "Upload failed",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         } else if (onUploadClick != null && !isMultiSelectMode) {
             // Show upload icon
