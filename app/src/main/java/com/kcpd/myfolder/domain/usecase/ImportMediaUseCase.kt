@@ -98,10 +98,35 @@ class ImportMediaUseCase @Inject constructor(
                 val verificationHash = calculateHash(tempFile)
                 android.util.Log.d("ImportMediaUseCase", "  ✓ Hash: ${verificationHash.take(16)}...")
 
-                // Check if already encrypted
+                // Check if already encrypted (by .enc extension)
                 android.util.Log.d("ImportMediaUseCase", "Step 5b: Checking if already encrypted...")
-                val existingMetadata = secureFileManager.validateAndGetMetadata(tempFile)
+                val isEncryptedFile = fileName.endsWith(".enc", ignoreCase = true)
+                var existingMetadata: SecureFileManager.FileMetadata? = null
                 val encryptedFile: File
+
+                if (isEncryptedFile) {
+                    // File has .enc extension - it's encrypted, must decrypt header
+                    android.util.Log.d("ImportMediaUseCase", "  File has .enc extension - attempting to decrypt header...")
+                    try {
+                        existingMetadata = secureFileManager.validateAndGetMetadata(tempFile)
+                        if (existingMetadata == null) {
+                            // Header couldn't be decrypted
+                            android.util.Log.e("ImportMediaUseCase", "  ❌ Cannot decrypt file header - wrong password")
+                            tempFile.delete()
+                            return@withContext Result.failure(
+                                Exception("Cannot import encrypted file - wrong password or corrupted file")
+                            )
+                        }
+                        android.util.Log.d("ImportMediaUseCase", "  ✓ Header decrypted successfully!")
+                    } catch (e: Exception) {
+                        // Failed to decrypt header
+                        android.util.Log.e("ImportMediaUseCase", "  ❌ Cannot decrypt file header: ${e.message}")
+                        tempFile.delete()
+                        return@withContext Result.failure(
+                            Exception("Cannot import encrypted file - wrong password or corrupted file")
+                        )
+                    }
+                }
 
                 if (existingMetadata != null) {
                     android.util.Log.d("ImportMediaUseCase", "  ✓ File is already encrypted! Skipping encryption.")
