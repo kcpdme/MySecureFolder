@@ -217,6 +217,42 @@ class SecurityManager @Inject constructor(
     }
 
     /**
+     * Deletes the database Write-Ahead Log (WAL) files.
+     * This can fix "file is not a database" errors caused by corrupted transaction logs.
+     */
+    fun deleteDatabaseWal(context: Context) {
+        val dbPath = context.getDatabasePath("myfolder_encrypted.db").absolutePath
+        val walFile = java.io.File("$dbPath-wal")
+        val shmFile = java.io.File("$dbPath-shm")
+        
+        if (walFile.exists()) {
+            walFile.delete()
+            android.util.Log.w("SecurityManager", "Deleted WAL file: ${walFile.name}")
+        }
+        if (shmFile.exists()) {
+            shmFile.delete()
+            android.util.Log.w("SecurityManager", "Deleted SHM file: ${shmFile.name}")
+        }
+    }
+
+    /**
+     * Deletes the entire encrypted database.
+     * Used for total reset when database is corrupted beyond repair.
+     */
+    fun deleteDatabase(context: Context) {
+        // Close connections first
+        com.kcpd.myfolder.data.database.AppDatabase.closeDatabase()
+        
+        val dbPath = context.getDatabasePath("myfolder_encrypted.db")
+        if (dbPath.exists()) {
+            context.deleteDatabase("myfolder_encrypted.db")
+            android.util.Log.w("SecurityManager", "Deleted corrupted database: ${dbPath.name}")
+        }
+        // Also clean up legacy DB just in case
+        context.deleteDatabase("myfolder_database")
+    }
+
+    /**
      * Recursively wipes ALL application data (Keys, Files, Database).
      * This is a destructive operation for Panic functionality.
      */
@@ -285,8 +321,7 @@ class SecurityManager @Inject constructor(
         // Close existing database instance to release locks
         com.kcpd.myfolder.data.database.AppDatabase.closeDatabase()
 
-        val dbPath = context.getDatabasePath("myfolder_encrypted.db").absolutePath
-        val dbFile = java.io.File(dbPath)
+        val dbFile = context.getDatabasePath("myfolder_encrypted.db")
 
         // If database doesn't exist yet, nothing to re-key
         if (!dbFile.exists()) {
@@ -295,16 +330,19 @@ class SecurityManager @Inject constructor(
         }
 
         try {
-            // Open database with old key using SupportFactory to handle ByteArray key
+            // Open database using SupportFactory to ensure correct key handling (byte[])
+            // We use version 3 to match AppDatabase and avoid downgrade errors
             val factory = net.sqlcipher.database.SupportFactory(oldDbKey)
             val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-                .name(dbPath)
-                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                .name(dbFile.absolutePath)
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
                     override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
                     override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, old: Int, new: Int) {}
+                    override fun onDowngrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
                 })
                 .build()
             
+            // Use getWritableDatabase to open (and decrypt) the database
             val db = factory.create(config).writableDatabase
 
             try {
@@ -336,9 +374,10 @@ class SecurityManager @Inject constructor(
             val factory = net.sqlcipher.database.SupportFactory(dbKey)
             val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(dbPath.absolutePath)
-                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
                     override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
                     override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, old: Int, new: Int) {}
+                    override fun onDowngrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
                 })
                 .build()
 

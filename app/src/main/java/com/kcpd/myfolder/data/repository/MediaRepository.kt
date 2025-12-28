@@ -49,15 +49,21 @@ class MediaRepository @Inject constructor(
 
     init {
         scope.launch {
-            // Migrate legacy unencrypted files
-            migrateLegacyFiles()
+            try {
+                // Migrate legacy unencrypted files
+                migrateLegacyFiles()
 
-            // Generate thumbnails for existing files that don't have them
-            generateMissingThumbnails()
+                // Generate thumbnails for existing files that don't have them
+                generateMissingThumbnails()
 
-            // Load from database
-            mediaFileDao.getAllFiles().collect { entities ->
-                _mediaFiles.value = entities.map { it.toMediaFile() }
+                // Load from database
+                mediaFileDao.getAllFiles().collect { entities ->
+                    _mediaFiles.value = entities.map { it.toMediaFile() }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MediaRepository", "Failed to initialize repository", e)
+                // Swallowing exception to prevent crash on startup if DB is corrupted
+                // This allows user to potentially access Settings -> Restore
             }
         }
     }
@@ -560,59 +566,31 @@ class MediaRepository @Inject constructor(
         }
 
     /**
-     * Cleans up orphaned files:
-     * 1. Unencrypted originals in /media/ (should have been deleted after encryption)
-     * 2. Ghost encrypted files in /secure_media/ (exist on disk but not in database)
-     *
-     * This fixes a bug where secureDelete didn't return the boolean properly,
-     * causing files to remain on disk even after database entries were removed.
-     *
-     * SECURITY CRITICAL: Unencrypted files are plain text originals!
+     * Scans for files on disk that are missing from the database and recovers them.
+     * Also cleans up orphaned unencrypted files in /media/.
      */
-    suspend fun cleanupOrphanedFiles(): Int =
+    suspend fun recoverOrphanedFiles(): Int =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            var deletedCount = 0
-            var deletedBytes = 0L
+            var recoveredCount = 0
 
             try {
-                // Step 1: Clean up orphaned unencrypted files in /files/media/
+                // Step 1: Clean up orphaned unencrypted files in /files/media/ (These are leaks)
                 val mediaDir = File(context.filesDir, "media")
                 if (mediaDir.exists()) {
-                    val orphanedFiles = mediaDir.listFiles()?.filter { it.isFile } ?: emptyList()
-
-                    if (orphanedFiles.isNotEmpty()) {
-                        android.util.Log.w(
-                            "MediaRepository",
-                            "Found ${orphanedFiles.size} orphaned UNENCRYPTED files in /media/"
-                        )
-
-                        orphanedFiles.forEach { file ->
-                            val sizeMB = file.length() / (1024.0 * 1024.0)
-                            android.util.Log.w(
-                                "MediaRepository",
-                                "  [UNENCRYPTED] Deleting: ${file.name} (%.2f MB)".format(sizeMB)
-                            )
-
-                            deletedBytes += file.length()
-                            if (secureFileManager.secureDelete(file)) {
-                                deletedCount++
-                            }
-                        }
+                    mediaDir.listFiles()?.filter { it.isFile }?.forEach { file ->
+                        secureFileManager.secureDelete(file)
                     }
                 }
 
-                // Step 2: Clean up ghost encrypted files in /files/secure_media/
-                // These are files that exist on disk but have no database entry
+                // Step 2: Recover ghost encrypted files in /files/secure_media/
                 val secureMediaDir = secureFileManager.getSecureStorageDir()
 
-                // Get all file paths from database
-                val dbFiles = mediaFileDao.getAllFilesOnce()
-                val dbFilePaths = dbFiles.map { it.encryptedFilePath }.toSet()
-
-                android.util.Log.d(
-                    "MediaRepository",
-                    "Database has ${dbFilePaths.size} file entries"
-                )
+                // Get all file paths from database (if accessible)
+                val dbFilePaths = try {
+                    mediaFileDao.getAllFilesOnce().map { it.encryptedFilePath }.toSet()
+                } catch (e: Exception) {
+                    emptySet() // If DB is broken, we assume everything needs recovery/check
+                }
 
                 // Scan all encrypted files on disk
                 val allDiskFiles = mutableListOf<File>()
@@ -625,44 +603,57 @@ class MediaRepository @Inject constructor(
                     }
                 }
 
-                android.util.Log.d(
-                    "MediaRepository",
-                    "Disk has ${allDiskFiles.size} encrypted files"
-                )
-
                 // Find ghost files (on disk but not in database)
                 val ghostFiles = allDiskFiles.filter { it.absolutePath !in dbFilePaths }
 
-                if (ghostFiles.isNotEmpty()) {
-                    android.util.Log.w(
-                        "MediaRepository",
-                        "Found ${ghostFiles.size} GHOST encrypted files (not in database)"
-                    )
+                ghostFiles.forEach { file ->
+                    try {
+                        // Try to read metadata from the encrypted file header
+                        val metadata = secureFileManager.validateAndGetMetadata(file)
+                        if (metadata != null) {
+                            // File is valid and decryptable! Recover it into DB.
+                            val category = FolderCategory.values().find { file.parent?.endsWith(it.path) == true } 
+                                ?: FolderCategory.PHOTOS // Fallback
+                            
+                            val mediaType = category.mediaType ?: MediaType.PHOTO
+                            
+                            // Regenerate thumbnail
+                            val thumbnail = when (mediaType) {
+                                MediaType.PHOTO -> secureFileManager.generateImageThumbnail(file)
+                                MediaType.VIDEO -> secureFileManager.generateVideoThumbnail(file)
+                                else -> null
+                            }
 
-                    ghostFiles.forEach { file ->
-                        val sizeMB = file.length() / (1024.0 * 1024.0)
-                        android.util.Log.w(
-                            "MediaRepository",
-                            "  [GHOST] Deleting: ${file.name} (%.2f MB)".format(sizeMB)
-                        )
+                            val entity = MediaFileEntity(
+                                id = UUID.randomUUID().toString(),
+                                originalFileName = metadata.filename,
+                                encryptedFileName = file.name,
+                                encryptedFilePath = file.absolutePath,
+                                mediaType = mediaType.name,
+                                encryptedThumbnailPath = null,
+                                thumbnail = thumbnail,
+                                duration = null, // Can't easily extract without decrypting fully
+                                size = file.length(),
+                                createdAt = metadata.timestamp,
+                                folderId = null,
+                                verificationHash = null, // Skip hash for speed
+                                originalSize = file.length(), // Approx
+                                mimeType = metadata.mimeType
+                            )
 
-                        deletedBytes += file.length()
-                        if (secureFileManager.secureDelete(file)) {
-                            deletedCount++
+                            mediaFileDao.insertFile(entity)
+                            recoveredCount++
+                            android.util.Log.i("MediaRepository", "Recovered file: ${metadata.filename}")
                         }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MediaRepository", "Failed to recover file: ${file.name}", e)
                     }
                 }
-
-                val freedMB = deletedBytes / (1024.0 * 1024.0)
-                android.util.Log.i(
-                    "MediaRepository",
-                    "Cleanup complete: Deleted $deletedCount files, freed %.2f MB".format(freedMB)
-                )
             } catch (e: Exception) {
-                android.util.Log.e("MediaRepository", "Failed to cleanup orphaned files", e)
+                android.util.Log.e("MediaRepository", "Failed to recover orphaned files", e)
             }
 
-            deletedCount
+            recoveredCount
         }
 
     /**

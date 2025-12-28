@@ -43,6 +43,24 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(this)
 
+        // Database Integrity Check & Recovery
+        try {
+            if (securityManager.isSetup()) {
+                if (!securityManager.validateDatabaseKey(this)) {
+                    android.util.Log.e("MyFolderApp", "Database corrupted or unreadable. Attempting WAL recovery...")
+                    securityManager.deleteDatabaseWal(this)
+                    
+                    if (securityManager.validateDatabaseKey(this)) {
+                        android.util.Log.i("MyFolderApp", "Database recovered successfully!")
+                    } else {
+                        android.util.Log.e("MyFolderApp", "Database recovery failed. User may need to restore backup.")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MyFolderApp", "Failed to check database integrity", e)
+        }
+
         // Setup crash handler for secure cleanup
         setupCrashHandler()
 

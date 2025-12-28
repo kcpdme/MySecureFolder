@@ -56,12 +56,16 @@ class FolderRepository @Inject constructor(
 
     init {
         scope.launch {
-            // Migrate legacy folders if needed
-            migrateLegacyFolders()
+            try {
+                // Migrate legacy folders if needed
+                migrateLegacyFolders()
 
-            // Load folders from database
-            folderDao.getAllFolders().collect { entities ->
-                _folders.value = entities.map { it.toUserFolder() }
+                // Load folders from database
+                folderDao.getAllFolders().collect { entities ->
+                    _folders.value = entities.map { it.toUserFolder() }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FolderRepository", "Failed to initialize repository", e)
             }
         }
     }

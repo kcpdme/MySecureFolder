@@ -36,6 +36,7 @@ class SettingsViewModel @Inject constructor(
     private val mediaRepository: com.kcpd.myfolder.data.repository.MediaRepository,
     private val remoteRepositoryManager: com.kcpd.myfolder.data.repository.RemoteRepositoryManager,
     private val googleDriveRepository: com.kcpd.myfolder.data.repository.GoogleDriveRepository,
+    private val securityManager: com.kcpd.myfolder.security.SecurityManager,
     @ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
@@ -154,15 +155,33 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun cleanupOrphanedFiles(onComplete: (Int) -> Unit) {
+    fun recoverOrphanedFiles(onComplete: (Int) -> Unit) {
         viewModelScope.launch {
             try {
-                val deletedCount = mediaRepository.cleanupOrphanedFiles()
-                onComplete(deletedCount)
-                // Refresh storage info after cleanup
+                val recoveredCount = mediaRepository.recoverOrphanedFiles()
+                onComplete(recoveredCount)
+                // Refresh storage info after recovery
                 _storageInfo.value = mediaRepository.analyzeStorageUsage()
             } catch (e: Exception) {
-                android.util.Log.e("SettingsViewModel", "Failed to cleanup orphaned files", e)
+                android.util.Log.e("SettingsViewModel", "Failed to recover orphaned files", e)
+                onComplete(0)
+            }
+        }
+    }
+
+    fun resetDatabase(onComplete: (Int) -> Unit) {
+        viewModelScope.launch {
+            try {
+                // 1. Delete corrupted database
+                securityManager.deleteDatabase(context)
+                
+                // 2. Re-initialize empty database (by accessing it via repository)
+                // The repository will automatically create a new DB when accessed
+                
+                // 3. Scan and recover files into the new database
+                recoverOrphanedFiles(onComplete)
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Failed to reset database", e)
                 onComplete(0)
             }
         }
@@ -366,16 +385,30 @@ fun SettingsScreen(
             HorizontalDivider()
 
             SettingsItem(
-                icon = Icons.Default.Delete,
-                title = "Clean Orphaned Files",
-                description = "Remove unencrypted leftovers (SECURITY FIX)",
+                icon = Icons.Default.Restore,
+                title = "Recover Database & Files",
+                description = "Scan storage and rebuild database if corrupted",
                 onClick = {
-                    viewModel.cleanupOrphanedFiles { deletedCount ->
-                        val message = if (deletedCount > 0) {
-                            "Deleted $deletedCount orphaned files"
+                    viewModel.recoverOrphanedFiles { recoveredCount ->
+                        val message = if (recoveredCount > 0) {
+                            "Recovered $recoveredCount files into database"
                         } else {
-                            "No orphaned files found"
+                            "No missing files found to recover"
                         }
+                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+
+            HorizontalDivider()
+
+            SettingsItem(
+                icon = Icons.Default.DeleteForever,
+                title = "Reset Database (Fix Corruption)",
+                description = "Delete corrupted database and recover files. Use this if app crashes.",
+                onClick = {
+                    viewModel.resetDatabase { recoveredCount ->
+                        val message = "Database reset. Recovered $recoveredCount files."
                         android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
