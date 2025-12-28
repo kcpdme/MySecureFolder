@@ -137,11 +137,12 @@ class GalleryViewModel @Inject constructor(
     }
 
     /**
-     * Rotates a photo 90 degrees clockwise and saves as a new encrypted file.
+     * Rotates a photo by the specified angle clockwise and saves as a new encrypted file.
      * @param mediaFile The photo to rotate
+     * @param angle The angle to rotate (90, 180, 270)
      * @return The newly created rotated MediaFile, or null if rotation failed
      */
-    fun rotatePhoto(mediaFile: MediaFile, onComplete: (MediaFile?) -> Unit) {
+    fun rotatePhoto(mediaFile: MediaFile, angle: Float, onComplete: (MediaFile?) -> Unit) {
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>()
@@ -153,9 +154,9 @@ class GalleryViewModel @Inject constructor(
                 val originalBitmap = BitmapFactory.decodeFile(decryptedFile.absolutePath)
                     ?: throw IllegalStateException("Failed to decode image")
 
-                // Rotate 90 degrees clockwise
+                // Rotate by specified angle
                 val matrix = Matrix().apply {
-                    postRotate(90f)
+                    postRotate(angle)
                 }
                 val rotatedBitmap = Bitmap.createBitmap(
                     originalBitmap,

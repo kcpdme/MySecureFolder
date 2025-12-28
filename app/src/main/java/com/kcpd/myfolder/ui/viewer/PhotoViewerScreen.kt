@@ -203,21 +203,13 @@ fun PhotoViewerScreen(
                     val currentFile = photoFiles[pagerState.currentPage]
                     when (editMode!!) {
                         EditMode.ROTATE -> {
-                            // Apply rotation (may need multiple 90-degree rotations)
-                            val rotations = finalRotation / 90
-                            var fileToRotate = currentFile
-                            for (i in 0 until rotations) {
-                                viewModel.rotatePhoto(fileToRotate) { newFile ->
-                                    if (newFile != null && i == rotations - 1) {
-                                        // Final rotation complete
-                                        editMode = null
-                                        rotationAngle = 0
-                                        showControls = true
-                                    }
-                                    fileToRotate = newFile ?: fileToRotate
+                            if (finalRotation != 0) {
+                                viewModel.rotatePhoto(currentFile, finalRotation.toFloat()) { newFile ->
+                                    editMode = null
+                                    rotationAngle = 0
+                                    showControls = true
                                 }
-                            }
-                            if (rotations == 0) {
+                            } else {
                                 // No rotation needed
                                 editMode = null
                                 showControls = true
