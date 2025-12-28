@@ -84,7 +84,12 @@ fun PasswordSetupScreen(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                )
             )
 
             // Password strength indicator
@@ -113,7 +118,12 @@ fun PasswordSetupScreen(
                     }
                 },
                 isError = errorMessage != null,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                )
             )
 
             if (errorMessage != null) {
@@ -303,7 +313,11 @@ fun RestoreBackupDialog(
                     singleLine = true,
                     isError = passwordError != null,
                     supportingText = passwordError?.let { { Text(it) } },
-                    enabled = !isRestoring
+                    enabled = !isRestoring,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                    )
                 )
             }
         },

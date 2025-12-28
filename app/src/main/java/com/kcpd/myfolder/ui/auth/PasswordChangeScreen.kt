@@ -87,7 +87,12 @@ fun PasswordChangeScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage != null
+                isError = errorMessage != null,
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                )
             )
 
             // New Password
@@ -107,7 +112,12 @@ fun PasswordChangeScreen(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                )
             )
 
             // Password strength indicator
@@ -133,7 +143,12 @@ fun PasswordChangeScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage != null
+                isError = errorMessage != null,
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                )
             )
 
             errorMessage?.let {
