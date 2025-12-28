@@ -33,6 +33,11 @@ class FolderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    /**
+     * Provides access to MediaRepository for operations like decryption.
+     */
+    fun getMediaRepository(): MediaRepository = mediaRepository
+
     private val categoryPath: String = savedStateHandle.get<String>("category") ?: "photos"
     val category: FolderCategory = FolderCategory.fromPath(categoryPath) ?: FolderCategory.PHOTOS
 

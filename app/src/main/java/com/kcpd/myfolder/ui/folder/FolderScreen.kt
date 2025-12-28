@@ -78,6 +78,10 @@ fun FolderScreen(
     var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) } // current/total
     var showSearch by remember { mutableStateOf(false) }
     var showUploadQueue by remember { mutableStateOf(false) }
+    var showShareOptionsDialog by remember { mutableStateOf(false) }
+    var showZippingSheet by remember { mutableStateOf(false) }
+    var zippingProgress by remember { mutableStateOf<ZipProgress?>(null) }
+    var pendingShareFiles by remember { mutableStateOf<List<MediaFile>>(emptyList()) }
 
     val hasContent = folders.isNotEmpty() || mediaFiles.isNotEmpty()
     val selectedCount = selectedFiles.size + selectedFolders.size
@@ -258,21 +262,32 @@ fun FolderScreen(
                                 val selectedMediaFiles = mediaFiles.filter { selectedFiles.contains(it.id) }
                                 if (selectedMediaFiles.isNotEmpty()) {
                                     if (selectedMediaFiles.size == 1) {
-                                        context.startActivity(
-                                            FileShareHelper.createShareIntent(
-                                                context = context,
-                                                mediaFile = selectedMediaFiles[0],
-                                                chooserTitle = "Share via"
-                                            )
-                                        )
+                                        // Single file: decrypt and share
+                                        pendingShareFiles = selectedMediaFiles
+                                        showZippingSheet = true
+                                        scope.launch {
+                                            try {
+                                                val (intent, tempFile) = FolderActions.createDecryptedShareIntent(
+                                                    context = context,
+                                                    mediaRepository = viewModel.getMediaRepository(),
+                                                    mediaFile = selectedMediaFiles[0]
+                                                )
+                                                showZippingSheet = false
+                                                context.startActivity(intent)
+                                                // Cleanup after delay
+                                                FolderActions.cleanupTempFiles(listOf(tempFile))
+                                                isMultiSelectMode = false
+                                                selectedFiles = emptySet()
+                                                pendingShareFiles = emptyList()
+                                            } catch (e: Exception) {
+                                                showZippingSheet = false
+                                                snackbarHostState.showSnackbar("Failed to share: ${e.message}")
+                                            }
+                                        }
                                     } else {
-                                        context.startActivity(
-                                            FileShareHelper.createMultipleShareIntent(
-                                                context = context,
-                                                mediaFiles = selectedMediaFiles,
-                                                chooserTitle = "Share via"
-                                            )
-                                        )
+                                        // Multiple files: show options dialog
+                                        pendingShareFiles = selectedMediaFiles
+                                        showShareOptionsDialog = true
                                     }
                                 }
                             },
@@ -617,13 +632,26 @@ fun FolderScreen(
                                 } else {
                                     android.util.Log.d("FolderScreen_Grid", "Grid item clicked: index=$index, file=${mediaFile.fileName}")
                                     if (mediaFile.mediaType == MediaType.OTHER) {
-                                        context.startActivity(
-                                            FileShareHelper.createShareIntent(
-                                                context = context,
-                                                mediaFile = mediaFile,
-                                                chooserTitle = "Share via"
-                                            )
-                                        )
+                                        // OTHER files: decrypt and share
+                                        pendingShareFiles = listOf(mediaFile)
+                                        showZippingSheet = true
+                                        scope.launch {
+                                            try {
+                                                val (intent, tempFile) = FolderActions.createDecryptedShareIntent(
+                                                    context = context,
+                                                    mediaRepository = viewModel.getMediaRepository(),
+                                                    mediaFile = mediaFile
+                                                )
+                                                showZippingSheet = false
+                                                pendingShareFiles = emptyList()
+                                                context.startActivity(intent)
+                                                FolderActions.cleanupTempFiles(listOf(tempFile))
+                                            } catch (e: Exception) {
+                                                showZippingSheet = false
+                                                pendingShareFiles = emptyList()
+                                                snackbarHostState.showSnackbar("Failed to share: ${e.message}")
+                                            }
+                                        }
                                     } else {
                                         onMediaClick(index, mediaFile)
                                     }
@@ -704,13 +732,26 @@ fun FolderScreen(
                                 } else {
                                     android.util.Log.d("FolderScreen_List", "List item clicked: index=$index, file=${mediaFile.fileName}")
                                     if (mediaFile.mediaType == MediaType.OTHER) {
-                                        context.startActivity(
-                                            FileShareHelper.createShareIntent(
-                                                context = context,
-                                                mediaFile = mediaFile,
-                                                chooserTitle = "Share via"
-                                            )
-                                        )
+                                        // OTHER files: decrypt and share
+                                        pendingShareFiles = listOf(mediaFile)
+                                        showZippingSheet = true
+                                        scope.launch {
+                                            try {
+                                                val (intent, tempFile) = FolderActions.createDecryptedShareIntent(
+                                                    context = context,
+                                                    mediaRepository = viewModel.getMediaRepository(),
+                                                    mediaFile = mediaFile
+                                                )
+                                                showZippingSheet = false
+                                                pendingShareFiles = emptyList()
+                                                context.startActivity(intent)
+                                                FolderActions.cleanupTempFiles(listOf(tempFile))
+                                            } catch (e: Exception) {
+                                                showZippingSheet = false
+                                                pendingShareFiles = emptyList()
+                                                snackbarHostState.showSnackbar("Failed to share: ${e.message}")
+                                            }
+                                        }
                                     } else {
                                         onMediaClick(index, mediaFile)
                                     }
@@ -845,6 +886,148 @@ fun FolderScreen(
                     queuedFiles = uploadQueue,
                     allFiles = mediaFiles,
                     onDismiss = { showUploadQueue = false }
+                )
+            }
+        }
+
+        // Share Options Dialog - styled to match app theme
+        if (showShareOptionsDialog && pendingShareFiles.isNotEmpty()) {
+            AlertDialog(
+                onDismissRequest = { 
+                    showShareOptionsDialog = false
+                    pendingShareFiles = emptyList()
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                icon = { 
+                    Icon(
+                        Icons.Default.Share, 
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    ) 
+                },
+                title = { 
+                    Text(
+                        "Share ${pendingShareFiles.size} files",
+                        style = MaterialTheme.typography.headlineSmall
+                    ) 
+                },
+                text = { 
+                    Text(
+                        "Choose how to share your files",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    ) 
+                },
+                confirmButton = {
+                    FilledTonalButton(
+                        onClick = {
+                            showShareOptionsDialog = false
+                            showZippingSheet = true
+                            // Start zipping
+                            scope.launch {
+                                FolderActions.createDecryptedZip(
+                                    context = context,
+                                    mediaRepository = viewModel.getMediaRepository(),
+                                    files = pendingShareFiles
+                                ).collect { progress ->
+                                    zippingProgress = progress
+                                    when (progress) {
+                                        is ZipProgress.Completed -> {
+                                            // Auto-share and cleanup
+                                            context.startActivity(
+                                                FolderActions.createZipShareIntent(context, progress.zipFile)
+                                            )
+                                            showZippingSheet = false
+                                            zippingProgress = null
+                                            pendingShareFiles = emptyList()
+                                            isMultiSelectMode = false
+                                            selectedFiles = emptySet()
+                                        }
+                                        is ZipProgress.Error -> {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Failed to create ZIP: ${progress.message}",
+                                                    duration = SnackbarDuration.Long
+                                                )
+                                            }
+                                            showZippingSheet = false
+                                            zippingProgress = null
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FolderZip, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share as ZIP")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = {
+                            showShareOptionsDialog = false
+                            showZippingSheet = true
+                            // Decrypt and share files individually
+                            scope.launch {
+                                FolderActions.createDecryptedMultipleShareIntent(
+                                    context = context,
+                                    mediaRepository = viewModel.getMediaRepository(),
+                                    files = pendingShareFiles
+                                ).collect { progress ->
+                                    when (progress) {
+                                        is ShareProgress.Decrypting -> {
+                                            zippingProgress = ZipProgress.Decrypting(
+                                                progress.current, 
+                                                progress.total, 
+                                                progress.fileName
+                                            )
+                                        }
+                                        is ShareProgress.Ready -> {
+                                            showZippingSheet = false
+                                            zippingProgress = null
+                                            context.startActivity(progress.intent)
+                                            // Cleanup temp files after delay
+                                            FolderActions.cleanupTempFiles(progress.tempFiles)
+                                            pendingShareFiles = emptyList()
+                                            isMultiSelectMode = false
+                                            selectedFiles = emptySet()
+                                        }
+                                        is ShareProgress.Error -> {
+                                            showZippingSheet = false
+                                            zippingProgress = null
+                                            snackbarHostState.showSnackbar(
+                                                message = "Failed to share: ${progress.message}",
+                                                duration = SnackbarDuration.Long
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FileCopy, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share as files")
+                    }
+                }
+            )
+        }
+
+        // Zipping Progress Bottom Sheet
+        if (showZippingSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { /* Don't allow dismiss while zipping */ },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                ZippingProgressSheet(
+                    progress = zippingProgress,
+                    totalFiles = pendingShareFiles.size
                 )
             }
         }
@@ -1021,5 +1204,123 @@ fun UploadQueueItem(
             else
                 MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * Bottom sheet showing zipping progress.
+ */
+@Composable
+fun ZippingProgressSheet(
+    progress: ZipProgress?,
+    totalFiles: Int
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+            .padding(bottom = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Icon(
+            Icons.Default.FolderZip,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        when (progress) {
+            is ZipProgress.Decrypting -> {
+                Text(
+                    text = if (totalFiles == 1) "Preparing file..." else "Preparing files...",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (totalFiles > 1) {
+                    LinearProgressIndicator(
+                        progress = { progress.current.toFloat() / progress.total },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "Decrypting ${progress.current}/$totalFiles: ${progress.fileName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 3.dp
+                    )
+                    Text(
+                        text = progress.fileName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            is ZipProgress.Zipping -> {
+                Text(
+                    text = "Creating ZIP...",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                LinearProgressIndicator(
+                    progress = { progress.current.toFloat() / progress.total },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Adding ${progress.current}/$totalFiles: ${progress.fileName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            is ZipProgress.Completed -> {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "ZIP created!",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Opening share dialog...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            is ZipProgress.Error -> {
+                Icon(
+                    Icons.Default.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "Failed to create ZIP",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = progress.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            null -> {
+                CircularProgressIndicator()
+                Text(
+                    text = if (totalFiles == 1) "Preparing file..." else "Preparing...",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
     }
 }
