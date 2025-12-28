@@ -109,22 +109,15 @@ class ImportMediaUseCase @Inject constructor(
                     android.util.Log.d("ImportMediaUseCase", "  ✓ File is already encrypted! Skipping encryption.")
                     android.util.Log.d("ImportMediaUseCase", "  Metadata: $existingMetadata")
 
-                    // Ensure target filename has .enc
-                    var targetName = fileName
-                    if (!targetName.endsWith(".enc")) {
-                        targetName += ".enc"
-                    }
+                    // SECURITY: Generate NEW random UUID filename for imported encrypted files
+                    // This ensures consistent security model (all files use random UUIDs)
+                    // Even if importing from another device/backup, generate new UUID
+                    val randomFileName = java.util.UUID.randomUUID().toString()
+                    val targetFile = File(secureDir, "$randomFileName.enc")
 
-                    // Ensure unique filename
-                    var targetFile = File(secureDir, targetName)
-                    var counter = 1
-                    while (targetFile.exists()) {
-                        val nameWithoutExt = targetName.substringBeforeLast(".enc")
-                        targetFile = File(secureDir, "$nameWithoutExt($counter).enc")
-                        counter++
-                    }
+                    android.util.Log.d("ImportMediaUseCase", "  New random filename: ${targetFile.name}")
 
-                    // Move temp file to secure storage
+                    // Move temp file to secure storage with new UUID filename
                     if (tempFile.renameTo(targetFile)) {
                         encryptedFile = targetFile
                     } else {
@@ -178,9 +171,20 @@ class ImportMediaUseCase @Inject constructor(
                     null
                 }
 
+                // CRITICAL FIX: For already-encrypted files, use the ORIGINAL filename from metadata
+                // not the encrypted filename (UUID) from the import source
+                val originalFileName = if (existingMetadata != null) {
+                    // File was already encrypted - use original filename from its metadata
+                    existingMetadata.filename
+                } else {
+                    // File was just encrypted - use the filename we passed to encryptFile
+                    fileName
+                }
+                android.util.Log.d("ImportMediaUseCase", "  Original filename for DB: $originalFileName")
+
                 val entity = MediaFileEntity(
                     id = id,
-                    originalFileName = fileName,
+                    originalFileName = originalFileName,  // Use extracted original name for encrypted files
                     encryptedFileName = encryptedFile.name,
                     encryptedFilePath = encryptedFile.absolutePath,
                     mediaType = mediaType.name,
