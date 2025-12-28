@@ -138,7 +138,11 @@ class ImportMediaUseCase @Inject constructor(
                     android.util.Log.d("ImportMediaUseCase", "Step 6: Encrypting file...")
                     android.util.Log.d("ImportMediaUseCase", "  Secure dir: ${secureDir.absolutePath}")
                     android.util.Log.d("ImportMediaUseCase", "  Starting encryption...")
-                    encryptedFile = secureFileManager.encryptFile(tempFile, secureDir)
+                    encryptedFile = secureFileManager.encryptFile(
+                        sourceFile = tempFile,
+                        destinationDir = secureDir,
+                        originalFileName = fileName
+                    )
                 }
                 
                 android.util.Log.d("ImportMediaUseCase", "  ✓ Encrypted file: ${encryptedFile.absolutePath}")

@@ -246,18 +246,22 @@ class SecurityManager @Inject constructor(
         }
 
         try {
-            // Open database with old key
-            val db = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                dbPath,
-                oldDbKey,
-                null,
-                net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE
-            )
+            // Open database with old key using SupportFactory to handle ByteArray key
+            val factory = net.sqlcipher.database.SupportFactory(oldDbKey)
+            val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(dbPath)
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                    override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
+                    override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, old: Int, new: Int) {}
+                })
+                .build()
+            
+            val db = factory.create(config).writableDatabase
 
             try {
                 // Convert new key to hex string for PRAGMA rekey
                 val newKeyHex = newDbKey.joinToString("") { "%02x".format(it) }
-                db.rawExecSQL("PRAGMA rekey = \"x'$newKeyHex'\"")
+                db.execSQL("PRAGMA rekey = \"x'$newKeyHex'\"")
                 android.util.Log.i("SecurityManager", "Database re-keyed successfully")
             } finally {
                 db.close()
@@ -280,12 +284,16 @@ class SecurityManager @Inject constructor(
 
         return try {
             val dbKey = getDatabaseKey()
-            val db = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                dbPath.absolutePath,
-                dbKey,
-                null,
-                net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY
-            )
+            val factory = net.sqlcipher.database.SupportFactory(dbKey)
+            val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(dbPath.absolutePath)
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                    override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
+                    override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, old: Int, new: Int) {}
+                })
+                .build()
+
+            val db = factory.create(config).readableDatabase
             db.close()
             true
         } catch (e: Exception) {

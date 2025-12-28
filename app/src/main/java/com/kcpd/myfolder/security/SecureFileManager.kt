@@ -59,12 +59,24 @@ class SecureFileManager @Inject constructor(
     /**
      * Encrypts a file and stores it securely using Envelope Encryption.
      * Returns the path to the encrypted file.
+     *
+     * @param sourceFile The file to encrypt
+     * @param destinationDir The directory where the encrypted file will be stored
+     * @param originalFileName Optional original filename to store in metadata (defaults to sourceFile.name)
+     * @return The encrypted file with a random UUID-based filename
      */
-    suspend fun encryptFile(sourceFile: File, destinationDir: File): File = withContext(Dispatchers.IO) {
+    suspend fun encryptFile(
+        sourceFile: File,
+        destinationDir: File,
+        originalFileName: String? = null
+    ): File = withContext(Dispatchers.IO) {
         require(sourceFile.exists()) { "Source file does not exist: ${sourceFile.path}" }
 
         destinationDir.mkdirs()
-        val encryptedFile = File(destinationDir, sourceFile.name + ENCRYPTED_FILE_EXTENSION)
+
+        // Use random UUID-based filename for encrypted file (more secure, no metadata leakage)
+        val randomFileName = java.util.UUID.randomUUID().toString()
+        val encryptedFile = File(destinationDir, randomFileName + ENCRYPTED_FILE_EXTENSION)
 
         // 1. Generate FEK (File Encryption Key)
         val fek = generateRandomKey(32)
@@ -73,9 +85,9 @@ class SecureFileManager @Inject constructor(
         val masterKey = securityManager.getActiveMasterKey()
         val (iv, encFek) = securityManager.wrapFEK(fek, masterKey)
 
-        // 3. Prepare Metadata
+        // 3. Prepare Metadata (store original filename, not the temp/rotated filename)
         val metadata = FileMetadata(
-            filename = sourceFile.name,
+            filename = originalFileName ?: sourceFile.name,
             timestamp = System.currentTimeMillis()
         )
         val metadataJson = Json.encodeToString(metadata)

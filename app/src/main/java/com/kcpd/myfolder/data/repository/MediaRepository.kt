@@ -79,7 +79,11 @@ class MediaRepository @Inject constructor(
                     try {
                         // Encrypt and move to secure storage
                         val categorySecureDir = File(secureDir, category.path).apply { mkdirs() }
-                        val encryptedFile = secureFileManager.encryptFile(file, categorySecureDir)
+                        val encryptedFile = secureFileManager.encryptFile(
+                            sourceFile = file,
+                            destinationDir = categorySecureDir,
+                            originalFileName = file.name
+                        )
 
                         // Generate thumbnail if applicable
                         val thumbnail = when (category.mediaType) {
@@ -230,12 +234,28 @@ class MediaRepository @Inject constructor(
 
         try {
             // Step 1: Encrypt the file (which is already rotated for photos)
-            encryptedFile = secureFileManager.encryptFile(fileToEncrypt, secureDir)
-            android.util.Log.d("MediaRepository", "  Encrypted to: ${encryptedFile.name}")
+            // Pass the ORIGINAL filename to preserve user's filename in metadata
+            encryptedFile = secureFileManager.encryptFile(
+                sourceFile = fileToEncrypt,
+                destinationDir = secureDir,
+                originalFileName = fileName  // Use original filename, not "rotated_" temp name
+            )
+            android.util.Log.d("MediaRepository", "  Encrypted to: ${encryptedFile.name} (original: $fileName)")
 
             // Clean up rotated temp file if we created one
             if (fileToEncrypt != file && fileToEncrypt.exists()) {
+                android.util.Log.d("MediaRepository", "  Deleting rotated temp file: ${fileToEncrypt.name}")
                 fileToEncrypt.delete()
+            }
+
+            // SECURITY CRITICAL: Delete original unencrypted file from /media/
+            // The file has been encrypted and stored in /secure_media/, so the original MUST be removed
+            if (file.exists()) {
+                android.util.Log.d("MediaRepository", "  Securely deleting original file: ${file.name}")
+                val deleted = secureFileManager.secureDelete(file)
+                if (!deleted) {
+                    android.util.Log.e("MediaRepository", "  WARNING: Failed to delete original file: ${file.absolutePath}")
+                }
             }
 
             // Step 2: Generate thumbnail for photos and videos
@@ -311,8 +331,12 @@ class MediaRepository @Inject constructor(
                 val verificationHash = calculateHash(tempFile)
 
                 // Encrypt the note
-                encryptedFile = secureFileManager.encryptFile(tempFile, secureDir)
-                android.util.Log.d("MediaRepository", "  Note encrypted to: ${encryptedFile.name}")
+                encryptedFile = secureFileManager.encryptFile(
+                    sourceFile = tempFile,
+                    destinationDir = secureDir,
+                    originalFileName = fileName
+                )
+                android.util.Log.d("MediaRepository", "  Note encrypted to: ${encryptedFile.name} (original: $fileName)")
 
                 // Create database entry (Room auto-wraps in transaction)
                 val entity = MediaFileEntity(
