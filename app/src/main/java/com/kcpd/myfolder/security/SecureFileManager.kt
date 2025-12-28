@@ -217,7 +217,7 @@ class SecureFileManager @Inject constructor(
         }
     }
 
-    private fun reWrapFile(file: File, oldKey: SecretKey, newKey: SecretKey) {
+    private suspend fun reWrapFile(file: File, oldKey: SecretKey, newKey: SecretKey) {
         val raf = RandomAccessFile(file, "rw")
         val channel = raf.channel
         
@@ -273,7 +273,7 @@ class SecureFileManager @Inject constructor(
         }
     }
     
-    private fun reWrapFileSlow(file: File, newHeader: FileHeader, oldBodyStart: Long) {
+    private suspend fun reWrapFileSlow(file: File, newHeader: FileHeader, oldBodyStart: Long) {
         val tempFile = File(file.parentFile, file.name + ".rewrap")
         FileOutputStream(tempFile).use { out ->
             newHeader.writeHeader(out)
@@ -284,6 +284,46 @@ class SecureFileManager @Inject constructor(
         }
         secureDelete(file)
         tempFile.renameTo(file)
+    }
+
+    /**
+     * Gets a streaming encryption OutputStream for creating new encrypted files.
+     * Writes header immediately and returns stream that encrypts body.
+     */
+    fun getStreamingEncryptionOutputStream(targetFile: File): java.io.OutputStream {
+        targetFile.parentFile?.mkdirs()
+        
+        // 1. Generate FEK
+        val fek = generateRandomKey(32)
+        
+        // 2. Wrap FEK
+        val masterKey = securityManager.getActiveMasterKey()
+        val (iv, encFek) = securityManager.wrapFEK(fek, masterKey)
+        
+        // 3. Metadata
+        val metadata = FileMetadata(filename = targetFile.name)
+        val metadataJson = Json.encodeToString(metadata)
+        val encMetadata = encryptDataGcm(metadataJson.toByteArray(Charsets.UTF_8), masterKey)
+        
+        // 4. Header
+        val header = FileHeader(FileHeader.VERSION_1, iv, encFek, encMetadata.size, encMetadata)
+        
+        // 5. Open stream
+        val fileOut = FileOutputStream(targetFile)
+        try {
+            header.writeHeader(fileOut)
+            
+            // 6. Body Cipher Stream
+            val bodyIv = iv.copyOf(16)
+            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, fek, IvParameterSpec(bodyIv))
+            
+            return CipherOutputStream(fileOut, cipher)
+        } catch (e: Exception) {
+            fileOut.close()
+            targetFile.delete()
+            throw e
+        }
     }
 
     /**
@@ -383,6 +423,28 @@ class SecureFileManager @Inject constructor(
             return Json.decodeFromString(String(plaintext, Charsets.UTF_8))
         } catch (e: Exception) {
             return null
+        }
+    }
+
+    /**
+     * Validates if a file is a valid encrypted file for the current user (MasterKey).
+     * Returns the decrypted metadata if valid, or null if invalid/not encrypted.
+     */
+    suspend fun validateAndGetMetadata(file: File): FileMetadata? = withContext(Dispatchers.IO) {
+        try {
+            FileInputStream(file).use { input ->
+                val header = FileHeader.readHeader(input)
+                val masterKey = securityManager.getActiveMasterKey()
+                
+                // Validate Key by trying to unwrap
+                // If this fails, it throws exception
+                securityManager.unwrapFEK(header.encryptedFek, header.iv, masterKey)
+                
+                // Decrypt Metadata
+                return@use decryptMetadata(header.meta, masterKey)
+            }
+        } catch (e: Exception) {
+            return@withContext null
         }
     }
 

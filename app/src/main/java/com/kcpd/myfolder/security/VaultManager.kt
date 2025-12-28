@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,7 +33,7 @@ class VaultManager @Inject constructor(
     private val passwordManager: PasswordManager,
     private val securityManager: SecurityManager,
     private val secureFileManager: SecureFileManager,
-    application: Application
+    private val application: Application
 ) : DefaultLifecycleObserver {
 
     companion object {
@@ -111,31 +113,62 @@ class VaultManager @Inject constructor(
 
     /**
      * Changes the master password.
-     * Re-encrypts file headers with new key.
+     * Re-encrypts file headers AND database with new key.
+     *
+     * Process:
+     * 1. Verify old password
+     * 2. Derive new Master Key (seed words remain unchanged)
+     * 3. Re-wrap all file encryption keys (FEKs) with new Master Key
+     * 4. Re-key the database with new database key (derived from new Master Key)
+     * 5. Update stored credentials
+     *
+     * @param oldPass Current password
+     * @param newPass New password
+     * @return true if successful, false otherwise
      */
     suspend fun changePassword(oldPass: String, newPass: String): Boolean {
         // 1. Verify old password and ensure Old Master Key is loaded
-        if (!passwordManager.verifyPassword(oldPass)) return false
-        
+        if (!passwordManager.verifyPassword(oldPass)) {
+            android.util.Log.w("VaultManager", "Password change failed: incorrect old password")
+            return false
+        }
+
         try {
             val oldMasterKey = securityManager.getActiveMasterKey()
-            
-            // 2. Get Seed Words
-            val seedWords = securityManager.loadStoredSeedWords() ?: return false
-            
+
+            // 2. Get Seed Words (they do NOT change)
+            val seedWords = securityManager.loadStoredSeedWords() ?: run {
+                android.util.Log.e("VaultManager", "Password change failed: seed words not found")
+                return false
+            }
+
             // 3. Derive New Master Key
             val newMasterKey = securityManager.deriveMasterKey(newPass, seedWords)
-            
-            // 4. Re-wrap all files
+
+            android.util.Log.i("VaultManager", "Starting password change: re-wrapping files and re-keying database")
+
+            // 4. Re-wrap all file headers (unwrap FEK with old key, re-wrap with new key)
+            // This updates the encrypted FEK in each file's header without re-encrypting file bodies
             secureFileManager.reWrapAllFiles(oldMasterKey, newMasterKey)
-            
-            // 5. Update Credentials
+
+            // 5. Re-key the database (change database encryption key)
+            // This uses SQLCipher's PRAGMA rekey to re-encrypt the entire database
+            withContext(Dispatchers.IO) {
+                securityManager.rekeyDatabase(
+                    context = application,
+                    oldMasterKey = oldMasterKey,
+                    newMasterKey = newMasterKey
+                )
+            }
+
+            // 6. Update Credentials (store new Master Key encrypted by Keystore)
             securityManager.storeCredentials(newMasterKey, seedWords)
             securityManager.setActiveMasterKey(newMasterKey)
-            
+
+            android.util.Log.i("VaultManager", "Password changed successfully")
             return true
         } catch (e: Exception) {
-            android.util.Log.e("VaultManager", "Failed to change password", e)
+            android.util.Log.e("VaultManager", "Failed to change password: ${e.message}", e)
             return false
         }
     }

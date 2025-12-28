@@ -71,11 +71,12 @@ class GoogleDriveRepository @Inject constructor(
             return@withContext Result.failure(Exception("Not signed in to Google Drive"))
         }
 
-        var tempDecryptedFile: File? = null
         try {
-            // Decrypt file
-            val encryptedFile = File(mediaFile.filePath)
-            tempDecryptedFile = secureFileManager.decryptFile(encryptedFile)
+            // Use encrypted file directly
+            val fileToUpload = File(mediaFile.filePath)
+            if (!fileToUpload.exists()) {
+                throw java.io.FileNotFoundException("Encrypted file not found: ${mediaFile.filePath}")
+            }
 
             // Create folder structure: MyFolderPrivate/Category/[FolderPath]
             val rootFolderId = getOrCreateFolder("MyFolderPrivate")
@@ -96,7 +97,7 @@ class GoogleDriveRepository @Inject constructor(
             fileMetadata.name = mediaFile.fileName
             fileMetadata.parents = listOf(parentFolderId)
             
-            val mediaContent = FileContent(getContentType(mediaFile.fileName), tempDecryptedFile)
+            val mediaContent = FileContent("application/octet-stream", fileToUpload)
             
             val uploadedFile = driveService!!.files().create(fileMetadata, mediaContent)
                 .setFields("id, webContentLink, webViewLink")
@@ -112,8 +113,6 @@ class GoogleDriveRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e("GoogleDriveRepository", "Upload failed", e)
             Result.failure(e)
-        } finally {
-            tempDecryptedFile?.delete()
         }
     }
 

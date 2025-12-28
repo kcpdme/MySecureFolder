@@ -14,6 +14,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kcpd.myfolder.security.PasswordStrength
+import kotlinx.coroutines.launch
 
 /**
  * Screen for setting up master password on first launch.
@@ -166,7 +167,6 @@ fun PasswordSetupScreen(
                             errorMessage = "Password is too short"
                         }
                         else -> {
-                            val scope = androidx.compose.runtime.rememberCoroutineScope()
                             scope.launch {
                                 if (viewModel.setupPassword(password)) {
                                     onPasswordSet()
@@ -199,14 +199,13 @@ fun PasswordSetupScreen(
         RestoreBackupDialog(
             onDismiss = { showRestoreDialog = false },
             onRestore = { code, pwd ->
-                if (viewModel.recoverFromBackup(pwd, code)) {
-                    showRestoreDialog = false
-                    onPasswordSet()
-                } else {
-                    // Show error in dialog? 
-                    // For simplicity, we just close and show error on main screen or toast
-                    // ideally pass error back
-                    errorMessage = "Restore failed. Invalid code or password."
+                scope.launch {
+                    if (viewModel.recoverFromBackup(pwd, code)) {
+                        showRestoreDialog = false
+                        onPasswordSet()
+                    } else {
+                        errorMessage = "Restore failed. Invalid code or password."
+                    }
                 }
             }
         )

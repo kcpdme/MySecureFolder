@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,13 +185,26 @@ fun PasswordChangeScreen(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 )
             ) {
-                Text(
-                    text = "⚠️ Warning: Changing your password will re-encrypt all your files. " +
-                           "This may take some time depending on the number of files.",
+                Column(
                     modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "⚠️ Important: Password Change Process",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        text = "Changing your password will:\n" +
+                               "• Re-encrypt all file headers with the new key\n" +
+                               "• Re-key your encrypted database\n" +
+                               "• Keep your 12 seed words unchanged\n\n" +
+                               "This process may take some time depending on the number of files. " +
+                               "Keep your device powered on during this process.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
             }
         }
     }

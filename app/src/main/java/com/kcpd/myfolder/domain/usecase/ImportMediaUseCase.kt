@@ -97,13 +97,50 @@ class ImportMediaUseCase @Inject constructor(
                 val verificationHash = calculateHash(tempFile)
                 android.util.Log.d("ImportMediaUseCase", "  ✓ Hash: ${verificationHash.take(16)}...")
 
-                // Encrypt the file
-                android.util.Log.d("ImportMediaUseCase", "Step 6: Encrypting file...")
+                // Check if already encrypted
+                android.util.Log.d("ImportMediaUseCase", "Step 5b: Checking if already encrypted...")
+                val existingMetadata = secureFileManager.validateAndGetMetadata(tempFile)
+                val encryptedFile: File
+
                 val secureDir = File(secureFileManager.getSecureStorageDir(), mediaType.name.lowercase())
-                android.util.Log.d("ImportMediaUseCase", "  Secure dir: ${secureDir.absolutePath}")
                 secureDir.mkdirs()
-                android.util.Log.d("ImportMediaUseCase", "  Starting encryption...")
-                val encryptedFile = secureFileManager.encryptFile(tempFile, secureDir)
+
+                if (existingMetadata != null) {
+                    android.util.Log.d("ImportMediaUseCase", "  ✓ File is already encrypted! Skipping encryption.")
+                    android.util.Log.d("ImportMediaUseCase", "  Metadata: $existingMetadata")
+
+                    // Ensure target filename has .enc
+                    var targetName = fileName
+                    if (!targetName.endsWith(".enc")) {
+                        targetName += ".enc"
+                    }
+
+                    // Ensure unique filename
+                    var targetFile = File(secureDir, targetName)
+                    var counter = 1
+                    while (targetFile.exists()) {
+                        val nameWithoutExt = targetName.substringBeforeLast(".enc")
+                        targetFile = File(secureDir, "$nameWithoutExt($counter).enc")
+                        counter++
+                    }
+
+                    // Move temp file to secure storage
+                    if (tempFile.renameTo(targetFile)) {
+                        encryptedFile = targetFile
+                    } else {
+                        // Fallback copy if rename fails (e.g. cross-filesystem)
+                        tempFile.copyTo(targetFile, overwrite = true)
+                        encryptedFile = targetFile
+                        tempFile.delete()
+                    }
+                } else {
+                    // Encrypt the file
+                    android.util.Log.d("ImportMediaUseCase", "Step 6: Encrypting file...")
+                    android.util.Log.d("ImportMediaUseCase", "  Secure dir: ${secureDir.absolutePath}")
+                    android.util.Log.d("ImportMediaUseCase", "  Starting encryption...")
+                    encryptedFile = secureFileManager.encryptFile(tempFile, secureDir)
+                }
+                
                 android.util.Log.d("ImportMediaUseCase", "  ✓ Encrypted file: ${encryptedFile.absolutePath}")
                 android.util.Log.d("ImportMediaUseCase", "  ✓ Encrypted size: ${encryptedFile.length()} bytes")
 

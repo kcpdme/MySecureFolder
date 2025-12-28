@@ -66,13 +66,13 @@ class S3Repository @Inject constructor(
     }
 
     override suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
-        var tempDecryptedFile: File? = null
         try {
-            // Step 1: Decrypt the encrypted file to a temporary file (do this once)
-            val encryptedFile = File(mediaFile.filePath)
-            Log.d("S3Repository", "Decrypting file for upload: ${mediaFile.fileName}")
-            tempDecryptedFile = secureFileManager.decryptFile(encryptedFile)
-            Log.d("S3Repository", "Decrypted to temp file: ${tempDecryptedFile.absolutePath}, size: ${tempDecryptedFile.length()} bytes")
+            // Step 1: Use encrypted file directly
+            val fileToUpload = File(mediaFile.filePath)
+            if (!fileToUpload.exists()) {
+                throw java.io.FileNotFoundException("Encrypted file not found: ${mediaFile.filePath}")
+            }
+            Log.d("S3Repository", "Uploading encrypted file: ${mediaFile.fileName}, size: ${fileToUpload.length()} bytes")
 
             var lastException: Exception? = null
             val maxRetries = 3
@@ -137,8 +137,8 @@ class S3Repository @Inject constructor(
                         PutObjectArgs.builder()
                             .bucket(config.bucketName)
                             .`object`(objectName)
-                            .stream(tempDecryptedFile.inputStream(), tempDecryptedFile.length(), -1)
-                            .contentType(getContentType(mediaFile.fileName))
+                            .stream(fileToUpload.inputStream(), fileToUpload.length(), -1)
+                            .contentType("application/octet-stream")
                             .build()
                     )
 
@@ -162,14 +162,6 @@ class S3Repository @Inject constructor(
         } catch (e: Exception) {
             Log.e("S3Repository", "Upload failed", e)
             Result.failure(e)
-        } finally {
-            // Step 3: Always clean up the temporary decrypted file
-            tempDecryptedFile?.let { tempFile ->
-                if (tempFile.exists()) {
-                    val deleted = tempFile.delete()
-                    Log.d("S3Repository", "Temp file deleted: $deleted (${tempFile.absolutePath})")
-                }
-            }
         }
     }
 

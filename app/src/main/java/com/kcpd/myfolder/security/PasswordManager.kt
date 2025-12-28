@@ -1,18 +1,20 @@
 package com.kcpd.myfolder.security
 
 import android.content.Context
-import cash.z.ecc.android.bip39.Mnemonics
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.security.MessageDigest
+import java.security.SecureRandom
 import javax.crypto.SecretKey
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Manages password-based authentication and key derivation using the "Hybrid" model.
- * Handles BIP39 Seed Word generation and recovery.
+ * Handles BIP39 Seed Word generation and recovery manually.
  */
 @Singleton
 class PasswordManager @Inject constructor(
@@ -20,8 +22,23 @@ class PasswordManager @Inject constructor(
     private val securityManager: SecurityManager
 ) {
     companion object {
-        // ENTROPY_BITS = 128 for 12 words
         private const val ENTROPY_BITS = 128
+        private const val CHECKSUM_BITS = 4 // ENTROPY_BITS / 32
+        private const val WORD_COUNT = 12
+    }
+
+    private val wordList: List<String> by lazy {
+        try {
+            val resId = context.resources.getIdentifier("bip39_english", "raw", context.packageName)
+            if (resId == 0) throw IllegalStateException("bip39_english.txt not found in raw resources")
+            
+            context.resources.openRawResource(resId).use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).readLines()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("PasswordManager", "Failed to load wordlist", e)
+            emptyList()
+        }
     }
 
     /**
@@ -35,24 +52,19 @@ class PasswordManager @Inject constructor(
      * Generates a new set of 12 BIP39 seed words.
      */
     fun generateSeedWords(): List<String> {
-        val mnemonicCode = Mnemonics.MnemonicCode(Mnemonics.WordList.ENGLISH)
-        // Generate 128 bits of entropy -> 12 words
-        val mnemonic = mnemonicCode.make(ENTROPY_BITS)
-        return String(mnemonic.chars).split(" ")
+        val entropy = ByteArray(ENTROPY_BITS / 8)
+        SecureRandom().nextBytes(entropy)
+        return entropyToMnemonic(entropy)
     }
 
     /**
      * Validates a list of seed words.
      */
     fun validateSeedWords(words: List<String>): Boolean {
-        if (words.size != 12) return false
-        try {
-            val mnemonicCode = Mnemonics.MnemonicCode(Mnemonics.WordList.ENGLISH)
-            mnemonicCode.validate(Mnemonics.Mnemonic(words.joinToString(" ").toCharArray()))
-            return true
-        } catch (e: Exception) {
-            return false
-        }
+        if (words.size != WORD_COUNT) return false
+        if (wordList.isEmpty()) return false // Should not happen
+        if (!words.all { it in wordList }) return false
+        return verifyChecksum(words)
     }
 
     /**
@@ -189,6 +201,76 @@ class PasswordManager @Inject constructor(
                 password.any { it.isLowerCase() } && password.any { !it.isLetterOrDigit() } -> PasswordStrength.STRONG
             else -> PasswordStrength.MEDIUM
         }
+    }
+
+    // --- BIP39 Implementation ---
+
+    private fun entropyToMnemonic(entropy: ByteArray): List<String> {
+        val hash = MessageDigest.getInstance("SHA-256").digest(entropy)
+        val checksumBits = getBits(hash, CHECKSUM_BITS)
+        
+        val entropyBits = bytesToBits(entropy)
+        val combinedBits = entropyBits + checksumBits
+        
+        return combinedBits.chunked(11).map { wordList[bitsToInt(it)] }
+    }
+
+    private fun verifyChecksum(words: List<String>): Boolean {
+        val indices = words.map { wordList.indexOf(it) }
+        val combinedBits = indices.flatMap { intToBits(it, 11) }
+        
+        val entropyBits = combinedBits.take(ENTROPY_BITS)
+        val checksumBits = combinedBits.takeLast(CHECKSUM_BITS)
+        
+        val entropy = bitsToBytes(entropyBits)
+        val hash = MessageDigest.getInstance("SHA-256").digest(entropy)
+        val expectedChecksum = getBits(hash, CHECKSUM_BITS)
+        
+        return checksumBits == expectedChecksum
+    }
+
+    private fun bytesToBits(bytes: ByteArray): List<Boolean> {
+        val bits = mutableListOf<Boolean>()
+        for (byte in bytes) {
+            for (i in 7 downTo 0) {
+                bits.add((byte.toInt() shr i and 1) == 1)
+            }
+        }
+        return bits
+    }
+
+    private fun bitsToBytes(bits: List<Boolean>): ByteArray {
+        val bytes = ByteArray(bits.size / 8)
+        for (i in bytes.indices) {
+            var byte = 0
+            for (j in 0 until 8) {
+                if (bits[i * 8 + j]) {
+                    byte = byte or (1 shl (7 - j))
+                }
+            }
+            bytes[i] = byte.toByte()
+        }
+        return bytes
+    }
+
+    private fun intToBits(value: Int, length: Int): List<Boolean> {
+        val bits = mutableListOf<Boolean>()
+        for (i in length - 1 downTo 0) {
+            bits.add((value shr i and 1) == 1)
+        }
+        return bits
+    }
+
+    private fun bitsToInt(bits: List<Boolean>): Int {
+        var value = 0
+        for (bit in bits) {
+            value = (value shl 1) or (if (bit) 1 else 0)
+        }
+        return value
+    }
+
+    private fun getBits(bytes: ByteArray, count: Int): List<Boolean> {
+        return bytesToBits(bytes).take(count)
     }
 }
 

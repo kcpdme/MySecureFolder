@@ -99,10 +99,10 @@ class SecurityManager @Inject constructor(
         // Argon2id Derivation
         val result = argon2.hash(
             mode = Argon2Mode.ARGON2_ID,
-            password = password.toCharArray(),
+            password = password.toByteArray(Charsets.UTF_8),
             salt = salt,
-            tCostInIterations = 3, // Recommended balance for mobile
-            mCostInKibibytes = 64 * 1024 // 64 MB
+            tCostInIterations = 3,
+            mCostInKibibyte = 64 * 1024 // 64 MB
         )
 
         return SecretKeySpec(result.rawHashAsByteArray(), "AES")
@@ -208,6 +208,90 @@ class SecurityManager @Inject constructor(
     fun deriveDatabaseKey(masterKey: SecretKey): ByteArray {
         // Use HKDF to derive DB key
         return hkdf(masterKey.encoded, HKDF_CONTEXT_DATABASE.toByteArray(), 32)
+    }
+
+    /**
+     * Gets the database encryption key.
+     * Tries to load master key if not active.
+     */
+    fun getDatabaseKey(): ByteArray {
+        val masterKey = activeMasterKey ?: loadStoredMasterKey()
+            ?: throw IllegalStateException("Cannot access database: Vault locked or not set up")
+        return deriveDatabaseKey(masterKey)
+    }
+
+    /**
+     * Re-encrypts the database with a new Master Key.
+     * This is called during password changes to keep the database in sync with the new key.
+     *
+     * @param context Application context
+     * @param oldMasterKey The previous Master Key
+     * @param newMasterKey The new Master Key
+     * @throws Exception if re-keying fails
+     */
+    fun rekeyDatabase(context: Context, oldMasterKey: SecretKey, newMasterKey: SecretKey) {
+        val oldDbKey = deriveDatabaseKey(oldMasterKey)
+        val newDbKey = deriveDatabaseKey(newMasterKey)
+
+        // Close existing database instance to release locks
+        com.kcpd.myfolder.data.database.AppDatabase.closeDatabase()
+
+        val dbPath = context.getDatabasePath("myfolder_encrypted.db").absolutePath
+        val dbFile = java.io.File(dbPath)
+
+        // If database doesn't exist yet, nothing to re-key
+        if (!dbFile.exists()) {
+            android.util.Log.i("SecurityManager", "Database doesn't exist yet, skipping rekey")
+            return
+        }
+
+        try {
+            // Open database with old key
+            val db = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                dbPath,
+                oldDbKey,
+                null,
+                net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE
+            )
+
+            try {
+                // Convert new key to hex string for PRAGMA rekey
+                val newKeyHex = newDbKey.joinToString("") { "%02x".format(it) }
+                db.rawExecSQL("PRAGMA rekey = \"x'$newKeyHex'\"")
+                android.util.Log.i("SecurityManager", "Database re-keyed successfully")
+            } finally {
+                db.close()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SecurityManager", "Failed to rekey database", e)
+            throw IllegalStateException("Database re-keying failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Validates if the database can be opened with the current Master Key.
+     * Returns true if database is accessible, false if key mismatch or doesn't exist.
+     */
+    fun validateDatabaseKey(context: Context): Boolean {
+        val dbPath = context.getDatabasePath("myfolder_encrypted.db")
+
+        // If database doesn't exist, consider it valid (will be created on first use)
+        if (!dbPath.exists()) return true
+
+        return try {
+            val dbKey = getDatabaseKey()
+            val db = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                dbPath.absolutePath,
+                dbKey,
+                null,
+                net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY
+            )
+            db.close()
+            true
+        } catch (e: Exception) {
+            android.util.Log.w("SecurityManager", "Database validation failed: ${e.message}")
+            false
+        }
     }
 
     /**
