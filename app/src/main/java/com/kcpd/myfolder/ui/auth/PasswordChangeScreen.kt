@@ -32,9 +32,16 @@ fun PasswordChangeScreen(
     var newVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showProgressSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val passwordChangeProgress by viewModel.passwordChangeProgress.collectAsState()
     val newPasswordStrength = viewModel.getPasswordStrength(newPassword)
+
+    // Show progress bottom sheet when password change is in progress
+    LaunchedEffect(passwordChangeProgress) {
+        showProgressSheet = passwordChangeProgress != null
+    }
 
     Scaffold(
         topBar = {
@@ -205,20 +212,76 @@ fun PasswordChangeScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "⚠️ Important: Password Change Process",
+                        text = "⚠️ Important: Crash-Safe Password Change",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                     Text(
                         text = "Changing your password will:\n" +
-                               "• Re-encrypt all file headers with the new key\n" +
-                               "• Re-key your encrypted database\n" +
+                               "• Re-wrap all file encryption keys (headers only)\n" +
+                               "• Re-wrap the database encryption key (no full re-encryption)\n" +
                                "• Keep your 12 seed words unchanged\n\n" +
-                               "This process may take some time depending on the number of files. " +
-                               "Keep your device powered on during this process.",
+                               "This process is crash-safe and atomic. If interrupted, you can recover with either your old or new password. " +
+                               "The process may take a few moments depending on the number of files.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
+                }
+            }
+        }
+        
+        // Progress Bottom Sheet
+        if (showProgressSheet && passwordChangeProgress != null) {
+            ModalBottomSheet(
+                onDismissRequest = { /* Don't allow dismissal during password change */ },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Changing Password",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    
+                    LinearProgressIndicator(
+                        progress = passwordChangeProgress!!.currentStep.toFloat() / passwordChangeProgress!!.totalSteps.toFloat(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Text(
+                        text = passwordChangeProgress!!.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Text(
+                        text = "Step ${passwordChangeProgress!!.currentStep} of ${passwordChangeProgress!!.totalSteps}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    if (passwordChangeProgress!!.currentStep == passwordChangeProgress!!.totalSteps) {
+                        Button(
+                            onClick = {
+                                viewModel.clearProgress()
+                                showProgressSheet = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Done")
+                        }
+                    } else {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }

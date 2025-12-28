@@ -1,0 +1,244 @@
+Fix Password Change, Encryption Envelope & Database Robustness
+CONTEXT
+
+You are working on an Android (Kotlin) secure vault application that uses:
+
+Envelope Encryption
+
+Master Key (derived via Argon2id from Password + BIP39 seed words)
+
+Per-file FEKs encrypted in file headers
+
+SQLCipher database
+
+Jetpack Compose UI
+
+Hilt DI
+
+Android Keystore + EncryptedSharedPreferences
+
+Streaming encryption/decryption (no plaintext on disk)
+
+The current implementation has critical flaws in the Change Password flow that can lead to:
+
+Permanent data loss
+
+Database corruption
+
+Irrecoverable state after crashes or process death
+
+Your task is to fix these issues correctly and robustly, without breaking existing users.
+
+GOALS (MUST ACHIEVE ALL)
+
+Make password change atomic and crash-safe
+
+Eliminate irreversible coupling between password change and database corruption
+
+Guarantee recoverability after app crash, OOM, or power loss
+
+Preserve backward compatibility with existing encrypted files
+
+Keep performance reasonable (no full file re-encryption)
+
+Avoid unnecessary crypto complexity
+
+CURRENT PROBLEMS YOU MUST FIX
+❌ 1. Non-atomic password change
+
+File FEKs, database, and stored master key are updated independently
+
+Crash mid-way causes permanent mismatch
+
+❌ 2. Database key derived directly from Master Key
+
+Password change forces full SQLCipher rekey
+
+Rekey failure = unrecoverable DB
+
+❌ 3. No rollback or resume mechanism
+
+No journal / state machine for password rotation
+
+❌ 4. PasswordManager exposes dangerous APIs
+
+Allows updating master key without re-wrapping FEKs
+
+❌ 5. Biometric unlock can load invalid keys after partial failure
+REQUIRED ARCHITECTURAL CHANGES
+✅ 1. Introduce a Password Rotation Journal
+
+Create a small persistent state (EncryptedSharedPreferences):
+
+{
+  "rotation_state": "IDLE | IN_PROGRESS",
+  "step": "FILES | DATABASE | FINALIZE",
+  "old_key_id": "...",
+  "new_key_id": "..."
+}
+
+
+Rules:
+
+Journal MUST be written before any destructive step
+
+On app startup:
+
+If IN_PROGRESS, resume or rollback
+
+Journal cleared ONLY after full success
+
+✅ 2. Decouple Database Key from Master Key (MANDATORY)
+Old (BROKEN):
+DB Key = HKDF(MasterKey)
+
+New (SAFE):
+Random DB Key (generated once)
+DB Key encrypted with Master Key
+Stored as encrypted blob
+
+
+Password change must:
+
+Re-wrap encrypted DB key
+
+NOT re-encrypt entire database
+
+NOT use SQLCipher PRAGMA rekey
+
+This change alone eliminates the biggest corruption risk.
+
+✅ 3. Make VaultManager the ONLY authority for password change
+
+Remove or restrict PasswordManager.changePassword()
+
+All password changes must go through:
+
+VaultManager.changePasswordSafely()
+
+✅ 4. Implement Crash-Safe Password Change Algorithm
+Required Order (NO CHANGES ALLOWED):
+1. Verify old password
+2. Write journal: IN_PROGRESS
+3. Derive new Master Key
+4. Re-wrap all FEKs (file headers only)
+5. Re-wrap encrypted DB key
+6. fsync / commit
+7. Store new Master Key
+8. Clear journal
+
+
+If crash happens at ANY step:
+
+App must detect state
+
+Either:
+
+Resume remaining steps
+
+Or rollback safely
+
+✅ 5. Guard All Access During Rotation
+
+During password change:
+
+Disable biometric unlock
+
+Block file access
+
+Block DB access
+
+Disable UI interactions
+
+Prevent app backgrounding if possible
+
+✅ 6. Harden File Re-wrap Logic
+
+Do NOT assume header size equality
+
+Always:
+
+Write new header to temp file
+
+Copy body
+
+fsync
+
+Atomic rename
+
+Never delete original until success
+
+
+FILES YOU WILL MODIFY
+
+VaultManager.kt
+
+SecurityManager.kt
+
+SecureFileManager.kt
+
+PasswordManager.kt
+
+(Add) PasswordRotationState.kt
+
+(Optional) PasswordRotationJournal.kt
+
+DELIVERABLES
+
+You must produce:
+
+Updated Kotlin code implementing the above
+
+Clear comments explaining safety guarantees
+
+Migration logic for existing users
+
+No breaking API changes for UI
+
+No plaintext secrets on disk
+
+ABSOLUTE RULES (DO NOT VIOLATE)
+
+❌ Never derive DB key directly from Master Key again
+
+❌ Never update stored Master Key before FEKs + DB key are rewrapped
+
+❌ Never leave system in partially updated state
+
+❌ Never require users to wipe data to recover
+
+❌ Never silently ignore failures
+
+SUCCESS CRITERIA
+
+After implementation:
+
+Password change survives:
+
+App kill
+
+Power loss
+
+Low memory kill
+
+Files and DB always stay in sync
+
+Old password OR new password can recover during crash window
+
+Biometric unlock never loads inconsistent keys
+
+FINAL CHECK
+
+Before finishing, verify:
+
+ Journal written before mutation
+
+ Journal cleared only on success
+
+ DB key no longer derived from Master Key
+
+ FEK rewrap is atomic per file
+
+ DB access is blocked during rotation
+
+ No irreversible operations without recovery path

@@ -193,20 +193,31 @@ class SecureFileManager @Inject constructor(
         val fileInputStream = FileInputStream(encryptedFile)
 
         try {
+            android.util.Log.d("SecureFileManager", "🔓 Starting streaming decryption for: ${encryptedFile.name}")
+            
             // 1. Read Header
             val header = FileHeader.readHeader(fileInputStream)
+            android.util.Log.d("SecureFileManager", "📖 Header IV: ${header.iv.joinToString(",") { "%02x".format(it) }}")
 
             // 2. Unwrap FEK
             val masterKey = securityManager.getActiveMasterKey()
+            android.util.Log.d("SecureFileManager", "🔑 Master key available: ${masterKey.encoded.size} bytes")
+            
             val fek = securityManager.unwrapFEK(header.encryptedFek, header.iv, masterKey)
+            android.util.Log.d("SecureFileManager", "✅ FEK unwrapped successfully")
 
             // 3. Setup Decryption Stream
             val bodyIv = header.iv.copyOf(16)
+            android.util.Log.d("SecureFileManager", "📖 Body IV (padded): ${bodyIv.joinToString(",") { "%02x".format(it) }}")
+            
             val cipher = Cipher.getInstance("AES/CTR/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, fek, IvParameterSpec(bodyIv))
+            
+            android.util.Log.d("SecureFileManager", "✅ Cipher initialized for body decryption")
 
             return CipherInputStream(fileInputStream, cipher)
         } catch (e: Exception) {
+            android.util.Log.e("SecureFileManager", "❌ Streaming decryption failed", e)
             try { fileInputStream.close() } catch (_: Exception) {}
             throw e
         }
@@ -215,20 +226,148 @@ class SecureFileManager @Inject constructor(
     /**
      * Re-wraps all encrypted files with a new Master Key.
      * This is used when the password changes.
+     * Each file is re-wrapped atomically to prevent data loss on crash.
+     * 
+     * IMPORTANT: Recursively scans all subdirectories to find encrypted files.
      */
     suspend fun reWrapAllFiles(oldMasterKey: SecretKey, newMasterKey: SecretKey) = withContext(Dispatchers.IO) {
-        val dir = getSecureStorageDir()
-        dir.listFiles()?.forEach { file ->
-            if (isEncrypted(file)) {
-                try {
-                    reWrapFile(file, oldMasterKey, newMasterKey)
-                } catch (e: Exception) {
-                    android.util.Log.e("SecureFileManager", "Failed to re-wrap file: ${file.name}", e)
+        val rootDir = getSecureStorageDir()
+        
+        // Recursively find all encrypted files in all subdirectories
+        val files = mutableListOf<File>()
+        fun scanDirectory(dir: File) {
+            dir.listFiles()?.forEach { file ->
+                when {
+                    file.isDirectory -> scanDirectory(file) // Recurse into subdirectories
+                    isEncrypted(file) -> files.add(file)
                 }
             }
         }
+        scanDirectory(rootDir)
+        
+        android.util.Log.i("SecureFileManager", "Re-wrapping ${files.size} files (scanned recursively)")
+        
+        var successCount = 0
+        var failureCount = 0
+        
+        files.forEach { file ->
+            try {
+                reWrapFileAtomic(file, oldMasterKey, newMasterKey)
+                successCount++
+            } catch (e: Exception) {
+                failureCount++
+                android.util.Log.e("SecureFileManager", "Failed to re-wrap file: ${file.absolutePath}", e)
+                // Continue with other files rather than failing completely
+            }
+        }
+        
+        android.util.Log.i("SecureFileManager", "Re-wrap complete: $successCount succeeded, $failureCount failed")
+        
+        if (failureCount > 0) {
+            throw IllegalStateException("Failed to re-wrap $failureCount files")
+        }
     }
 
+    /**
+     * Re-wraps a single file atomically using temp file + atomic rename.
+     * GUARANTEES:
+     * - Original file is never deleted until new file is complete
+     * - New file is written to temp location first
+     * - Atomic rename ensures crash safety
+     * - fsync ensures durability
+     */
+    private suspend fun reWrapFileAtomic(file: File, oldKey: SecretKey, newKey: SecretKey) {
+        val tempFile = File(file.parentFile, "${file.name}.tmp.${System.currentTimeMillis()}")
+        
+        android.util.Log.d("SecureFileManager", "🔄 Re-wrapping ${file.name}")
+        
+        try {
+            FileInputStream(file).use { input ->
+                // 1. Read existing header
+                val header = FileHeader.readHeader(input)
+                val bodyStartPos = input.channel.position()
+                
+                android.util.Log.d("SecureFileManager", "📖 Original header IV: ${header.iv.joinToString(",") { "%02x".format(it) }}")
+                
+                // 2. Unwrap FEK with OLD key
+                val fek = securityManager.unwrapFEK(header.encryptedFek, header.iv, oldKey)
+                
+                android.util.Log.d("SecureFileManager", "✅ FEK unwrapped successfully with old key")
+                
+                // 3. Decrypt Metadata with OLD key
+                val metadata = decryptMetadata(header.meta, oldKey)
+                    ?: throw IllegalStateException("Failed to decrypt metadata for ${file.name}")
+                
+                android.util.Log.d("SecureFileManager", "✅ Metadata decrypted: ${metadata.filename}")
+                
+                // 4. Wrap FEK with NEW key, REUSING THE ORIGINAL IV
+                // CRITICAL: The body is encrypted with bodyIv = header.iv.copyOf(16)
+                // We must preserve the original IV so the body decryption still works
+                val (newIv, newEncFek) = securityManager.wrapFEK(fek, newKey, header.iv)
+                
+                android.util.Log.d("SecureFileManager", "✅ FEK wrapped with new key, IV preserved: ${newIv.contentEquals(header.iv)}")
+                
+                // 5. Encrypt Metadata with NEW key
+                val metadataBytes = Json.encodeToString(metadata).toByteArray(Charsets.UTF_8)
+                val newEncMetadata = encryptDataGcm(metadataBytes, newKey)
+                
+                // 6. Create New Header with the SAME IV (newIv == header.iv at this point)
+                val newHeader = FileHeader(
+                    version = FileHeader.VERSION_1,
+                    iv = newIv,  // Same as original header.iv
+                    encryptedFek = newEncFek,
+                    metaLen = newEncMetadata.size,
+                    meta = newEncMetadata
+                )
+                
+                android.util.Log.d("SecureFileManager", "📝 New header created with IV: ${newHeader.iv.joinToString(",") { "%02x".format(it) }}")
+                
+                // 7. Write to temp file: new header + unchanged body
+                FileOutputStream(tempFile).use { output ->
+                    newHeader.writeHeader(output)
+                    
+                    // Reset input stream to body start
+                    input.channel.position(bodyStartPos)
+                    
+                    // Copy encrypted body as-is (no re-encryption needed!)
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                    }
+                    
+                    // Force flush to disk
+                    output.fd.sync()
+                }
+            }
+            
+            // 8. Atomic rename (this is the commit point)
+            // On crash before this: temp file exists, original unchanged
+            // On crash after this: new file in place, temp file cleaned up later
+            if (!tempFile.renameTo(file)) {
+                throw IllegalStateException("Failed to rename temp file to ${file.name}")
+            }
+            
+            android.util.Log.d("SecureFileManager", "Successfully re-wrapped: ${file.name}")
+            
+        } catch (e: Exception) {
+            // Clean up temp file on failure
+            try {
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                }
+            } catch (cleanupEx: Exception) {
+                android.util.Log.w("SecureFileManager", "Failed to clean up temp file", cleanupEx)
+            }
+            throw e
+        }
+    }
+
+    /**
+     * DEPRECATED: Use reWrapFileAtomic instead.
+     * This method is kept for compatibility but should not be used directly.
+     */
+    @Deprecated("Use reWrapFileAtomic for safer file re-wrapping")
     private suspend fun reWrapFile(file: File, oldKey: SecretKey, newKey: SecretKey) {
         val raf = RandomAccessFile(file, "rw")
         val channel = raf.channel

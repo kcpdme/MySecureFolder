@@ -5,6 +5,9 @@ import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.PasswordStrength
 import com.kcpd.myfolder.security.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 @HiltViewModel
@@ -12,6 +15,15 @@ class PasswordSetupViewModel @Inject constructor(
     private val passwordManager: PasswordManager,
     private val vaultManager: VaultManager
 ) : ViewModel() {
+
+    private val _passwordChangeProgress = MutableStateFlow<PasswordChangeProgress?>(null)
+    val passwordChangeProgress: StateFlow<PasswordChangeProgress?> = _passwordChangeProgress.asStateFlow()
+
+    data class PasswordChangeProgress(
+        val message: String,
+        val currentStep: Int,
+        val totalSteps: Int
+    )
 
     fun isPasswordSet(): Boolean {
         return passwordManager.isPasswordSet()
@@ -24,7 +36,13 @@ class PasswordSetupViewModel @Inject constructor(
     }
 
     suspend fun changePassword(currentPassword: String, newPassword: String): Boolean {
-        return vaultManager.changePassword(currentPassword, newPassword)
+        return vaultManager.changePasswordSafely(currentPassword, newPassword) { message, step, total ->
+            _passwordChangeProgress.value = PasswordChangeProgress(message, step, total)
+        }
+    }
+
+    fun clearProgress() {
+        _passwordChangeProgress.value = null
     }
 
     fun getPasswordStrength(password: String): PasswordStrength {

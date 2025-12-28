@@ -159,27 +159,25 @@ class PasswordManager @Inject constructor(
     }
 
     /**
-     * Changes the password.
-     * Note: Seed words do not change.
-     * Requires re-wrapping all file encryption keys (implemented in caller or separate use case).
-     * This method only updates the Master Key and storage.
-     * 
-     * @return The new Master Key, which the caller must use to re-wrap FEKs.
+     * Derives a new master key from a new password and existing seed words.
+     * This DOES NOT store or activate the new key.
+     * It is intended for use by VaultManager during a safe password rotation.
      */
-    suspend fun changePassword(oldPassword: String, newPassword: String): SecretKey? = withContext(Dispatchers.Default) {
-        if (!verifyPassword(oldPassword)) return@withContext null
+    internal suspend fun deriveNewMasterKey(newPassword: String): SecretKey? = withContext(Dispatchers.Default) {
         if (newPassword.length < 8) throw IllegalArgumentException("New password too short")
-
         val seedWords = securityManager.loadStoredSeedWords() ?: return@withContext null
-        
-        // Derive NEW Master Key
-        val newMasterKey = securityManager.deriveMasterKey(newPassword, seedWords)
-        
-        // Update storage
+        securityManager.deriveMasterKey(newPassword, seedWords)
+    }
+
+    /**
+     * Stores the new master key and updates the active key.
+     * This is the final step of a password change, controlled by VaultManager.
+     */
+    internal fun storeNewMasterKey(newMasterKey: SecretKey) {
+        val seedWords = securityManager.loadStoredSeedWords()
+            ?: throw IllegalStateException("Cannot store new master key without seed words.")
         securityManager.storeCredentials(newMasterKey, seedWords)
         securityManager.setActiveMasterKey(newMasterKey)
-        
-        newMasterKey
     }
 
     /**

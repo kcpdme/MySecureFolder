@@ -30,6 +30,7 @@ class SecurityManager @Inject constructor(
         private const val ENCRYPTED_PREFS_NAME = "secure_prefs"
         private const val KEY_STORED_MASTER_KEY = "stored_master_key" // Encrypted by Keystore
         private const val KEY_STORED_SEED_WORDS = "stored_seed_words" // Encrypted by Keystore
+        private const val KEY_ENCRYPTED_DB_KEY = "encrypted_db_key" // DB key, encrypted by Master Key
         private const val KEY_PANIC_PIN_HASH = "panic_pin_hash"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val GCM_TAG_LENGTH = 128
@@ -114,21 +115,21 @@ class SecurityManager @Inject constructor(
      *
      * @param fek The random File Encryption Key
      * @param masterKey The Master Key
+     * @param iv Optional IV to use (for re-wrapping); if null, generates a new random IV
      * @return Pair of (IV, EncryptedFEK)
      */
-    fun wrapFEK(fek: SecretKey, masterKey: SecretKey): Pair<ByteArray, ByteArray> {
+    fun wrapFEK(fek: SecretKey, masterKey: SecretKey, iv: ByteArray? = null): Pair<ByteArray, ByteArray> {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         
-        // Generate random IV for this wrapping
-        val iv = ByteArray(IV_LENGTH)
-        SecureRandom().nextBytes(iv)
-        val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+        // Use provided IV or generate random IV for this wrapping
+        val wrapIv = iv ?: ByteArray(IV_LENGTH).also { SecureRandom().nextBytes(it) }
+        val spec = GCMParameterSpec(GCM_TAG_LENGTH, wrapIv)
 
         cipher.init(Cipher.ENCRYPT_MODE, masterKey, spec)
         
         val encryptedBytes = cipher.doFinal(fek.encoded)
         
-        return Pair(iv, encryptedBytes)
+        return Pair(wrapIv, encryptedBytes)
     }
 
     /**
@@ -157,11 +158,17 @@ class SecurityManager @Inject constructor(
     fun storeCredentials(masterKey: SecretKey, seedWords: List<String>) {
         val masterKeyBase64 = android.util.Base64.encodeToString(masterKey.encoded, android.util.Base64.NO_WRAP)
         val seedWordsString = seedWords.joinToString(" ")
-        
-        encryptedPrefs.edit()
+
+        val editor = encryptedPrefs.edit()
             .putString(KEY_STORED_MASTER_KEY, masterKeyBase64)
             .putString(KEY_STORED_SEED_WORDS, seedWordsString)
-            .apply()
+
+        // Generate and store the encrypted DB key only if it doesn't exist
+        if (!encryptedPrefs.contains(KEY_ENCRYPTED_DB_KEY)) {
+            generateAndStoreEncryptedDbKey(masterKey)
+        }
+
+        editor.apply()
     }
 
     /**
@@ -185,6 +192,68 @@ class SecurityManager @Inject constructor(
     fun loadStoredSeedWords(): List<String>? {
         val seedString = encryptedPrefs.getString(KEY_STORED_SEED_WORDS, null) ?: return null
         return seedString.split(" ")
+    }
+
+    /**
+     * Generates a new random 32-byte key for the database, encrypts it with the
+     * master key, and stores it in EncryptedSharedPreferences.
+     * This should only be called once during initial vault setup.
+     */
+    private fun generateAndStoreEncryptedDbKey(masterKey: SecretKey) {
+        // 1. Generate a random 32-byte key for SQLCipher
+        val dbKeyBytes = ByteArray(32)
+        SecureRandom().nextBytes(dbKeyBytes)
+
+        // 2. Encrypt this key with the master key
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val iv = ByteArray(IV_LENGTH)
+        SecureRandom().nextBytes(iv)
+        val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+        cipher.init(Cipher.ENCRYPT_MODE, masterKey, spec)
+        val encryptedDbKey = cipher.doFinal(dbKeyBytes)
+
+        // 3. Store IV + Encrypted Key as a single Base64 string
+        val combined = iv + encryptedDbKey
+        val dbKeyBlob = android.util.Base64.encodeToString(combined, android.util.Base64.NO_WRAP)
+
+        encryptedPrefs.edit().putString(KEY_ENCRYPTED_DB_KEY, dbKeyBlob).apply()
+    }
+
+    /**
+     * Re-wraps the existing database key with a new master key.
+     * This is the safe way to handle database key updates during a password change.
+     */
+    fun rewrapEncryptedDbKey(oldMasterKey: SecretKey, newMasterKey: SecretKey): Boolean {
+        try {
+            // 1. Decrypt DB key with OLD master key
+            val dbKeyBlob = encryptedPrefs.getString(KEY_ENCRYPTED_DB_KEY, null)
+                ?: throw IllegalStateException("Encrypted DB key not found.")
+            val combined = android.util.Base64.decode(dbKeyBlob, android.util.Base64.NO_WRAP)
+            val iv = combined.copyOfRange(0, IV_LENGTH)
+            val encryptedDbKey = combined.copyOfRange(IV_LENGTH, combined.size)
+
+            val decryptCipher = Cipher.getInstance(TRANSFORMATION)
+            val decryptSpec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            decryptCipher.init(Cipher.DECRYPT_MODE, oldMasterKey, decryptSpec)
+            val dbKeyBytes = decryptCipher.doFinal(encryptedDbKey)
+
+            // 2. Encrypt DB key with NEW master key
+            val newIv = ByteArray(IV_LENGTH)
+            SecureRandom().nextBytes(newIv)
+            val encryptCipher = Cipher.getInstance(TRANSFORMATION)
+            val encryptSpec = GCMParameterSpec(GCM_TAG_LENGTH, newIv)
+            encryptCipher.init(Cipher.ENCRYPT_MODE, newMasterKey, encryptSpec)
+            val newEncryptedDbKey = encryptCipher.doFinal(dbKeyBytes)
+
+            // 3. Store the newly encrypted key
+            val newCombined = newIv + newEncryptedDbKey
+            val newDbKeyBlob = android.util.Base64.encodeToString(newCombined, android.util.Base64.NO_WRAP)
+            encryptedPrefs.edit().putString(KEY_ENCRYPTED_DB_KEY, newDbKeyBlob).apply()
+            return true
+        } catch (e: Exception) {
+            android.util.Log.e("SecurityManager", "Failed to re-wrap database key", e)
+            return false
+        }
     }
 
     /**
@@ -287,75 +356,44 @@ class SecurityManager @Inject constructor(
     }
 
     /**
-     * Derives a database encryption key from the Master Key.
-     * We use HKDF to derive a sub-key so the Master Key itself isn't used for DB.
-     */
-    fun deriveDatabaseKey(masterKey: SecretKey): ByteArray {
-        // Use HKDF to derive DB key
-        return hkdf(masterKey.encoded, HKDF_CONTEXT_DATABASE.toByteArray(), 32)
-    }
-
-    /**
-     * Gets the database encryption key.
-     * Tries to load master key if not active.
+     * Gets the database encryption key by decrypting the stored encrypted DB key.
+     * The database key is now a random key, NOT derived from the Master Key.
+     * This decoupling allows password changes without database re-keying.
      */
     fun getDatabaseKey(): ByteArray {
+        android.util.Log.d("SecurityManager", "getDatabaseKey() called")
+        
         val masterKey = activeMasterKey ?: loadStoredMasterKey()
             ?: throw IllegalStateException("Cannot access database: Vault locked or not set up")
-        return deriveDatabaseKey(masterKey)
-    }
+        
+        android.util.Log.d("SecurityManager", "Master key available: ${masterKey.encoded.size} bytes")
 
-    /**
-     * Re-encrypts the database with a new Master Key.
-     * This is called during password changes to keep the database in sync with the new key.
-     *
-     * @param context Application context
-     * @param oldMasterKey The previous Master Key
-     * @param newMasterKey The new Master Key
-     * @throws Exception if re-keying fails
-     */
-    fun rekeyDatabase(context: Context, oldMasterKey: SecretKey, newMasterKey: SecretKey) {
-        val oldDbKey = deriveDatabaseKey(oldMasterKey)
-        val newDbKey = deriveDatabaseKey(newMasterKey)
-
-        // Close existing database instance to release locks
-        com.kcpd.myfolder.data.database.AppDatabase.closeDatabase()
-
-        val dbFile = context.getDatabasePath("myfolder_encrypted.db")
-
-        // If database doesn't exist yet, nothing to re-key
-        if (!dbFile.exists()) {
-            android.util.Log.i("SecurityManager", "Database doesn't exist yet, skipping rekey")
-            return
+        val dbKeyBlob = encryptedPrefs.getString(KEY_ENCRYPTED_DB_KEY, null)
+        
+        if (dbKeyBlob == null) {
+            android.util.Log.e("SecurityManager", "Encrypted DB key not found! This may be a first-time migration.")
+            throw IllegalStateException("Database key not found. Vault may be in an inconsistent state.")
         }
+        
+        android.util.Log.d("SecurityManager", "Encrypted DB key blob found: ${dbKeyBlob.length} chars")
 
-        try {
-            // Open database using SupportFactory to ensure correct key handling (byte[])
-            // We use version 3 to match AppDatabase and avoid downgrade errors
-            val factory = net.sqlcipher.database.SupportFactory(oldDbKey)
-            val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-                .name(dbFile.absolutePath)
-                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
-                    override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
-                    override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, old: Int, new: Int) {}
-                    override fun onDowngrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
-                })
-                .build()
+        return try {
+            val combined = android.util.Base64.decode(dbKeyBlob, android.util.Base64.NO_WRAP)
+            val iv = combined.copyOfRange(0, IV_LENGTH)
+            val encryptedDbKey = combined.copyOfRange(IV_LENGTH, combined.size)
+
+            android.util.Log.d("SecurityManager", "Decrypting DB key: IV=${iv.size} bytes, Encrypted=${encryptedDbKey.size} bytes")
+
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            cipher.init(Cipher.DECRYPT_MODE, masterKey, spec)
+            val dbKey = cipher.doFinal(encryptedDbKey)
             
-            // Use getWritableDatabase to open (and decrypt) the database
-            val db = factory.create(config).writableDatabase
-
-            try {
-                // Convert new key to hex string for PRAGMA rekey
-                val newKeyHex = newDbKey.joinToString("") { "%02x".format(it) }
-                db.execSQL("PRAGMA rekey = \"x'$newKeyHex'\"")
-                android.util.Log.i("SecurityManager", "Database re-keyed successfully")
-            } finally {
-                db.close()
-            }
+            android.util.Log.d("SecurityManager", "✅ Database key decrypted successfully: ${dbKey.size} bytes")
+            dbKey
         } catch (e: Exception) {
-            android.util.Log.e("SecurityManager", "Failed to rekey database", e)
-            throw IllegalStateException("Database re-keying failed: ${e.message}", e)
+            android.util.Log.e("SecurityManager", "❌ Failed to decrypt database key", e)
+            throw IllegalStateException("Could not decrypt database key. Master key may be incorrect.", e)
         }
     }
 
