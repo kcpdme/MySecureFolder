@@ -1,0 +1,184 @@
+Role: Android Security Architect & Kotlin Expert
+Task: Comprehensive Refactor of "MySecureFolder" Encryption Layer.
+
+Objective: Implement a "Hybrid" security model using Argon2id for key derivation, Envelope Encryption for file security, and Deterministic Key Generation (Seed Words) for recovery.
+
+1. Core Architecture Principles
+
+A. Identity & Recovery (Deterministic Model)
+
+User Credentials: Access requires VaultPassword + 12 Seed Words.
+
+Master Key (KEK) Derivation:
+
+Algorithm: Argon2id.
+
+Input: Password.
+
+Salt: SHA-256(SeedWords). (The Seed Words act as the high-entropy global salt).
+
+Result: A 32-byte MasterKey.
+
+Recovery Flow:
+
+If the Android Keystore is broken or the user switches phones, they must input their Password and Seed Words.
+
+Since the salt is derived from the seed words, the app re-generates the exact same MasterKey without needing to read a salt from a file header.
+
+B. Storage & Caching (The Hybrid Approach)
+
+RAM (Session): The MasterKey is held in memory (SecurityManager singleton) while the vault is unlocked.
+
+Keystore (Convenience):
+
+The MasterKey and Seed Words are encrypted using the Android Keystore (AES-GCM) and stored locally.
+
+Unlock: Biometrics/PIN decrypts the Keystore entry to load the Master Key.
+
+Failure: If Keystore fails, prompt user for manual entry (Pass + Seed) to recover.
+
+C. File Encryption (Envelope Pattern)
+
+FEK (File Encryption Key): A unique, random 32-byte key generated for each file. Encrypts the file body.
+
+IV (Initialization Vector): A unique, random 12-byte IV generated for each file. Used to encrypt the FEK.
+
+Encrypted FEK: The FEK is encrypted using AES-GCM(Key=MasterKey, IV=FileIV).
+
+2. Technical Specifications
+
+Step 1: Dependencies (build.gradle.kts)
+
+Add com.lambdapioneer.argon2kt:argon2kt (or equivalent) for Argon2id support.
+
+Ensure coroutine support for heavy crypto operations.
+
+Step 2: The Lean File Header (SecureFileManager.kt)
+Implement a binary header format for .enc files.
+
+Note: NO SALT is stored in the header.
+
+Field
+
+Size
+
+Description
+
+MAGIC
+
+4 bytes
+
+Constant [0x4B, 0x43, 0x50, 0x44] ("KCPD")
+
+VERSION
+
+1 byte
+
+Version 0x01
+
+IV
+
+12 bytes
+
+Unique Random IV for this file. Required to decrypt the FEK.
+
+ENC_FEK
+
+Var bytes
+
+The FEK encrypted by MasterKey + IV. (Typically 32 bytes + 16 bytes tag).
+
+META_LEN
+
+4 bytes
+
+Integer length of the metadata JSON.
+
+META
+
+Var bytes
+
+Encrypted Metadata JSON (Filename, MIME, Timestamp).
+
+BODY
+
+Stream
+
+The actual content, encrypted with the raw FEK.
+
+Step 3: Key Management (SecurityManager.kt / PasswordManager.kt)
+
+deriveMasterKey(password, seedWords):
+
+val salt = MessageDigest.getInstance("SHA-256").digest(seedWords.toString().toByteArray())
+
+Return Argon2id.derive(password, salt)
+
+wrapFEK(fek: SecretKey, masterKey: SecretKey): Pair<ByteArray, ByteArray>:
+
+Generate random 12-byte IV.
+
+Encrypt fek using masterKey and iv.
+
+Return Pair(iv, encryptedBytes).
+
+unwrapFEK(encryptedFek: ByteArray, iv: ByteArray, masterKey: SecretKey): SecretKey:
+
+Decrypt encryptedFek using masterKey and iv.
+
+Return SecretKeySpec(decryptedBytes, "AES").
+
+Step 4: File Operations (SecureFileManager.kt)
+
+Encrypt (Import):
+
+Generate val fek = generateRandomKey(32).
+
+val (iv, encFek) = securityManager.wrapFEK(fek, activeMasterKey).
+
+Write MAGIC + VERSION + IV + ENC_FEK + META_LEN + META.
+
+Open CipherOutputStream using fek and stream file content.
+
+Decrypt (View):
+
+Read IV and ENC_FEK from header.
+
+val fek = securityManager.unwrapFEK(encFek, iv, activeMasterKey).
+
+Open CipherInputStream using fek.
+
+Step 5: Password Change (Key Rotation)
+Implement changePassword(oldPass, newPass):
+
+Note: Seed words do not change.
+
+Derive OldMasterKey (OldPass + Seed) and NewMasterKey (NewPass + Seed).
+
+Iterate through ALL .enc files.
+
+Process Header Only:
+
+Read OldIV and EncryptedFEK.
+
+val rawFEK = unwrapFEK(EncryptedFEK, OldIV, OldMasterKey).
+
+Generate NewIV (Security Best Practice).
+
+val (newIV, newEncFEK) = wrapFEK(rawFEK, NewMasterKey).
+
+Overwrite the file header with newIV and newEncFEK.
+
+Critical: Do not touch the encrypted file body.
+
+3. Deliverables
+
+Updated build.gradle.kts: Add Argon2 library.
+
+FileHeader.kt: A data class/helper for parsing and writing the binary header.
+
+PasswordManager.kt: Logic for BIP39 Seed Word generation, validation, and recovery.
+
+SecurityManager.kt: Argon2 implementation and Key Wrap/Unwrap logic.
+
+SecureFileManager.kt: Refactored encryptFile, decryptFile, and stream handling to respect the new header format.

@@ -1,15 +1,15 @@
 package com.kcpd.myfolder.security
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.lambdapioneer.argon2kt.Argon2Kt
+import com.lambdapioneer.argon2kt.Argon2Mode
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
 import javax.crypto.Mac
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -19,7 +19,8 @@ import javax.inject.Singleton
 
 /**
  * Manages encryption keys and security operations for the app.
- * Uses Android Keystore for secure key storage and AES-256-GCM for encryption.
+ * Implements the "Hybrid" security model using Argon2id for key derivation
+ * and Envelope Encryption for file security.
  */
 @Singleton
 class SecurityManager @Inject constructor(
@@ -27,303 +28,195 @@ class SecurityManager @Inject constructor(
 ) {
     companion object {
         private const val ENCRYPTED_PREFS_NAME = "secure_prefs"
-        private const val KEY_ALIAS = "myfolder_master_key"
-        private const val DATABASE_KEY_PREF = "database_encryption_key"
-        private const val FILE_KEY_PREF = "file_encryption_key"
+        private const val KEY_STORED_MASTER_KEY = "stored_master_key" // Encrypted by Keystore
+        private const val KEY_STORED_SEED_WORDS = "stored_seed_words" // Encrypted by Keystore
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val GCM_TAG_LENGTH = 128
         private const val IV_LENGTH = 12
-        private const val DATABASE_KEY_LENGTH = 32 // 256 bits
+        private const val MASTER_KEY_LENGTH = 32 // 256 bits
 
-        // HKDF context strings for key derivation
-        private const val HKDF_CONTEXT_FILE = "myfolder-file-encryption-v1"
+        // HKDF context string for database key derivation
         private const val HKDF_CONTEXT_DATABASE = "myfolder-database-encryption-v1"
     }
 
-    private val masterKey: MasterKey by lazy {
+    private val argon2 = Argon2Kt()
+
+    private val masterKeyAlias: MasterKey by lazy {
         MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
     }
 
+    // EncryptedSharedPreferences uses Android Keystore to encrypt values
     private val encryptedPrefs by lazy {
         EncryptedSharedPreferences.create(
             context,
             ENCRYPTED_PREFS_NAME,
-            masterKey,
+            masterKeyAlias,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
     }
 
-    // Active file encryption key (in-memory)
-    private var activeFileEncryptionKey: SecretKey? = null
-    // Active database encryption key (in-memory)
-    private var activeDatabaseKey: ByteArray? = null
+    // Active Master Key (held in memory while unlocked)
+    private var activeMasterKey: SecretKey? = null
 
     /**
-     * Sets the active file encryption key (after password verification).
+     * Sets the active master key (after successful authentication/recovery).
      */
-    fun setFileEncryptionKey(key: SecretKey) {
-        activeFileEncryptionKey = key
+    fun setActiveMasterKey(key: SecretKey) {
+        activeMasterKey = key
     }
 
     /**
-     * Sets the active database encryption key (after password verification).
+     * Gets the active master key.
+     * @throws IllegalStateException if the vault is locked.
      */
-    fun setDatabaseKey(key: ByteArray) {
-        activeDatabaseKey = key
+    fun getActiveMasterKey(): SecretKey {
+        return activeMasterKey ?: throw IllegalStateException("Vault is locked. Master key not available.")
     }
 
     /**
-     * Gets or generates the database encryption key.
-     * This key is used by SQLCipher to encrypt the Room database.
+     * Checks if the vault is unlocked (Master Key is in memory).
      */
-    fun getDatabaseKey(): ByteArray {
-        // 1. Use active in-memory key if set
-        activeDatabaseKey?.let { return it }
+    fun isUnlocked(): Boolean {
+        return activeMasterKey != null
+    }
 
-        // 2. Check if key already exists in encrypted preferences
-        try {
-            val existingKey = encryptedPrefs.getString(DATABASE_KEY_PREF, null)
-            if (existingKey != null) {
-                val key = android.util.Base64.decode(existingKey, android.util.Base64.NO_WRAP)
-                activeDatabaseKey = key
-                return key
-            }
-        } catch (e: Exception) {
-            // Keystore broken
-            e.printStackTrace()
-        }
+    /**
+     * Derives the Master Key from Password and Seed Words using Argon2id.
+     * 
+     * @param password User's password
+     * @param seedWords List of 12 BIP39 seed words
+     * @return 32-byte Master Key
+     */
+    fun deriveMasterKey(password: String, seedWords: List<String>): SecretKey {
+        // Salt = SHA-256(SeedWords)
+        // The Seed Words act as the high-entropy global salt.
+        val seedString = seedWords.joinToString(" ")
+        val salt = MessageDigest.getInstance("SHA-256").digest(seedString.toByteArray(Charsets.UTF_8))
 
-        // 3. Generate new random key (Only if not password protected yet? 
-        // Or if we are setting up for first time?)
-        // If we are here, it means no active key and no stored key (or stored key unreadable).
-        // For fresh install, generating random key is fine.
-        // For recovery, this method shouldn't be called until password is verified.
+        // Argon2id Derivation
+        val result = argon2.hash(
+            mode = Argon2Mode.ARGON2_ID,
+            password = password.toCharArray(),
+            salt = salt,
+            tCostInIterations = 3, // Recommended balance for mobile
+            mCostInKibibytes = 64 * 1024 // 64 MB
+        )
+
+        return SecretKeySpec(result.rawHashAsByteArray(), "AES")
+    }
+
+    /**
+     * Wraps (Encrypts) a File Encryption Key (FEK) using the Master Key.
+     *
+     * @param fek The random File Encryption Key
+     * @param masterKey The Master Key
+     * @return Pair of (IV, EncryptedFEK)
+     */
+    fun wrapFEK(fek: SecretKey, masterKey: SecretKey): Pair<ByteArray, ByteArray> {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
         
-        val key = ByteArray(DATABASE_KEY_LENGTH)
-        SecureRandom().nextBytes(key)
+        // Generate random IV for this wrapping
+        val iv = ByteArray(IV_LENGTH)
+        SecureRandom().nextBytes(iv)
+        val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
 
-        // Store it encrypted (might fail if keystore broken)
-        try {
-            val encodedKey = android.util.Base64.encodeToString(key, android.util.Base64.NO_WRAP)
-            encryptedPrefs.edit().putString(DATABASE_KEY_PREF, encodedKey).apply()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        return key
+        cipher.init(Cipher.ENCRYPT_MODE, masterKey, spec)
+        
+        val encryptedBytes = cipher.doFinal(fek.encoded)
+        
+        return Pair(iv, encryptedBytes)
     }
 
     /**
-     * Stores the database encryption key.
+     * Unwraps (Decrypts) a File Encryption Key (FEK).
+     *
+     * @param encryptedFek The encrypted FEK bytes
+     * @param iv The IV used for encryption
+     * @param masterKey The Master Key
+     * @return The original FEK
      */
-    fun storeDatabaseKey(key: ByteArray) {
-        val encodedKey = android.util.Base64.encodeToString(key, android.util.Base64.NO_WRAP)
-        encryptedPrefs.edit().putString(DATABASE_KEY_PREF, encodedKey).apply()
-    }
-
-    /**
-     * Gets the file encryption key to use.
-     * Priorities:
-     * 1. Active in-memory key (from password derivation)
-     * 2. Stored key in EncryptedSharedPreferences (if available)
-     * 3. Legacy Keystore key (fallback)
-     */
-    fun getFileEncryptionKey(): SecretKey {
-        // 1. Use active in-memory key if set (best for recovery)
-        activeFileEncryptionKey?.let { return it }
-
-        // 2. Try to get from EncryptedSharedPreferences
-        try {
-            val encodedKey = encryptedPrefs.getString(FILE_KEY_PREF, null)
-            if (encodedKey != null) {
-                val keyBytes = android.util.Base64.decode(encodedKey, android.util.Base64.NO_WRAP)
-                val key = SecretKeySpec(keyBytes, "AES")
-                activeFileEncryptionKey = key // Cache it
-                return key
-            }
-        } catch (e: Exception) {
-            // Keystore might be broken or key invalidated
-            e.printStackTrace()
-        }
-
-        // 3. Fallback to Legacy Keystore key (if it exists)
-        // This is needed for migration or if we haven't switched yet
-        return getLegacyKeystoreKey()
-    }
-
-    private fun getLegacyKeystoreKey(): SecretKey {
-        val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
-        keyStore.load(null)
-
-        if (keyStore.containsAlias(KEY_ALIAS)) {
-            return keyStore.getKey(KEY_ALIAS, null) as SecretKey
-        }
-
-        // If no key exists at all, we should probably generate one via PasswordManager
-        // But for compatibility, we might need to generate a legacy one?
-        // NO - new keys should only come from PasswordManager.
-        throw IllegalStateException("No encryption key available. Please set up password.")
-    }
-
-    /**
-     * Encrypts data using AES-256-GCM.
-     * Returns: IV (12 bytes) + Encrypted data + Auth tag (16 bytes)
-     */
-    fun encrypt(data: ByteArray): ByteArray {
+    fun unwrapFEK(encryptedFek: ByteArray, iv: ByteArray, masterKey: SecretKey): SecretKey {
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        val key = getFileEncryptionKey()
-        cipher.init(Cipher.ENCRYPT_MODE, key)
-
-        val iv = cipher.iv // 12 bytes for GCM
-        val encryptedData = cipher.doFinal(data)
-
-        // Combine IV + encrypted data
-        return iv + encryptedData
+        val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+        
+        cipher.init(Cipher.DECRYPT_MODE, masterKey, spec)
+        
+        val decryptedBytes = cipher.doFinal(encryptedFek)
+        
+        return SecretKeySpec(decryptedBytes, "AES")
     }
 
     /**
-     * Decrypts data encrypted with encrypt().
-     * Expects: IV (12 bytes) + Encrypted data + Auth tag (16 bytes)
+     * Stores the Master Key and Seed Words in EncryptedSharedPreferences (KeyStore backed).
+     * This allows convenience unlock via Biometrics/PIN without re-entering password.
      */
-    fun decrypt(encryptedData: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        val key = getFileEncryptionKey()
-
-        // Extract IV (first 12 bytes)
-        val iv = encryptedData.copyOfRange(0, IV_LENGTH)
-        val ciphertext = encryptedData.copyOfRange(IV_LENGTH, encryptedData.size)
-
-        val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
-        cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec)
-
-        return cipher.doFinal(ciphertext)
-    }
-
-    /**
-     * Encrypts a string to Base64-encoded encrypted data.
-     */
-    fun encryptString(plaintext: String): String {
-        val encrypted = encrypt(plaintext.toByteArray(Charsets.UTF_8))
-        return android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
-    }
-
-    /**
-     * Decrypts a Base64-encoded encrypted string.
-     */
-    fun decryptString(encryptedBase64: String): String {
-        val encrypted = android.util.Base64.decode(encryptedBase64, android.util.Base64.NO_WRAP)
-        val decrypted = decrypt(encrypted)
-        return String(decrypted, Charsets.UTF_8)
-    }
-
-    /**
-     * Checks if the app has been initialized with encryption keys.
-     */
-    fun isInitialized(): Boolean {
-        return encryptedPrefs.contains(DATABASE_KEY_PREF)
-    }
-
-    /**
-     * Wipes all security keys (for logout/reset).
-     * WARNING: This will make all encrypted data unrecoverable.
-     */
-    fun wipeKeys() {
-        // Clear encrypted preferences
-        encryptedPrefs.edit().clear().apply()
-
-        // Remove key from Android Keystore
-        try {
-            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
-            keyStore.load(null)
-            keyStore.deleteEntry(KEY_ALIAS)
-        } catch (e: Exception) {
-            // Key might not exist
-        }
-    }
-
-    /**
-     * Derives a file encryption key from the master key using HKDF.
-     * This allows password-based recovery of file encryption keys.
-     *
-     * @param masterKey The master key derived from user password via PBKDF2
-     * @return SecretKey for file encryption
-     */
-    fun deriveFileEncryptionKey(masterKey: ByteArray): SecretKey {
-        val derivedKey = hkdf(masterKey, HKDF_CONTEXT_FILE.toByteArray(), 32)
-        return SecretKeySpec(derivedKey, "AES")
-    }
-
-    /**
-     * Derives a database encryption key from the master key using HKDF.
-     *
-     * @param masterKey The master key derived from user password via PBKDF2
-     * @return ByteArray for SQLCipher database encryption
-     */
-    fun deriveDatabaseEncryptionKey(masterKey: ByteArray): ByteArray {
-        return hkdf(masterKey, HKDF_CONTEXT_DATABASE.toByteArray(), 32)
-    }
-
-    /**
-     * Stores the password-derived file encryption key.
-     * Key is stored encrypted in EncryptedSharedPreferences.
-     *
-     * @param fileKey The file encryption key to store
-     */
-    fun storeFileEncryptionKey(fileKey: SecretKey) {
-        val encodedKey = android.util.Base64.encodeToString(fileKey.encoded, android.util.Base64.NO_WRAP)
+    fun storeCredentials(masterKey: SecretKey, seedWords: List<String>) {
+        val masterKeyBase64 = android.util.Base64.encodeToString(masterKey.encoded, android.util.Base64.NO_WRAP)
+        val seedWordsString = seedWords.joinToString(" ")
+        
         encryptedPrefs.edit()
-            .putString(FILE_KEY_PREF, encodedKey)
+            .putString(KEY_STORED_MASTER_KEY, masterKeyBase64)
+            .putString(KEY_STORED_SEED_WORDS, seedWordsString)
             .apply()
     }
 
     /**
-     * Gets the stored file encryption key (Legacy/Helper method).
-     * @return SecretKey for file encryption, or null if not available
+     * Tries to load the Master Key from secure storage (e.g., after Biometric auth).
+     * @return The Master Key if available, null otherwise.
      */
-    fun getStoredFileEncryptionKey(): SecretKey? {
+    fun loadStoredMasterKey(): SecretKey? {
+        val base64 = encryptedPrefs.getString(KEY_STORED_MASTER_KEY, null) ?: return null
         return try {
-            val encodedKey = encryptedPrefs.getString(FILE_KEY_PREF, null) ?: return null
-            val keyBytes = android.util.Base64.decode(encodedKey, android.util.Base64.NO_WRAP)
-            SecretKeySpec(keyBytes, "AES")
+            val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
+            SecretKeySpec(bytes, "AES")
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }
 
     /**
-     * Checks if the file encryption key exists in storage.
-     *
-     * @return true if file key is stored
+     * Loads the stored seed words.
      */
-    fun hasFileEncryptionKey(): Boolean {
-        return try {
-            encryptedPrefs.contains(FILE_KEY_PREF)
-        } catch (e: Exception) {
-            false
-        }
+    fun loadStoredSeedWords(): List<String>? {
+        val seedString = encryptedPrefs.getString(KEY_STORED_SEED_WORDS, null) ?: return null
+        return seedString.split(" ")
     }
 
     /**
-     * HKDF (HMAC-based Key Derivation Function) implementation.
-     * Used to derive multiple keys from a single master key.
-     *
-     * Based on RFC 5869: https://tools.ietf.org/html/rfc5869
-     *
-     * @param ikm Input keying material (master key)
-     * @param info Context and application specific information
-     * @param length Desired output length in bytes
-     * @return Derived key
+     * Checks if credentials are stored (i.e., app is set up).
+     */
+    fun isSetup(): Boolean {
+        return encryptedPrefs.contains(KEY_STORED_MASTER_KEY)
+    }
+
+    /**
+     * Wipes all stored keys from memory and storage.
+     */
+    fun wipeKeys() {
+        activeMasterKey = null
+        encryptedPrefs.edit().clear().apply()
+    }
+
+    /**
+     * Derives a database encryption key from the Master Key.
+     * We use HKDF to derive a sub-key so the Master Key itself isn't used for DB.
+     */
+    fun deriveDatabaseKey(masterKey: SecretKey): ByteArray {
+        // Use HKDF to derive DB key
+        return hkdf(masterKey.encoded, HKDF_CONTEXT_DATABASE.toByteArray(), 32)
+    }
+
+    /**
+     * HKDF implementation for internal key derivation.
      */
     private fun hkdf(ikm: ByteArray, info: ByteArray, length: Int): ByteArray {
-        // HKDF-Extract: PRK = HMAC-Hash(salt, IKM)
-        // We use a fixed salt (all zeros) since our IKM is already high-entropy (from PBKDF2)
-        val salt = ByteArray(32) // 32 bytes of zeros
+        val salt = ByteArray(32) // Fixed zero salt as IKM is already high entropy
         val prk = hmacSha256(salt, ikm)
 
-        // HKDF-Expand: OKM = HMAC-Hash(PRK, T(0) | info | 0x01)
         val okm = ByteArray(length)
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(prk, "HmacSHA256"))
@@ -347,13 +240,6 @@ class SecurityManager @Inject constructor(
         return okm
     }
 
-    /**
-     * Computes HMAC-SHA256.
-     *
-     * @param key HMAC key
-     * @param data Data to authenticate
-     * @return HMAC output
-     */
     private fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(key, "HmacSHA256"))

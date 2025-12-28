@@ -31,6 +31,7 @@ fun PasswordChangeScreen(
     var newVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     val newPasswordStrength = viewModel.getPasswordStrength(newPassword)
 
@@ -157,12 +158,14 @@ fun PasswordChangeScreen(
                             errorMessage = "Passwords do not match"
                         }
                         else -> {
-                            val result = viewModel.changePassword(currentPassword, newPassword)
-                            if (result) {
-                                Toast.makeText(context, "Password changed successfully", Toast.LENGTH_SHORT).show()
-                                navController.navigateUp()
-                            } else {
-                                errorMessage = "Current password is incorrect"
+                            scope.launch {
+                                val result = viewModel.changePassword(currentPassword, newPassword)
+                                if (result) {
+                                    Toast.makeText(context, "Password changed successfully", Toast.LENGTH_SHORT).show()
+                                    navController.navigateUp()
+                                } else {
+                                    errorMessage = "Current password is incorrect"
+                                }
                             }
                         }
                     }

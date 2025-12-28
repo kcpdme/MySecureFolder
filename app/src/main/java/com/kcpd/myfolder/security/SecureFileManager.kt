@@ -8,17 +8,28 @@ import android.media.ThumbnailUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.RandomAccessFile
+import java.nio.channels.Channels
 import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.CipherOutputStream
+import javax.crypto.SecretKey
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Handles secure file operations including encryption/decryption and secure deletion.
- * All media files are encrypted at rest using AES-256-GCM.
+ * Implements the "Hybrid" security model with Envelope Encryption.
  */
 @Singleton
 class SecureFileManager @Inject constructor(
@@ -28,11 +39,15 @@ class SecureFileManager @Inject constructor(
     companion object {
         private const val ENCRYPTED_FILE_EXTENSION = ".enc"
         private const val BUFFER_SIZE = 8192
-        private const val SECURE_DELETE_PASSES = 3 // DoD 5220.22-M standard
-        private const val THUMBNAIL_SIZE = 200 // Thumbnail size in pixels (like Tella's 1/10 approach)
         private const val THUMBNAIL_QUALITY = 85 // JPEG compression quality
-        private const val KEY_ALIAS = "myfolder_master_key"
     }
+
+    @Serializable
+    data class FileMetadata(
+        val filename: String,
+        val mimeType: String = "application/octet-stream",
+        val timestamp: Long = System.currentTimeMillis()
+    )
 
     /**
      * Gets the secure storage directory for encrypted files.
@@ -42,28 +57,76 @@ class SecureFileManager @Inject constructor(
     }
 
     /**
-     * Encrypts a file and stores it securely using streaming encryption.
+     * Encrypts a file and stores it securely using Envelope Encryption.
      * Returns the path to the encrypted file.
-     *
-     * This method uses streaming I/O to handle files of any size without loading
-     * them entirely into memory. Perfect for large video files (100MB+).
      */
     suspend fun encryptFile(sourceFile: File, destinationDir: File): File = withContext(Dispatchers.IO) {
         require(sourceFile.exists()) { "Source file does not exist: ${sourceFile.path}" }
 
         destinationDir.mkdirs()
-
         val encryptedFile = File(destinationDir, sourceFile.name + ENCRYPTED_FILE_EXTENSION)
 
-        // Use streaming encryption to avoid OutOfMemoryError
-        FileInputStream(sourceFile).use { input ->
-            getStreamingEncryptionOutputStream(encryptedFile).use { output ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
+        // 1. Generate FEK (File Encryption Key)
+        val fek = generateRandomKey(32)
+
+        // 2. Wrap FEK using Master Key
+        val masterKey = securityManager.getActiveMasterKey()
+        val (iv, encFek) = securityManager.wrapFEK(fek, masterKey)
+
+        // 3. Prepare Metadata
+        val metadata = FileMetadata(
+            filename = sourceFile.name,
+            timestamp = System.currentTimeMillis()
+        )
+        val metadataJson = Json.encodeToString(metadata)
+        val metadataBytes = metadataJson.toByteArray(Charsets.UTF_8)
+        
+        // Encrypt Metadata (using MasterKey + its own IV, reusing general encrypt method)
+        // We use the securityManager.encrypt which generates its own IV and tags
+        // But wait, SecurityManager.encrypt uses getFileEncryptionKey/activeMasterKey
+        // We should add a method to SecurityManager to encrypt with a specific key or use public encrypt
+        // Ideally we should keep header structure simple.
+        // Step 2 says: "META Var bytes Encrypted Metadata JSON".
+        // I'll manually encrypt it here using MasterKey to be self-contained in header logic if needed,
+        // or add a helper in SecurityManager.
+        // Let's use a helper in SecurityManager: encryptWithMasterKey(bytes) -> bytes
+        // But SecurityManager.encrypt() already does (IV + Encrypted + Tag).
+        // I need to ensure SecurityManager uses the *activeMasterKey*.
+        // I will update SecurityManager to expose `encrypt(data, key)` or check `encrypt` impl.
+        // The previous `encrypt` used `getFileEncryptionKey`. I removed that method.
+        // I'll add `encryptData(data: ByteArray, key: SecretKey): ByteArray` to SecurityManager later?
+        // Or implement it here locally. 
+        // AES-GCM for Metadata seems appropriate.
+        val encMetadata = encryptDataGcm(metadataBytes, masterKey)
+
+        // 4. Create Header
+        val header = FileHeader(
+            version = FileHeader.VERSION_1,
+            iv = iv,
+            encryptedFek = encFek,
+            metaLen = encMetadata.size,
+            meta = encMetadata
+        )
+
+        // 5. Write Header + Encrypt Body
+        FileOutputStream(encryptedFile).use { output ->
+            // Write Header
+            header.writeHeader(output)
+
+            // Encrypt Body using FEK (AES-CTR for streaming)
+            // Use IV from header (padded to 16 bytes)
+            val bodyIv = iv.copyOf(16) // Pad with zeros
+            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, fek, IvParameterSpec(bodyIv))
+
+            FileInputStream(sourceFile).use { input ->
+                CipherOutputStream(output, cipher).use { cipherOut ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        cipherOut.write(buffer, 0, bytesRead)
+                    }
                 }
-                output.flush()
             }
         }
 
@@ -75,25 +138,34 @@ class SecureFileManager @Inject constructor(
 
     /**
      * Decrypts an encrypted file to a temporary location for viewing.
-     * Caller is responsible for securely deleting the decrypted file after use.
-     * Uses streaming decryption to avoid OutOfMemoryError with large files.
      */
     suspend fun decryptFile(encryptedFile: File): File = withContext(Dispatchers.IO) {
         require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
 
-        // Create temporary file (remove .enc extension)
-        val originalName = encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)
-        val tempFile = File(context.cacheDir, "temp_$originalName")
+        val tempFile = File(context.cacheDir, "temp_${System.currentTimeMillis()}_${encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)}")
 
-        // Use streaming decryption
-        getStreamingDecryptedInputStream(encryptedFile).use { input ->
-            FileOutputStream(tempFile).use { output ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
+        FileInputStream(encryptedFile).use { input ->
+            // 1. Read Header
+            val header = FileHeader.readHeader(input)
+
+            // 2. Unwrap FEK
+            val masterKey = securityManager.getActiveMasterKey()
+            val fek = securityManager.unwrapFEK(header.encryptedFek, header.iv, masterKey)
+
+            // 3. Decrypt Body
+            val bodyIv = header.iv.copyOf(16)
+            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, fek, IvParameterSpec(bodyIv))
+
+            // Input stream is already positioned at body start
+            CipherInputStream(input, cipher).use { cipherIn ->
+                FileOutputStream(tempFile).use { output ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var bytesRead: Int
+                    while (cipherIn.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                    }
                 }
-                output.flush()
             }
         }
 
@@ -101,39 +173,7 @@ class SecureFileManager @Inject constructor(
     }
 
     /**
-     * Gets a decrypted InputStream from an encrypted file.
-     * This is memory-efficient for use with image loaders like Coil.
-     * The stream provides decrypted data on-the-fly without creating temporary files.
-     *
-     * @deprecated Use getStreamingDecryptedInputStream for better performance
-     */
-    @Deprecated("Use getStreamingDecryptedInputStream instead")
-    fun getDecryptedInputStream(encryptedFile: File): java.io.InputStream {
-        require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
-
-        // Read and decrypt the entire file
-        // Note: For very large files, you might want to implement streaming decryption
-        val encryptedData = encryptedFile.readBytes()
-        val plainData = securityManager.decrypt(encryptedData)
-
-        return java.io.ByteArrayInputStream(plainData)
-    }
-
-    /**
-     * Gets a streaming decrypted InputStream from an encrypted file.
-     * This is the most memory-efficient method - decrypts on-the-fly as data is read.
-     *
-     * Uses CipherInputStream for true chunk-by-chunk decryption without loading
-     * the entire file into memory.
-     *
-     * Uses AES/CTR/NoPadding (like Tella) for streaming compatibility.
-     *
-     * This approach:
-     * - Minimizes memory usage (only buffers 8KB chunks)
-     * - Reduces battery consumption (streaming vs batch processing)
-     * - Improves UI responsiveness (progressive loading)
-     * - Never materializes full decrypted file in memory or disk
-     * - Supports files of ANY size without OutOfMemoryError
+     * Gets a streaming decrypted InputStream.
      */
     fun getStreamingDecryptedInputStream(encryptedFile: File): java.io.InputStream {
         require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
@@ -141,421 +181,286 @@ class SecureFileManager @Inject constructor(
         val fileInputStream = FileInputStream(encryptedFile)
 
         try {
-            // Read IV (16 bytes for CTR mode)
-            val iv = ByteArray(16)
-            val bytesRead = fileInputStream.read(iv)
-            if (bytesRead != 16) {
-                fileInputStream.close()
-                throw IllegalStateException("Failed to read IV from encrypted file")
-            }
+            // 1. Read Header
+            val header = FileHeader.readHeader(fileInputStream)
 
-            // Use key from SecurityManager (supports password-derived key)
-            val key = securityManager.getFileEncryptionKey()
+            // 2. Unwrap FEK
+            val masterKey = securityManager.getActiveMasterKey()
+            val fek = securityManager.unwrapFEK(header.encryptedFek, header.iv, masterKey)
 
-            // Initialize cipher for decryption - use CTR mode (like Tella)
-            val cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding")
-            val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
-            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, ivSpec)
+            // 3. Setup Decryption Stream
+            val bodyIv = header.iv.copyOf(16)
+            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, fek, IvParameterSpec(bodyIv))
 
-            // Return CipherInputStream that decrypts chunks on-the-fly
-            return javax.crypto.CipherInputStream(fileInputStream, cipher)
+            return CipherInputStream(fileInputStream, cipher)
         } catch (e: Exception) {
-            // Clean up on error
-            try {
-                fileInputStream.close()
-            } catch (_: Exception) {
-            }
+            try { fileInputStream.close() } catch (_: Exception) {}
             throw e
         }
     }
 
     /**
-     * Gets a streaming OutputStream for encrypting data directly to a file.
-     * Data written to this stream is automatically encrypted and saved.
-     *
-     * This is memory-efficient for large files - encrypts chunks as they're written
-     * rather than buffering the entire file in memory.
-     *
-     * Uses AES/CTR/NoPadding (like Tella) instead of AES/GCM to avoid OutOfMemoryError
-     * during close() with large files. CTR mode is ideal for streaming.
+     * Re-wraps all encrypted files with a new Master Key.
+     * This is used when the password changes.
      */
-    fun getStreamingEncryptionOutputStream(targetFile: File): java.io.OutputStream {
-        targetFile.parentFile?.mkdirs()
-
-        val fileOutputStream = FileOutputStream(targetFile)
-
-        try {
-            // Use key from SecurityManager (supports password-derived key)
-            val key = securityManager.getFileEncryptionKey()
-
-            // Initialize cipher for encryption - use CTR mode for streaming (like Tella)
-            val cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding")
-
-            // Generate random IV (16 bytes for CTR mode)
-            val iv = ByteArray(16)
-            SecureRandom().nextBytes(iv)
-            val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
-
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key, ivSpec)
-
-            // Write IV to file first (16 bytes for CTR)
-            fileOutputStream.write(iv)
-            fileOutputStream.flush()
-
-            // Return CipherOutputStream that encrypts chunks on-the-fly
-            // CTR mode doesn't have the close() memory issue that GCM has
-            return javax.crypto.CipherOutputStream(fileOutputStream, cipher)
-        } catch (e: Exception) {
-            // Clean up on error
-            try {
-                fileOutputStream.close()
-                targetFile.delete()
-            } catch (_: Exception) {
+    suspend fun reWrapAllFiles(oldMasterKey: SecretKey, newMasterKey: SecretKey) = withContext(Dispatchers.IO) {
+        val dir = getSecureStorageDir()
+        dir.listFiles()?.forEach { file ->
+            if (isEncrypted(file)) {
+                try {
+                    reWrapFile(file, oldMasterKey, newMasterKey)
+                } catch (e: Exception) {
+                    android.util.Log.e("SecureFileManager", "Failed to re-wrap file: ${file.name}", e)
+                }
             }
-            throw e
         }
     }
 
+    private fun reWrapFile(file: File, oldKey: SecretKey, newKey: SecretKey) {
+        val raf = RandomAccessFile(file, "rw")
+        val channel = raf.channel
+        
+        try {
+            // 1. Read existing header to get FEK and Body Start Position
+            // We use a separate stream to not mess with channel position logic if buffering happens
+            channel.position(0)
+            val input = Channels.newInputStream(channel)
+            val header = FileHeader.readHeader(input)
+            val headerEndPos = channel.position()
+            
+            // 2. Unwrap FEK with OLD key
+            val fek = securityManager.unwrapFEK(header.encryptedFek, header.iv, oldKey)
+            
+            // 3. Decrypt Metadata with OLD key
+            val metadata = decryptMetadata(header.meta, oldKey) 
+                ?: throw IllegalStateException("Failed to decrypt metadata for ${file.name}")
+            
+            // 4. Wrap FEK with NEW key
+            val (newIv, newEncFek) = securityManager.wrapFEK(fek, newKey)
+            
+            // 5. Encrypt Metadata with NEW key
+            val metadataBytes = Json.encodeToString(metadata).toByteArray(Charsets.UTF_8)
+            val newEncMetadata = encryptDataGcm(metadataBytes, newKey)
+            
+            // 6. Create New Header
+            val newHeader = FileHeader(
+                version = FileHeader.VERSION_1,
+                iv = newIv,
+                encryptedFek = newEncFek,
+                metaLen = newEncMetadata.size,
+                meta = newEncMetadata
+            )
+            
+            // 7. Check size match
+            val oldHeaderSize = headerEndPos
+            val buffer = ByteArrayOutputStream()
+            newHeader.writeHeader(buffer)
+            val newHeaderBytes = buffer.toByteArray()
+            
+            if (newHeaderBytes.size.toLong() == oldHeaderSize) {
+                // Perfect fit, overwrite in place
+                channel.position(0)
+                channel.write(java.nio.ByteBuffer.wrap(newHeaderBytes))
+            } else {
+                // Size mismatch - must rewrite file
+                raf.close()
+                reWrapFileSlow(file, newHeader, headerEndPos)
+                return
+            }
+        } finally {
+            try { raf.close() } catch(_:Exception){}
+        }
+    }
+    
+    private fun reWrapFileSlow(file: File, newHeader: FileHeader, oldBodyStart: Long) {
+        val tempFile = File(file.parentFile, file.name + ".rewrap")
+        FileOutputStream(tempFile).use { out ->
+            newHeader.writeHeader(out)
+            FileInputStream(file).use { input ->
+                input.skip(oldBodyStart)
+                input.copyTo(out)
+            }
+        }
+        secureDelete(file)
+        tempFile.renameTo(file)
+    }
+
     /**
-     * Encrypts data in place, replacing the original file with encrypted version.
-     * Uses streaming encryption to avoid OutOfMemoryError with large files.
+     * Encrypts data in place (replaces original file).
      */
     suspend fun encryptFileInPlace(file: File): File = withContext(Dispatchers.IO) {
-        require(file.exists()) { "File does not exist: ${file.path}" }
-
-        // Create new encrypted file
-        val encryptedFile = File(file.parentFile, file.name + ENCRYPTED_FILE_EXTENSION)
-
-        // Use streaming encryption
-        FileInputStream(file).use { input ->
-            getStreamingEncryptionOutputStream(encryptedFile).use { output ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
-                }
-                output.flush()
-            }
-        }
-
-        // Securely delete original
+        // Implementation similar to encryptFile but with temp destination then rename
+        val tempEncrypted = File(file.parentFile, file.name + ".temp")
+        encryptFileToTarget(file, tempEncrypted)
         secureDelete(file)
-
-        encryptedFile
+        tempEncrypted.renameTo(File(file.parentFile, file.name + ENCRYPTED_FILE_EXTENSION))
+        File(file.parentFile, file.name + ENCRYPTED_FILE_EXTENSION)
     }
 
-    /**
-     * Decrypts data in place, replacing the encrypted file with plaintext version.
-     * Uses streaming decryption to avoid OutOfMemoryError with large files.
-     */
-    suspend fun decryptFileInPlace(encryptedFile: File): File = withContext(Dispatchers.IO) {
-        require(encryptedFile.exists()) { "Encrypted file does not exist: ${encryptedFile.path}" }
+    private suspend fun encryptFileToTarget(source: File, target: File) {
+        val fek = generateRandomKey(32)
+        val masterKey = securityManager.getActiveMasterKey()
+        val (iv, encFek) = securityManager.wrapFEK(fek, masterKey)
 
-        // Create plaintext file
-        val originalName = encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)
-        val plainFile = File(encryptedFile.parentFile, originalName)
+        val metadata = FileMetadata(filename = source.name)
+        val encMetadata = encryptDataGcm(Json.encodeToString(metadata).toByteArray(), masterKey)
 
-        // Use streaming decryption
-        getStreamingDecryptedInputStream(encryptedFile).use { input ->
-            FileOutputStream(plainFile).use { output ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
+        val header = FileHeader(FileHeader.VERSION_1, iv, encFek, encMetadata.size, encMetadata)
+
+        FileOutputStream(target).use { output ->
+            header.writeHeader(output)
+            val bodyIv = iv.copyOf(16)
+            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, fek, IvParameterSpec(bodyIv))
+            
+            FileInputStream(source).use { input ->
+                CipherOutputStream(output, cipher).use { cipherOut ->
+                    input.copyTo(cipherOut)
                 }
-                output.flush()
             }
         }
-
-        // Securely delete encrypted file
-        secureDelete(encryptedFile)
-
-        plainFile
     }
 
     /**
-     * Securely deletes a file by overwriting it multiple times before deletion.
-     * Uses DoD 5220.22-M standard (3-pass overwrite).
-     *
-     * Pass 1: Overwrite with 0x00
-     * Pass 2: Overwrite with 0xFF
-     * Pass 3: Overwrite with random data
+     * Securely deletes a file.
      */
     suspend fun secureDelete(file: File): Boolean = withContext(Dispatchers.IO) {
-        if (!file.exists()) {
-            android.util.Log.w("SecureFileManager", "Cannot delete file that doesn't exist: ${file.absolutePath}")
-            return@withContext false
-        }
-
+        if (!file.exists()) return@withContext false
         try {
-            val fileSize = file.length()
-            android.util.Log.d("SecureFileManager", "Securely deleting file: ${file.name} (${fileSize} bytes)")
-
-            if (fileSize > 0) {
-                // Pass 1: Overwrite with zeros
-                overwriteFile(file, 0x00.toByte(), fileSize)
-
-                // Pass 2: Overwrite with ones
-                overwriteFile(file, 0xFF.toByte(), fileSize)
-
-                // Pass 3: Overwrite with random data
-                overwriteFileRandom(file, fileSize)
+            val length = file.length()
+            if (length > 0) {
+                // Single pass random overwrite is usually sufficient for flash storage/SSD
+                // and avoids excessive wear
+                overwriteFileRandom(file, length)
             }
-
-            // Finally delete the file
-            val deleted = file.delete()
-            if (deleted) {
-                android.util.Log.d("SecureFileManager", "Successfully deleted: ${file.name}")
-            } else {
-                android.util.Log.e("SecureFileManager", "Failed to delete: ${file.name}")
-            }
-            return@withContext deleted
+            file.delete()
         } catch (e: Exception) {
-            android.util.Log.e("SecureFileManager", "Error during secure deletion of ${file.name}", e)
-            // If secure deletion fails, still attempt regular deletion
-            val deleted = file.delete()
-            return@withContext deleted
+            file.delete()
         }
     }
 
-    /**
-     * Overwrites file with a specific byte pattern.
-     */
-    private fun overwriteFile(file: File, pattern: Byte, size: Long) {
-        FileOutputStream(file).use { fos ->
-            val buffer = ByteArray(BUFFER_SIZE) { pattern }
-            var remaining = size
-
-            while (remaining > 0) {
-                val toWrite = minOf(remaining, BUFFER_SIZE.toLong()).toInt()
-                fos.write(buffer, 0, toWrite)
-                remaining -= toWrite
-            }
-            fos.fd.sync() // Force write to disk
-        }
-    }
-
-    /**
-     * Overwrites file with random data.
-     */
     private fun overwriteFileRandom(file: File, size: Long) {
         val random = SecureRandom()
         FileOutputStream(file).use { fos ->
             val buffer = ByteArray(BUFFER_SIZE)
             var remaining = size
-
             while (remaining > 0) {
                 val toWrite = minOf(remaining, BUFFER_SIZE.toLong()).toInt()
                 random.nextBytes(buffer)
                 fos.write(buffer, 0, toWrite)
                 remaining -= toWrite
             }
-            fos.fd.sync() // Force write to disk
+            fos.fd.sync()
         }
     }
-
-    /**
-     * Securely deletes all files in a directory and the directory itself.
-     */
-    suspend fun secureDeleteDirectory(directory: File): Boolean = withContext(Dispatchers.IO) {
-        if (!directory.exists() || !directory.isDirectory) {
-            return@withContext false
-        }
-
-        var success = true
-        directory.listFiles()?.forEach { file ->
-            success = if (file.isDirectory) {
-                secureDeleteDirectory(file) && success
-            } else {
-                secureDelete(file) && success
-            }
-        }
-
-        directory.delete() && success
+    
+    // Helper to generate random AES key
+    private fun generateRandomKey(size: Int): SecretKey {
+        val key = ByteArray(size)
+        SecureRandom().nextBytes(key)
+        return SecretKeySpec(key, "AES")
     }
 
-    /**
-     * Creates a secure thumbnail by decrypting, creating thumbnail, and re-encrypting.
-     */
-    suspend fun createEncryptedThumbnail(
-        encryptedSourceFile: File,
-        thumbnailGenerator: suspend (File) -> File
-    ): File = withContext(Dispatchers.IO) {
-        // Decrypt to temp
-        val tempDecrypted = decryptFile(encryptedSourceFile)
-
+    // Helper for GCM encryption (IV + Data + Tag)
+    private fun encryptDataGcm(data: ByteArray, key: SecretKey): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val iv = ByteArray(12)
+        SecureRandom().nextBytes(iv)
+        cipher.init(Cipher.ENCRYPT_MODE, key, javax.crypto.spec.GCMParameterSpec(128, iv))
+        val ciphertext = cipher.doFinal(data)
+        return iv + ciphertext
+    }
+    
+    // Decrypts metadata
+    fun decryptMetadata(encryptedMetadata: ByteArray, key: SecretKey): FileMetadata? {
         try {
-            // Generate thumbnail
-            val thumbnail = thumbnailGenerator(tempDecrypted)
-
-            // Encrypt thumbnail
-            val encryptedThumbnail = encryptFileInPlace(thumbnail)
-
-            encryptedThumbnail
-        } finally {
-            // Always clean up temp file
-            secureDelete(tempDecrypted)
+            val iv = encryptedMetadata.copyOfRange(0, 12)
+            val ciphertext = encryptedMetadata.copyOfRange(12, encryptedMetadata.size)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, key, javax.crypto.spec.GCMParameterSpec(128, iv))
+            val plaintext = cipher.doFinal(ciphertext)
+            return Json.decodeFromString(String(plaintext, Charsets.UTF_8))
+        } catch (e: Exception) {
+            return null
         }
     }
 
     /**
-     * Checks if a file is encrypted (has .enc extension).
+     * Checks if a file is encrypted.
      */
     fun isEncrypted(file: File): Boolean {
         return file.name.endsWith(ENCRYPTED_FILE_EXTENSION)
     }
 
     /**
-     * Gets the original filename from an encrypted file.
+     * Gets original filename (from filename or metadata if implemented).
+     * For now, simplistic check.
      */
     fun getOriginalFileName(encryptedFile: File): String {
         return encryptedFile.name.removeSuffix(ENCRYPTED_FILE_EXTENSION)
     }
-
-    /**
-     * Generates a thumbnail byte array from an encrypted image file.
-     * The thumbnail is NOT encrypted - it's stored as a plain JPEG in the database.
-     * This allows fast grid loading without decrypting full images.
-     * Uses streaming decryption to avoid OutOfMemoryError with large images.
-     *
-     * Note: No EXIF rotation needed here since photos are already rotated before encryption.
-     *
-     * @param encryptedFile The encrypted image file
-     * @return Thumbnail as JPEG byte array, or null if generation fails
-     */
+    
+    // Thumbnail generation methods...
     suspend fun generateImageThumbnail(encryptedFile: File): ByteArray? = withContext(Dispatchers.IO) {
         try {
-            // Get streaming decrypted input
-            val decryptedStream = getStreamingDecryptedInputStream(encryptedFile)
+            val stream = getStreamingDecryptedInputStream(encryptedFile)
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeStream(stream, null, options)
+            stream.close()
 
-            // Decode to bitmap with efficient sampling
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-
-            // First pass: get dimensions
-            decryptedStream.use { stream ->
-                BitmapFactory.decodeStream(stream, null, options)
-            }
-
-            // Get fresh stream for actual decoding
-            val decryptedStream2 = getStreamingDecryptedInputStream(encryptedFile)
-
-            // Tella's adaptive sizing: 1/10 of original dimensions for photos
-            val targetWidth = options.outWidth / 10
-            val targetHeight = options.outHeight / 10
-
-            // Calculate sample size for efficient memory usage
-            options.inSampleSize = calculateInSampleSize(options, targetWidth, targetHeight)
+            val stream2 = getStreamingDecryptedInputStream(encryptedFile)
             options.inJustDecodeBounds = false
+            options.inSampleSize = calculateInSampleSize(options, 200, 200)
+            val bitmap = BitmapFactory.decodeStream(stream2, null, options)
+            stream2.close()
 
-            // Decode the sampled bitmap from stream
-            val bitmap = decryptedStream2.use { stream ->
-                BitmapFactory.decodeStream(stream, null, options)
-            } ?: return@withContext null
+            if (bitmap == null) return@withContext null
 
-            // Extract thumbnail at 1/10 size (adaptive to original image)
-            val thumbnail = ThumbnailUtils.extractThumbnail(
-                bitmap,
-                targetWidth,
-                targetHeight,
-                ThumbnailUtils.OPTIONS_RECYCLE_INPUT
-            )
-
-            // Compress to JPEG byte array
-            val outputStream = ByteArrayOutputStream()
-            thumbnail.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, outputStream)
-            val thumbnailBytes = outputStream.toByteArray()
-
-            // Clean up
-            if (thumbnail != bitmap) {
-                thumbnail.recycle()
-            }
-
-            thumbnailBytes
+            val thumb = ThumbnailUtils.extractThumbnail(bitmap, bitmap.width/4, bitmap.height/4)
+            val out = ByteArrayOutputStream()
+            thumb.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, out)
+            if (thumb != bitmap) thumb.recycle()
+            bitmap.recycle()
+            out.toByteArray()
         } catch (e: Exception) {
-            android.util.Log.e("SecureFileManager", "Failed to generate thumbnail", e)
+            e.printStackTrace()
             null
         }
     }
-
-    /**
-     * Generates a thumbnail byte array from an encrypted video file.
-     * Extracts a frame from the video and creates a thumbnail.
-     *
-     * @param encryptedFile The encrypted video file
-     * @return Thumbnail as JPEG byte array, or null if generation fails
-     */
+    
     suspend fun generateVideoThumbnail(encryptedFile: File): ByteArray? = withContext(Dispatchers.IO) {
         var tempFile: File? = null
         try {
-            // Decrypt video to temp file (MediaMetadataRetriever needs a file path)
             tempFile = decryptFile(encryptedFile)
-
-            // Extract frame from video
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(tempFile.absolutePath)
-
-            // Get frame at 1 second (or first frame if shorter)
-            val bitmap = retriever.getFrameAtTime(1_000_000) // 1 second in microseconds
-                ?: retriever.frameAtTime // Fallback to first frame
-                ?: return@withContext null
-
+            val bitmap = retriever.getFrameAtTime(1_000_000) ?: return@withContext null
             retriever.release()
-
-            // Tella's adaptive sizing: 1/4 of original dimensions for videos
-            val targetWidth = bitmap.width / 4
-            val targetHeight = bitmap.height / 4
-
-            // Create thumbnail at 1/4 size
-            val thumbnail = ThumbnailUtils.extractThumbnail(
-                bitmap,
-                targetWidth,
-                targetHeight,
-                ThumbnailUtils.OPTIONS_RECYCLE_INPUT
-            )
-
-            // Compress to JPEG byte array
-            val outputStream = ByteArrayOutputStream()
-            thumbnail.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, outputStream)
-            val thumbnailBytes = outputStream.toByteArray()
-
-            // Clean up
-            if (thumbnail != bitmap) {
-                thumbnail.recycle()
-            }
-
-            thumbnailBytes
+            
+            val thumb = ThumbnailUtils.extractThumbnail(bitmap, bitmap.width/4, bitmap.height/4)
+            val out = ByteArrayOutputStream()
+            thumb.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, out)
+            if (thumb != bitmap) thumb.recycle()
+            bitmap.recycle()
+            out.toByteArray()
         } catch (e: Exception) {
-            android.util.Log.e("SecureFileManager", "Failed to generate video thumbnail", e)
             null
         } finally {
-            // Securely delete temp file
             tempFile?.let { secureDelete(it) }
         }
     }
 
-    /**
-     * Calculates sample size for efficient bitmap decoding.
-     * Based on Android's official sample code.
-     */
-    private fun calculateInSampleSize(
-        options: BitmapFactory.Options,
-        reqWidth: Int,
-        reqHeight: Int
-    ): Int {
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
         val (height: Int, width: Int) = options.run { outHeight to outWidth }
         var inSampleSize = 1
-
         if (height > reqHeight || width > reqWidth) {
             val halfHeight: Int = height / 2
             val halfWidth: Int = width / 2
-
             while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
                 inSampleSize *= 2
             }
         }
-
         return inSampleSize
     }
 }

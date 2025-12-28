@@ -30,6 +30,7 @@ fun PasswordSetupScreen(
     var confirmVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showRestoreDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val passwordStrength = viewModel.getPasswordStrength(password)
 
@@ -165,10 +166,13 @@ fun PasswordSetupScreen(
                             errorMessage = "Password is too short"
                         }
                         else -> {
-                            if (viewModel.setupPassword(password)) {
-                                onPasswordSet()
-                            } else {
-                                errorMessage = "Failed to setup password. Please try again."
+                            val scope = androidx.compose.runtime.rememberCoroutineScope()
+                            scope.launch {
+                                if (viewModel.setupPassword(password)) {
+                                    onPasswordSet()
+                                } else {
+                                    errorMessage = "Failed to setup password. Please try again."
+                                }
                             }
                         }
                     }
@@ -214,17 +218,17 @@ fun RestoreBackupDialog(
     onDismiss: () -> Unit,
     onRestore: (String, String) -> Unit
 ) {
-    var backupCode by remember { mutableStateOf("") }
+    var seedWordsInput by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isRestoring by remember { mutableStateOf(false) }
 
-    // Validate backup code format (should be base64)
-    val isValidBackupCodeFormat = backupCode.isBlank() || backupCode.matches(Regex("^[A-Za-z0-9+/=]+$"))
-    val backupCodeError = when {
-        backupCode.isNotBlank() && !isValidBackupCodeFormat -> "Invalid recovery code format"
-        backupCode.isNotBlank() && backupCode.length < 20 -> "Recovery code seems too short"
+    // Validate seed words (roughly 12 words)
+    val words = seedWordsInput.trim().split("\\s+".toRegex())
+    val isValidSeedWords = seedWordsInput.isBlank() || words.size == 12
+    val seedWordsError = when {
+        seedWordsInput.isNotBlank() && !isValidSeedWords -> "Must be exactly 12 words"
         else -> null
     }
 
@@ -233,9 +237,9 @@ fun RestoreBackupDialog(
         else -> null
     }
 
-    val canRestore = backupCode.isNotBlank() &&
+    val canRestore = seedWordsInput.isNotBlank() &&
                      password.length >= 8 &&
-                     isValidBackupCodeFormat &&
+                     isValidSeedWords &&
                      !isRestoring
 
     AlertDialog(
@@ -244,7 +248,7 @@ fun RestoreBackupDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
-                    "Enter your recovery code and password to restore access.",
+                    "Enter your 12 seed words (space separated) and password to restore access.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
@@ -265,18 +269,19 @@ fun RestoreBackupDialog(
                 }
 
                 OutlinedTextField(
-                    value = backupCode,
+                    value = seedWordsInput,
                     onValueChange = {
-                        backupCode = it
+                        seedWordsInput = it
                         errorMessage = null
                     },
-                    label = { Text("Recovery Code") },
+                    label = { Text("Recovery Seed Words") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = false,
-                    maxLines = 3,
-                    isError = backupCodeError != null,
-                    supportingText = backupCodeError?.let { { Text(it) } },
-                    enabled = !isRestoring
+                    maxLines = 4,
+                    isError = seedWordsError != null,
+                    supportingText = seedWordsError?.let { { Text(it) } },
+                    enabled = !isRestoring,
+                    placeholder = { Text("word1 word2 ... word12") }
                 )
 
                 OutlinedTextField(
@@ -309,14 +314,11 @@ fun RestoreBackupDialog(
                     isRestoring = true
                     errorMessage = null
                     // Validate and provide specific error feedback
-                    if (backupCode.length < 20) {
-                        errorMessage = "Recovery code is too short. Please enter the full code from settings."
-                        isRestoring = false
-                    } else if (!isValidBackupCodeFormat) {
-                        errorMessage = "Invalid recovery code format. Code should contain only letters, numbers, and +/= characters."
+                    if (!isValidSeedWords) {
+                        errorMessage = "Please enter exactly 12 words separated by spaces."
                         isRestoring = false
                     } else {
-                        onRestore(backupCode, password)
+                        onRestore(seedWordsInput, password)
                         isRestoring = false
                     }
                 },

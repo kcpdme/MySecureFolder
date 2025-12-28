@@ -127,8 +127,8 @@ class SettingsViewModel @Inject constructor(
         return VaultManager.LockTimeoutPreset.fromMilliseconds(_lockTimeout.value)
     }
 
-    fun getBackupCode(): String? {
-        return passwordManager.getBackupCode()
+    fun getSeedWords(): List<String>? {
+        return passwordManager.getSeedWords()
     }
 
     fun setBiometricEnabled(enabled: Boolean) {
@@ -317,8 +317,8 @@ fun SettingsScreen(
 
             SettingsItem(
                 icon = Icons.Default.Key,
-                title = "Recovery Code",
-                description = "View backup code for device migration",
+                title = "Recovery Seed Words",
+                description = "View your 12-word recovery phrase",
                 onClick = {
                     showBackupDialog = true
                 }
@@ -521,21 +521,22 @@ fun SettingsScreen(
         )
     }
 
-    // Backup Code Dialog
+    // Seed Words Dialog
     if (showBackupDialog) {
-        val backupCode = viewModel.getBackupCode()
+        val seedWords = viewModel.getSeedWords()
         AlertDialog(
             onDismissRequest = { showBackupDialog = false },
-            title = { Text("Recovery Code") },
+            title = { Text("Recovery Seed Words") },
             text = {
                 Column {
                     Text(
-                        text = "Save this code securely. You will need it to recover your data if you lose your device or reinstall the app.",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "These 12 words are the ONLY way to recover your data if you lose your password or device. Write them down and keep them safe.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    if (backupCode != null) {
+                    if (seedWords != null && seedWords.isNotEmpty()) {
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -543,14 +544,27 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = MaterialTheme.shapes.small
                         ) {
-                            Text(
-                                text = backupCode,
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                seedWords.chunked(3).forEachIndexed { rowIndex, row ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        row.forEachIndexed { colIndex, word ->
+                                            val index = rowIndex * 3 + colIndex + 1
+                                            Text(
+                                                text = "$index. $word",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.width(100.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                }
+                            }
                         }
                     } else {
-                        Text("Error: Could not generate backup code. Is password set?")
+                        Text("Error: Could not retrieve seed words. Is the vault unlocked?")
                     }
                 }
             },
@@ -560,10 +574,10 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                if (backupCode != null) {
+                if (seedWords != null) {
                     TextButton(onClick = {
                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Recovery Code", backupCode)
+                        val clip = android.content.ClipData.newPlainText("Seed Words", seedWords.joinToString(" "))
                         clipboard.setPrimaryClip(clip)
                     }) {
                         Text("Copy to Clipboard")

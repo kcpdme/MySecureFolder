@@ -29,6 +29,8 @@ import javax.inject.Singleton
 @Singleton
 class VaultManager @Inject constructor(
     private val passwordManager: PasswordManager,
+    private val securityManager: SecurityManager,
+    private val secureFileManager: SecureFileManager,
     application: Application
 ) : DefaultLifecycleObserver {
 
@@ -90,7 +92,6 @@ class VaultManager @Inject constructor(
     /**
      * Unlocks the vault after biometric verification.
      * This should only be called after successful biometric authentication.
-     * The actual password verification was already done during initial setup.
      */
     fun unlockWithBiometric() {
         if (!isBiometricEnabled()) {
@@ -98,10 +99,45 @@ class VaultManager @Inject constructor(
             return
         }
 
-        _vaultState.value = VaultState.Unlocked(
-            unlockedAt = System.currentTimeMillis(),
-            autoLockEnabled = lockTimeoutMs != NEVER_LOCK
-        )
+        if (passwordManager.unlockWithBiometrics()) {
+            _vaultState.value = VaultState.Unlocked(
+                unlockedAt = System.currentTimeMillis(),
+                autoLockEnabled = lockTimeoutMs != NEVER_LOCK
+            )
+        } else {
+            android.util.Log.e("VaultManager", "Biometric unlock failed to load keys")
+        }
+    }
+
+    /**
+     * Changes the master password.
+     * Re-encrypts file headers with new key.
+     */
+    suspend fun changePassword(oldPass: String, newPass: String): Boolean {
+        // 1. Verify old password and ensure Old Master Key is loaded
+        if (!passwordManager.verifyPassword(oldPass)) return false
+        
+        try {
+            val oldMasterKey = securityManager.getActiveMasterKey()
+            
+            // 2. Get Seed Words
+            val seedWords = securityManager.loadStoredSeedWords() ?: return false
+            
+            // 3. Derive New Master Key
+            val newMasterKey = securityManager.deriveMasterKey(newPass, seedWords)
+            
+            // 4. Re-wrap all files
+            secureFileManager.reWrapAllFiles(oldMasterKey, newMasterKey)
+            
+            // 5. Update Credentials
+            securityManager.storeCredentials(newMasterKey, seedWords)
+            securityManager.setActiveMasterKey(newMasterKey)
+            
+            return true
+        } catch (e: Exception) {
+            android.util.Log.e("VaultManager", "Failed to change password", e)
+            return false
+        }
     }
 
     /**

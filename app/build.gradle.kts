@@ -153,6 +153,12 @@ dependencies {
     // AndroidX Security for encrypted preferences (Latest stable)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // Argon2id for password hashing
+    implementation("com.lambdapioneer.argon2kt:argon2kt:1.3.0")
+
+    // BIP39 for seed words
+    implementation("cash.z.ecc.android:kotlin-bip39:1.0.4")
+
     // Biometric authentication (Latest)
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
 
