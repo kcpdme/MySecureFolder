@@ -67,12 +67,20 @@ class S3Repository @Inject constructor(
 
     override suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
         try {
+            Log.d("S3Repository", "═══════════════════════════════════════")
+            Log.d("S3Repository", "Starting S3/MinIO upload")
+            Log.d("S3Repository", "  Original filename: ${mediaFile.fileName}")
+            Log.d("S3Repository", "  Local file path: ${mediaFile.filePath}")
+
             // Step 1: Use encrypted file directly
             val fileToUpload = File(mediaFile.filePath)
             if (!fileToUpload.exists()) {
                 throw java.io.FileNotFoundException("Encrypted file not found: ${mediaFile.filePath}")
             }
-            Log.d("S3Repository", "Uploading encrypted file: ${mediaFile.fileName}, size: ${fileToUpload.length()} bytes")
+
+            Log.d("S3Repository", "  Encrypted filename: ${fileToUpload.name}")
+            Log.d("S3Repository", "  File size: ${fileToUpload.length()} bytes")
+            Log.d("S3Repository", "  MediaType: ${mediaFile.mediaType}")
 
             var lastException: Exception? = null
             val maxRetries = 3
@@ -121,7 +129,12 @@ class S3Repository @Inject constructor(
                     }
 
                     // Step 2: Upload the encrypted file to S3 with uniform path structure
+                    // Use category.path (lowercase) for consistency with local storage directory structure
                     val category = FolderCategory.fromMediaType(mediaFile.mediaType)
+
+                    Log.d("S3Repository", "  Category name: ${category.name}")
+                    Log.d("S3Repository", "  Category path: ${category.path} (used for object key)")
+                    Log.d("S3Repository", "  Category displayName: ${category.displayName} (NOT used)")
 
                     // SECURITY: Use encrypted filename (UUID) to prevent metadata leakage on S3
                     // The original filename is already encrypted INSIDE the file's metadata
@@ -133,13 +146,20 @@ class S3Repository @Inject constructor(
 
                     // Build folder path if file is in a folder
                     val folderPath = buildFolderPath(mediaFile.folderId)
-                    val objectName = if (folderPath.isNotEmpty()) {
-                        "MyFolderPrivate/${category.displayName}/$folderPath/$encryptedFileName"
+                    if (folderPath.isNotEmpty()) {
+                        Log.d("S3Repository", "  User folder ID: ${mediaFile.folderId}")
+                        Log.d("S3Repository", "  User folder path: $folderPath")
                     } else {
-                        "MyFolderPrivate/${category.displayName}/$encryptedFileName"
+                        Log.d("S3Repository", "  No user subfolder (root level file)")
                     }
 
-                    Log.d("S3Repository", "Uploading to S3 path: $objectName")
+                    val objectName = if (folderPath.isNotEmpty()) {
+                        "MyFolderPrivate/${category.path}/$folderPath/$encryptedFileName"
+                    } else {
+                        "MyFolderPrivate/${category.path}/$encryptedFileName"
+                    }
+
+                    Log.d("S3Repository", "  Final S3 object key: $objectName")
 
                     minioClient.putObject(
                         PutObjectArgs.builder()
@@ -151,7 +171,8 @@ class S3Repository @Inject constructor(
                     )
 
                     val url = "${config.endpoint}/${config.bucketName}/$objectName"
-                    Log.d("S3Repository", "File uploaded successfully on attempt $attempt: $url")
+                    Log.d("S3Repository", "  Upload successful! URL: $url")
+                    Log.d("S3Repository", "═══════════════════════════════════════")
 
                     return@withContext Result.success(url)
 

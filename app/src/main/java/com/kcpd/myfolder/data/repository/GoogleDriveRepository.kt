@@ -31,6 +31,10 @@ class GoogleDriveRepository @Inject constructor(
     private var signedInAccount: GoogleSignInAccount? = null
     private val folderIdCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+    // CRITICAL: Synchronization lock to prevent race condition when creating folders
+    // Without this, parallel uploads can create duplicate folders with the same name
+    private val folderCreationLock = Any()
+
     init {
         // Check if already signed in
         signedInAccount = GoogleSignIn.getLastSignedInAccount(context)
@@ -72,25 +76,45 @@ class GoogleDriveRepository @Inject constructor(
         }
 
         try {
+            Log.d("GoogleDriveRepository", "═══════════════════════════════════════")
+            Log.d("GoogleDriveRepository", "Starting Google Drive upload")
+            Log.d("GoogleDriveRepository", "  Original filename: ${mediaFile.fileName}")
+            Log.d("GoogleDriveRepository", "  Local file path: ${mediaFile.filePath}")
+
             // Use encrypted file directly
             val fileToUpload = File(mediaFile.filePath)
             if (!fileToUpload.exists()) {
                 throw java.io.FileNotFoundException("Encrypted file not found: ${mediaFile.filePath}")
             }
 
-            // Create folder structure: MyFolderPrivate/Category/[FolderPath]
+            Log.d("GoogleDriveRepository", "  Encrypted filename: ${fileToUpload.name}")
+            Log.d("GoogleDriveRepository", "  File size: ${fileToUpload.length()} bytes")
+            Log.d("GoogleDriveRepository", "  MediaType: ${mediaFile.mediaType}")
+
+            // Create folder structure: MyFolderPrivate/category/[FolderPath]
+            // Use category.path (lowercase) for consistency with local storage directory structure
             val rootFolderId = getOrCreateFolder("MyFolderPrivate")
             val category = FolderCategory.fromMediaType(mediaFile.mediaType)
-            var parentFolderId = getOrCreateFolder(category.displayName, rootFolderId)
+
+            Log.d("GoogleDriveRepository", "  Category name: ${category.name}")
+            Log.d("GoogleDriveRepository", "  Category path: ${category.path} (used for folder)")
+            Log.d("GoogleDriveRepository", "  Category displayName: ${category.displayName} (NOT used)")
+
+            var parentFolderId = getOrCreateFolder(category.path, rootFolderId)
 
             // Build user folder path if file is in a folder
             val userFolderPath = buildFolderPathList(mediaFile.folderId)
             if (userFolderPath.isNotEmpty()) {
+                Log.d("GoogleDriveRepository", "  User folder ID: ${mediaFile.folderId}")
+                Log.d("GoogleDriveRepository", "  User folder path: ${userFolderPath.joinToString("/")}")
+
                 // Create nested folders in Google Drive
                 for (folderName in userFolderPath) {
                     parentFolderId = getOrCreateFolder(folderName, parentFolderId)
                 }
-                Log.d("GoogleDriveRepository", "Created folder hierarchy: ${userFolderPath.joinToString("/")}")
+                Log.d("GoogleDriveRepository", "  Created folder hierarchy: ${userFolderPath.joinToString("/")}")
+            } else {
+                Log.d("GoogleDriveRepository", "  No user subfolder (root level file)")
             }
 
             // SECURITY: Use encrypted filename (UUID) to prevent metadata leakage on Google Drive
@@ -105,13 +129,27 @@ class GoogleDriveRepository @Inject constructor(
             fileMetadata.name = encryptedFileName  // Use encrypted filename, not original
             fileMetadata.parents = listOf(parentFolderId)
 
+            // Build full Google Drive path for logging
+            val fullPath = buildString {
+                append("MyFolderPrivate/")
+                append(category.path)
+                append("/")
+                if (userFolderPath.isNotEmpty()) {
+                    append(userFolderPath.joinToString("/"))
+                    append("/")
+                }
+                append(encryptedFileName)
+            }
+            Log.d("GoogleDriveRepository", "  Final Google Drive path: $fullPath")
+
             val mediaContent = FileContent("application/octet-stream", fileToUpload)
-            
+
             val uploadedFile = driveService!!.files().create(fileMetadata, mediaContent)
                 .setFields("id, webContentLink, webViewLink")
                 .execute()
-                
-            Log.d("GoogleDriveRepository", "File uploaded: ${uploadedFile.id}")
+
+            Log.d("GoogleDriveRepository", "  Upload successful! File ID: ${uploadedFile.id}")
+            Log.d("GoogleDriveRepository", "═══════════════════════════════════════")
             
             // Return the ID or a link. The S3 implementation returns a URL.
             // For Drive, we might return "drive://<id>" or the webViewLink.
@@ -149,45 +187,54 @@ class GoogleDriveRepository @Inject constructor(
         return folderNames
     }
 
-    private fun getFolderId(name: String, parentId: String? = null): String {
-        val key = "${parentId ?: "root"}/$name"
-        folderIdCache[key]?.let { return it }
-
-        val id = getOrCreateFolder(name, parentId)
-        folderIdCache[key] = id
-        return id
-    }
-
     private fun getOrCreateFolder(folderName: String, parentId: String? = null): String {
-        // Search for folder
-        val queryBuilder = StringBuilder("mimeType = 'application/vnd.google-apps.folder' and name = '$folderName' and trashed = false")
-        if (parentId != null) {
-            queryBuilder.append(" and '$parentId' in parents")
+        // CRITICAL: Check cache first before taking the lock
+        // This avoids lock contention for folders that are already created
+        val cacheKey = "${parentId ?: "root"}/$folderName"
+        folderIdCache[cacheKey]?.let { return it }
+
+        // CRITICAL: Synchronize folder creation to prevent race condition
+        // Without this, parallel uploads can both search, find nothing, and both create the same folder
+        return synchronized(folderCreationLock) {
+            // Double-check cache inside lock (another thread may have created it while we waited)
+            folderIdCache[cacheKey]?.let { return it }
+
+            // Search for folder
+            val queryBuilder = StringBuilder("mimeType = 'application/vnd.google-apps.folder' and name = '$folderName' and trashed = false")
+            if (parentId != null) {
+                queryBuilder.append(" and '$parentId' in parents")
+            }
+
+            val fileList = driveService!!.files().list()
+                .setQ(queryBuilder.toString())
+                .setSpaces("drive")
+                .setFields("files(id, name)")
+                .execute()
+
+            if (fileList.files.isNotEmpty()) {
+                val folderId = fileList.files[0].id
+                folderIdCache[cacheKey] = folderId
+                Log.d("GoogleDriveRepository", "  Found existing folder '$folderName': $folderId")
+                return folderId
+            }
+
+            // Create folder
+            val folderMetadata = com.google.api.services.drive.model.File()
+            folderMetadata.name = folderName
+            folderMetadata.mimeType = "application/vnd.google-apps.folder"
+            if (parentId != null) {
+                folderMetadata.parents = listOf(parentId)
+            }
+
+            val folder = driveService!!.files().create(folderMetadata)
+                .setFields("id")
+                .execute()
+
+            folderIdCache[cacheKey] = folder.id
+            Log.d("GoogleDriveRepository", "  Created new folder '$folderName': ${folder.id}")
+
+            folder.id
         }
-        
-        val fileList = driveService!!.files().list()
-            .setQ(queryBuilder.toString())
-            .setSpaces("drive")
-            .setFields("files(id, name)")
-            .execute()
-            
-        if (fileList.files.isNotEmpty()) {
-            return fileList.files[0].id
-        }
-        
-        // Create folder
-        val folderMetadata = com.google.api.services.drive.model.File()
-        folderMetadata.name = folderName
-        folderMetadata.mimeType = "application/vnd.google-apps.folder"
-        if (parentId != null) {
-            folderMetadata.parents = listOf(parentId)
-        }
-        
-        val folder = driveService!!.files().create(folderMetadata)
-            .setFields("id")
-            .execute()
-            
-        return folder.id
     }
 
     private fun getContentType(fileName: String): String {

@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import com.kcpd.myfolder.data.database.dao.MediaFileDao
 import com.kcpd.myfolder.data.database.entity.MediaFileEntity
+import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.model.MediaType
 import com.kcpd.myfolder.security.SecureFileManager
@@ -59,11 +60,11 @@ class ImportMediaUseCase @Inject constructor(
             android.util.Log.d("ImportMediaUseCase", "Step 1: Getting file info...")
             val fileName = getFileName(contentResolver, sourceUri)
             val mimeType = contentResolver.getType(sourceUri)
-            val mediaType = getMediaTypeFromMime(mimeType, fileName, sourceUri)
+            var mediaType = getMediaTypeFromMime(mimeType, fileName, sourceUri)
             android.util.Log.d("ImportMediaUseCase", "  ✓ File name: $fileName")
             android.util.Log.d("ImportMediaUseCase", "  ✓ MIME type: $mimeType")
             android.util.Log.d("ImportMediaUseCase", "  ✓ URI: $sourceUri")
-            android.util.Log.d("ImportMediaUseCase", "  ✓ Media type: $mediaType")
+            android.util.Log.d("ImportMediaUseCase", "  ✓ Initial media type: $mediaType")
 
             // Open input stream
             android.util.Log.d("ImportMediaUseCase", "Step 2: Opening input stream...")
@@ -102,12 +103,29 @@ class ImportMediaUseCase @Inject constructor(
                 val existingMetadata = secureFileManager.validateAndGetMetadata(tempFile)
                 val encryptedFile: File
 
-                val secureDir = File(secureFileManager.getSecureStorageDir(), mediaType.name.lowercase())
-                secureDir.mkdirs()
-
                 if (existingMetadata != null) {
                     android.util.Log.d("ImportMediaUseCase", "  ✓ File is already encrypted! Skipping encryption.")
                     android.util.Log.d("ImportMediaUseCase", "  Metadata: $existingMetadata")
+
+                    // CRITICAL FIX: Use MIME type from encrypted metadata to determine correct MediaType
+                    // The import source may have generic MIME type (application/octet-stream)
+                    // but the encrypted metadata has the REAL MIME type
+                    val metadataMimeType = existingMetadata.mimeType
+                    if (metadataMimeType != null) {
+                        val detectedType = getMediaTypeFromMime(metadataMimeType, existingMetadata.filename, sourceUri)
+                        if (detectedType != mediaType) {
+                            android.util.Log.d("ImportMediaUseCase", "  Correcting media type from $mediaType to $detectedType (from metadata)")
+                            mediaType = detectedType
+                        }
+                    }
+
+                    // CRITICAL FIX: Use category.path for directory naming to match MediaRepository
+                    // This ensures consistency: photos/ videos/ recordings/ notes/ pdfs/ (all plural, lowercase)
+                    // NOT photo/ video/ audio/ note/ pdf/ (MediaType.name.lowercase())
+                    val category = FolderCategory.fromMediaType(mediaType)
+                    val secureDir = File(secureFileManager.getSecureStorageDir(), category.path)
+                    secureDir.mkdirs()
+                    android.util.Log.d("ImportMediaUseCase", "  Using category path: ${category.path} (not mediaType.name: ${mediaType.name.lowercase()})")
 
                     // SECURITY: Generate NEW random UUID filename for imported encrypted files
                     // This ensures consistent security model (all files use random UUIDs)
@@ -127,8 +145,16 @@ class ImportMediaUseCase @Inject constructor(
                         tempFile.delete()
                     }
                 } else {
-                    // Encrypt the file
+                    // File is NOT encrypted - need to encrypt it
+                    // CRITICAL FIX: Use category.path for directory naming to match MediaRepository
+                    // This ensures consistency: photos/ videos/ recordings/ notes/ pdfs/ (all plural, lowercase)
+                    // NOT photo/ video/ audio/ note/ pdf/ (MediaType.name.lowercase())
+                    val category = FolderCategory.fromMediaType(mediaType)
+                    val secureDir = File(secureFileManager.getSecureStorageDir(), category.path)
+                    secureDir.mkdirs()
+
                     android.util.Log.d("ImportMediaUseCase", "Step 6: Encrypting file...")
+                    android.util.Log.d("ImportMediaUseCase", "  Using category path: ${category.path} (not mediaType.name: ${mediaType.name.lowercase()})")
                     android.util.Log.d("ImportMediaUseCase", "  Secure dir: ${secureDir.absolutePath}")
                     android.util.Log.d("ImportMediaUseCase", "  Starting encryption...")
                     encryptedFile = secureFileManager.encryptFile(
@@ -181,6 +207,7 @@ class ImportMediaUseCase @Inject constructor(
                     fileName
                 }
                 android.util.Log.d("ImportMediaUseCase", "  Original filename for DB: $originalFileName")
+                android.util.Log.d("ImportMediaUseCase", "  Final media type: $mediaType")
 
                 val entity = MediaFileEntity(
                     id = id,
