@@ -37,6 +37,7 @@ fun PasswordChangeScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showProgressSheet by remember { mutableStateOf(false) }
     var showRestartingScreen by remember { mutableStateOf(false) }
+    var passwordChangeSuccess by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val passwordChangeProgress by viewModel.passwordChangeProgress.collectAsState()
@@ -188,21 +189,12 @@ fun PasswordChangeScreen(
                             scope.launch {
                                 val result = viewModel.changePassword(currentPassword, newPassword)
                                 if (result) {
-                                    // Show restarting screen and restart app
-                                    showProgressSheet = false
-                                    showRestartingScreen = true
-                                    delay(1500) // Show message for 1.5 seconds
-                                    
-                                    // Restart the app
-                                    val activity = context as? Activity
-                                    activity?.let {
-                                        val intent = it.packageManager.getLaunchIntentForPackage(it.packageName)
-                                        intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                        it.startActivity(intent)
-                                        it.finishAffinity()
-                                        Runtime.getRuntime().exit(0)
-                                    }
+                                    // Mark success - user will click Done to trigger restart
+                                    passwordChangeSuccess = true
                                 } else {
+                                    // Clear progress and show error
+                                    viewModel.clearProgress()
+                                    showProgressSheet = false
                                     errorMessage = "Current password is incorrect"
                                 }
                             }
@@ -281,11 +273,26 @@ fun PasswordChangeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     
-                    if (passwordChangeProgress!!.currentStep == passwordChangeProgress!!.totalSteps) {
+                    if (passwordChangeProgress!!.currentStep == passwordChangeProgress!!.totalSteps && passwordChangeSuccess) {
                         Button(
                             onClick = {
                                 viewModel.clearProgress()
                                 showProgressSheet = false
+                                showRestartingScreen = true
+                                
+                                // Restart the app after a short delay
+                                scope.launch {
+                                    delay(1500) // Show message for 1.5 seconds
+                                    
+                                    val activity = context as? Activity
+                                    activity?.let {
+                                        val intent = it.packageManager.getLaunchIntentForPackage(it.packageName)
+                                        intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                        it.startActivity(intent)
+                                        it.finishAffinity()
+                                        Runtime.getRuntime().exit(0)
+                                    }
+                                }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
