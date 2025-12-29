@@ -4,6 +4,7 @@ import android.net.Uri
 import android.graphics.Rect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -95,9 +96,12 @@ fun PhotoViewerScreen(
         pageCount = { photoFiles.size }
     )
     var showControls by remember { mutableStateOf(true) }
+    var showBottomSheet by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf<EditMode?>(null) }
     var rotationAngle by remember { mutableIntStateOf(0) } // 0, 90, 180, 270
     var editCropRect by remember { mutableStateOf<Rect?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
 
     android.util.Log.d("PhotoViewerScreen", "PagerState: initialPage=${initialIndex.coerceIn(0, (photoFiles.size - 1).coerceAtLeast(0))}, pageCount=${photoFiles.size}")
 
@@ -132,36 +136,8 @@ fun PhotoViewerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        // Enter rotate edit mode
-                        editMode = EditMode.ROTATE
-                        rotationAngle = 0
-                        showControls = false
-                    }) {
-                        Icon(Icons.Default.RotateRight, "Rotate")
-                    }
-                    IconButton(onClick = {
-                        // Enter crop edit mode
-                        editMode = EditMode.CROP
-                        editCropRect = null
-                        showControls = false
-                    }) {
-                        Icon(Icons.Default.Crop, "Crop")
-                    }
-                    IconButton(onClick = {
-                        if (photoFiles.isNotEmpty()) {
-                            viewModel.shareMediaFile(photoFiles[pagerState.currentPage])
-                        }
-                    }) {
-                        Icon(Icons.Default.Share, "Share")
-                    }
-                    IconButton(onClick = {
-                        if (photoFiles.isNotEmpty()) {
-                            viewModel.deleteMediaFile(photoFiles[pagerState.currentPage])
-                            navController.navigateUp()
-                        }
-                    }) {
-                        Icon(Icons.Default.Delete, "Delete")
+                    IconButton(onClick = { showBottomSheet = true }) {
+                        Icon(Icons.Default.MoreVert, "More options")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -172,6 +148,90 @@ fun PhotoViewerScreen(
                 ),
                 modifier = Modifier.align(Alignment.TopCenter)
             )
+        }
+
+        // Bottom Sheet for actions
+        if (showBottomSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false },
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 32.dp)
+                ) {
+                    // Rotate option
+                    ListItem(
+                        headlineContent = { Text("Rotate") },
+                        leadingContent = {
+                            Icon(Icons.Default.RotateRight, contentDescription = "Rotate")
+                        },
+                        modifier = Modifier.clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                showBottomSheet = false
+                                editMode = EditMode.ROTATE
+                                rotationAngle = 0
+                                showControls = false
+                            }
+                        }
+                    )
+                    
+                    // Crop option
+                    ListItem(
+                        headlineContent = { Text("Crop") },
+                        leadingContent = {
+                            Icon(Icons.Default.Crop, contentDescription = "Crop")
+                        },
+                        modifier = Modifier.clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                showBottomSheet = false
+                                editMode = EditMode.CROP
+                                editCropRect = null
+                                showControls = false
+                            }
+                        }
+                    )
+                    
+                    // Share option
+                    ListItem(
+                        headlineContent = { Text("Share") },
+                        leadingContent = {
+                            Icon(Icons.Default.Share, contentDescription = "Share")
+                        },
+                        modifier = Modifier.clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                showBottomSheet = false
+                                if (photoFiles.isNotEmpty()) {
+                                    viewModel.shareMediaFile(photoFiles[pagerState.currentPage])
+                                }
+                            }
+                        }
+                    )
+                    
+                    // Delete option
+                    ListItem(
+                        headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Delete, 
+                                contentDescription = "Delete",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                showBottomSheet = false
+                                if (photoFiles.isNotEmpty()) {
+                                    viewModel.deleteMediaFile(photoFiles[pagerState.currentPage])
+                                    navController.navigateUp()
+                                }
+                            }
+                        }
+                    )
+                }
+            }
         }
 
         // Page indicator
@@ -245,6 +305,8 @@ fun ZoomableImage(
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+    var imageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+    val coroutineScope = rememberCoroutineScope()
 
     // Stable model key to prevent re-loading on recomposition
     val context = LocalContext.current
@@ -258,83 +320,116 @@ fun ZoomableImage(
             .build()
     }
 
-    // Separate modifier chains based on zoom state to allow HorizontalPager to receive swipes when not zoomed
-    val baseModifier = Modifier
-        .fillMaxSize()
-        .background(Color.Black)
-        .layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints)
-            containerSize = androidx.compose.ui.geometry.Size(
-                placeable.width.toFloat(),
-                placeable.height.toFloat()
-            )
-            layout(placeable.width, placeable.height) {
-                placeable.place(0, 0)
-            }
+    // Calculate the actual displayed image size based on ContentScale.Fit
+    fun calculateImageBounds(): Pair<Float, Float> {
+        if (imageSize.width <= 0 || imageSize.height <= 0 || containerSize.width <= 0 || containerSize.height <= 0) {
+            return Pair(0f, 0f)
         }
-        .pointerInput(Unit) {
-            detectTapGestures(
-                onDoubleTap = {
-                    if (scale > 1f) {
-                        scale = 1f
-                        offset = Offset.Zero
-                    } else {
-                        scale = 2.5f
-                        offset = Offset.Zero
-                    }
-                },
-                onTap = { onTap() }
-            )
+        
+        // With ContentScale.Fit, the image is scaled to fit within the container while maintaining aspect ratio
+        val imageAspect = imageSize.width / imageSize.height
+        val containerAspect = containerSize.width / containerSize.height
+        
+        val displayedWidth: Float
+        val displayedHeight: Float
+        
+        if (imageAspect > containerAspect) {
+            // Image is wider - width fills container
+            displayedWidth = containerSize.width
+            displayedHeight = containerSize.width / imageAspect
+        } else {
+            // Image is taller - height fills container
+            displayedHeight = containerSize.height
+            displayedWidth = containerSize.height * imageAspect
         }
-
-    // Only add transform gestures when zoomed - otherwise let HorizontalPager handle swipes
-    val gestureModifier = if (scale > 1f) {
-        Modifier.pointerInput(scale, containerSize) {
-            detectTransformGestures { centroid, pan, zoom, _ ->
-                val oldScale = scale
-                val newScale = (scale * zoom).coerceIn(1f, 5f)
-
-                // Apply zoom
-                scale = newScale
-
-                // Calculate new offset
-                if (newScale > 1f) {
-                    // Adjust offset for zoom around centroid
-                    val newOffset = if (oldScale != newScale) {
-                        // Zooming - keep centroid point fixed
-                        val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
-                        val zoomChange = newScale / oldScale
-                        offset * zoomChange + (centroid - containerCenter) * (zoomChange - 1f)
-                    } else {
-                        // Panning - just add pan delta
-                        offset + pan
-                    }
-
-                    // Calculate bounds - with ContentScale.Fit, the image is centered and scaled to fit
-                    // Maximum translation is when scaled image edge reaches container edge
-                    val scaledWidth = containerSize.width * newScale
-                    val scaledHeight = containerSize.height * newScale
-
-                    // Max offset is half the difference between scaled size and container size
-                    val maxX = ((scaledWidth - containerSize.width) / 2f).coerceAtLeast(0f)
-                    val maxY = ((scaledHeight - containerSize.height) / 2f).coerceAtLeast(0f)
-
-                    // Constrain offset to prevent black areas
-                    offset = Offset(
-                        x = newOffset.x.coerceIn(-maxX, maxX),
-                        y = newOffset.y.coerceIn(-maxY, maxY)
-                    )
-                } else {
-                    // Scale is 1f - reset offset
-                    offset = Offset.Zero
-                }
-            }
-        }
-    } else {
-        Modifier  // No gesture interception when not zoomed - allows HorizontalPager to swipe
+        
+        // Calculate max offset based on scaled displayed size vs container
+        val scaledWidth = displayedWidth * scale
+        val scaledHeight = displayedHeight * scale
+        
+        val maxX = ((scaledWidth - containerSize.width) / 2f).coerceAtLeast(0f)
+        val maxY = ((scaledHeight - containerSize.height) / 2f).coerceAtLeast(0f)
+        
+        return Pair(maxX, maxY)
     }
 
-    Box(modifier = baseModifier.then(gestureModifier)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                containerSize = androidx.compose.ui.geometry.Size(
+                    placeable.width.toFloat(),
+                    placeable.height.toFloat()
+                )
+                layout(placeable.width, placeable.height) {
+                    placeable.place(0, 0)
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = { tapOffset ->
+                        if (scale > 1f) {
+                            scale = 1f
+                            offset = Offset.Zero
+                        } else {
+                            // Zoom to 2.5x centered on tap position
+                            val newScale = 2.5f
+                            scale = newScale
+                            
+                            // Calculate offset to zoom towards tap point
+                            val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                            val zoomChange = newScale / 1f
+                            val newOffset = (tapOffset - containerCenter) * (1f - zoomChange)
+                            
+                            // Apply bounds
+                            val (maxX, maxY) = calculateImageBounds()
+                            offset = Offset(
+                                x = newOffset.x.coerceIn(-maxX, maxX),
+                                y = newOffset.y.coerceIn(-maxY, maxY)
+                            )
+                        }
+                    },
+                    onTap = { onTap() }
+                )
+            }
+            .pointerInput(scale, containerSize, imageSize) {
+                detectTransformGestures { centroid, pan, zoom, _ ->
+                    val oldScale = scale
+                    val newScale = (scale * zoom).coerceIn(1f, 5f)
+
+                    // Apply zoom
+                    scale = newScale
+
+                    // Calculate new offset
+                    if (newScale > 1f) {
+                        // Adjust offset for zoom around centroid
+                        val newOffset = if (oldScale != newScale && zoom != 1f) {
+                            // Zooming - keep centroid point fixed
+                            val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                            val zoomChange = newScale / oldScale
+                            offset * zoomChange + (centroid - containerCenter) * (zoomChange - 1f)
+                        } else {
+                            // Panning - just add pan delta
+                            offset + pan
+                        }
+
+                        // Calculate proper bounds based on actual image size
+                        val (maxX, maxY) = calculateImageBounds()
+
+                        // Constrain offset to prevent black areas
+                        offset = Offset(
+                            x = newOffset.x.coerceIn(-maxX, maxX),
+                            y = newOffset.y.coerceIn(-maxY, maxY)
+                        )
+                    } else {
+                        // Scale is 1f - reset offset
+                        offset = Offset.Zero
+                    }
+                }
+            }
+    ) {
         AsyncImage(
             model = imageModel,  // Use stable remembered model
             contentDescription = mediaFile.fileName,
@@ -347,7 +442,15 @@ fun ZoomableImage(
                     scaleY = scale,
                     translationX = offset.x,
                     translationY = offset.y
-                )
+                ),
+            onState = { state ->
+                if (state is AsyncImagePainter.State.Success) {
+                    val intrinsicSize = state.painter.intrinsicSize
+                    if (intrinsicSize.width > 0 && intrinsicSize.height > 0) {
+                        imageSize = intrinsicSize
+                    }
+                }
+            }
         )
     }
 }
