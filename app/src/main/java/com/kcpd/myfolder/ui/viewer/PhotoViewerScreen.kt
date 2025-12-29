@@ -5,9 +5,17 @@ import android.graphics.Rect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -34,6 +42,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -306,7 +315,6 @@ fun ZoomableImage(
     var offset by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
     var imageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
-    val coroutineScope = rememberCoroutineScope()
 
     // Stable model key to prevent re-loading on recomposition
     val context = LocalContext.current
@@ -321,7 +329,7 @@ fun ZoomableImage(
     }
 
     // Calculate the actual displayed image size based on ContentScale.Fit
-    fun calculateImageBounds(): Pair<Float, Float> {
+    fun calculateImageBounds(currentScale: Float): Pair<Float, Float> {
         if (imageSize.width <= 0 || imageSize.height <= 0 || containerSize.width <= 0 || containerSize.height <= 0) {
             return Pair(0f, 0f)
         }
@@ -344,8 +352,8 @@ fun ZoomableImage(
         }
         
         // Calculate max offset based on scaled displayed size vs container
-        val scaledWidth = displayedWidth * scale
-        val scaledHeight = displayedHeight * scale
+        val scaledWidth = displayedWidth * currentScale
+        val scaledHeight = displayedHeight * currentScale
         
         val maxX = ((scaledWidth - containerSize.width) / 2f).coerceAtLeast(0f)
         val maxY = ((scaledHeight - containerSize.height) / 2f).coerceAtLeast(0f)
@@ -368,64 +376,117 @@ fun ZoomableImage(
                 }
             }
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { tapOffset ->
-                        if (scale > 1f) {
-                            scale = 1f
-                            offset = Offset.Zero
-                        } else {
-                            // Zoom to 2.5x centered on tap position
-                            val newScale = 2.5f
-                            scale = newScale
+                // Combined gesture detector for tap, double-tap, and pinch-to-zoom
+                awaitEachGesture {
+                    // Wait for first finger down
+                    val firstDown = awaitFirstDown(requireUnconsumed = false)
+                    val firstDownTime = System.currentTimeMillis()
+                    var firstUpTime = 0L
+                    var transformStarted = false
+                    
+                    do {
+                        val event = awaitPointerEvent()
+                        val pointerCount = event.changes.count { it.pressed }
+                        
+                        if (pointerCount >= 2) {
+                            // Multi-touch detected - this is a pinch gesture
+                            transformStarted = true
+                            val zoomChange = event.calculateZoom()
+                            val panChange = event.calculatePan()
+                            val centroid = event.calculateCentroid()
                             
-                            // Calculate offset to zoom towards tap point
-                            val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
-                            val zoomChange = newScale / 1f
-                            val newOffset = (tapOffset - containerCenter) * (1f - zoomChange)
+                            if (zoomChange != 1f || panChange != Offset.Zero) {
+                                val oldScale = scale
+                                val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+                                scale = newScale
+                                
+                                if (newScale > 1f) {
+                                    val newOffset = if (zoomChange != 1f) {
+                                        val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                        val zoomRatio = newScale / oldScale
+                                        offset * zoomRatio + (centroid - containerCenter) * (zoomRatio - 1f)
+                                    } else {
+                                        offset + panChange
+                                    }
+                                    
+                                    val (maxX, maxY) = calculateImageBounds(newScale)
+                                    offset = Offset(
+                                        x = newOffset.x.coerceIn(-maxX, maxX),
+                                        y = newOffset.y.coerceIn(-maxY, maxY)
+                                    )
+                                } else {
+                                    offset = Offset.Zero
+                                }
+                            }
                             
-                            // Apply bounds
-                            val (maxX, maxY) = calculateImageBounds()
-                            offset = Offset(
-                                x = newOffset.x.coerceIn(-maxX, maxX),
-                                y = newOffset.y.coerceIn(-maxY, maxY)
-                            )
+                            // Consume the changes
+                            event.changes.forEach { 
+                                if (it.positionChanged()) it.consume() 
+                            }
+                        } else if (pointerCount == 1 && !transformStarted) {
+                            // Single finger - check for pan when zoomed
+                            val change = event.changes.first()
+                            
+                            if (scale > 1f && change.positionChanged()) {
+                                // Panning when zoomed
+                                val panChange = change.position - change.previousPosition
+                                val newOffset = offset + panChange
+                                val (maxX, maxY) = calculateImageBounds(scale)
+                                offset = Offset(
+                                    x = newOffset.x.coerceIn(-maxX, maxX),
+                                    y = newOffset.y.coerceIn(-maxY, maxY)
+                                )
+                                change.consume()
+                            }
+                            
+                            if (!change.pressed) {
+                                // Finger released
+                                firstUpTime = System.currentTimeMillis()
+                            }
+                        } else if (pointerCount == 0) {
+                            // All fingers released
+                            break
                         }
-                    },
-                    onTap = { onTap() }
-                )
-            }
-            .pointerInput(scale, containerSize, imageSize) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val oldScale = scale
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-
-                    // Apply zoom
-                    scale = newScale
-
-                    // Calculate new offset
-                    if (newScale > 1f) {
-                        // Adjust offset for zoom around centroid
-                        val newOffset = if (oldScale != newScale && zoom != 1f) {
-                            // Zooming - keep centroid point fixed
-                            val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
-                            val zoomChange = newScale / oldScale
-                            offset * zoomChange + (centroid - containerCenter) * (zoomChange - 1f)
-                        } else {
-                            // Panning - just add pan delta
-                            offset + pan
+                    } while (event.changes.any { it.pressed })
+                    
+                    // After gesture ends, check if it was a tap or double-tap
+                    if (!transformStarted && firstUpTime > 0) {
+                        val tapDuration = firstUpTime - firstDownTime
+                        val tapPosition = firstDown.position
+                        
+                        if (tapDuration < 300) {
+                            // Quick tap - wait briefly to check for double tap
+                            val secondDown = withTimeoutOrNull(300) {
+                                awaitFirstDown(requireUnconsumed = false)
+                            }
+                            
+                            if (secondDown != null) {
+                                // Double tap detected
+                                val doubleTapPosition = secondDown.position
+                                
+                                // Wait for second tap to complete
+                                waitForUpOrCancellation()
+                                
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                } else {
+                                    val newScale = 2.5f
+                                    scale = newScale
+                                    val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                    val zoomChange = newScale / 1f
+                                    val newOffset = (doubleTapPosition - containerCenter) * (1f - zoomChange)
+                                    val (maxX, maxY) = calculateImageBounds(newScale)
+                                    offset = Offset(
+                                        x = newOffset.x.coerceIn(-maxX, maxX),
+                                        y = newOffset.y.coerceIn(-maxY, maxY)
+                                    )
+                                }
+                            } else {
+                                // Single tap
+                                onTap()
+                            }
                         }
-
-                        // Calculate proper bounds based on actual image size
-                        val (maxX, maxY) = calculateImageBounds()
-
-                        // Constrain offset to prevent black areas
-                        offset = Offset(
-                            x = newOffset.x.coerceIn(-maxX, maxX),
-                            y = newOffset.y.coerceIn(-maxY, maxY)
-                        )
-                    } else {
-                        // Scale is 1f - reset offset
-                        offset = Offset.Zero
                     }
                 }
             }
