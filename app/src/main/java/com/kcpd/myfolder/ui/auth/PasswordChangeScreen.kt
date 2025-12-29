@@ -1,5 +1,7 @@
 package com.kcpd.myfolder.ui.auth
 
+import android.app.Activity
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -16,6 +18,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +36,7 @@ fun PasswordChangeScreen(
     var confirmVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showProgressSheet by remember { mutableStateOf(false) }
+    var showRestartingScreen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val passwordChangeProgress by viewModel.passwordChangeProgress.collectAsState()
@@ -184,8 +188,20 @@ fun PasswordChangeScreen(
                             scope.launch {
                                 val result = viewModel.changePassword(currentPassword, newPassword)
                                 if (result) {
-                                    Toast.makeText(context, "Password changed successfully", Toast.LENGTH_SHORT).show()
-                                    navController.navigateUp()
+                                    // Show restarting screen and restart app
+                                    showProgressSheet = false
+                                    showRestartingScreen = true
+                                    delay(1500) // Show message for 1.5 seconds
+                                    
+                                    // Restart the app
+                                    val activity = context as? Activity
+                                    activity?.let {
+                                        val intent = it.packageManager.getLaunchIntentForPackage(it.packageName)
+                                        intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                        it.startActivity(intent)
+                                        it.finishAffinity()
+                                        Runtime.getRuntime().exit(0)
+                                    }
                                 } else {
                                     errorMessage = "Current password is incorrect"
                                 }
@@ -283,6 +299,41 @@ fun PasswordChangeScreen(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+            }
+        }
+    }
+    
+    // Restarting overlay - shown after successful password change
+    if (showRestartingScreen) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(64.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text(
+                    text = "Password Changed Successfully!",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Restarting app...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
