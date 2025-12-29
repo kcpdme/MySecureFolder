@@ -147,6 +147,25 @@
 -dontwarn android.security.keystore.**
 
 # ===================================
+# Google Drive / Google API Client
+# (These libraries use reflection; keep to prevent release-only failures)
+# ===================================
+-keep class com.google.api.client.** { *; }
+-dontwarn com.google.api.client.**
+
+-keep class com.google.api.services.drive.** { *; }
+-dontwarn com.google.api.services.drive.**
+
+-keep class com.google.auth.** { *; }
+-dontwarn com.google.auth.**
+
+-keep class com.google.http.client.** { *; }
+-dontwarn com.google.http.client.**
+
+-keep class android.security.keystore.** { *; }
+-dontwarn android.security.keystore.**
+
+# ===================================
 # Reflection Used Classes
 # ===================================
 # Keep classes that use reflection

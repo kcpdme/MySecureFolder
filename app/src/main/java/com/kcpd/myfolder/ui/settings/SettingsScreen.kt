@@ -71,9 +71,18 @@ class SettingsViewModel @Inject constructor(
 
     fun setRemoteType(type: com.kcpd.myfolder.data.model.RemoteType) {
         viewModelScope.launch {
-            // Always sign out of Google when switching remotes to ensure a fresh session/clean state
-            signOutGoogleSuspend(context)
+            // Only sign out when switching AWAY from Google Drive.
+            // Signing out while selecting Google Drive leaves the repository uninitialized until app restart.
+            if (type != com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) {
+                signOutGoogleSuspend(context)
+            }
+
             remoteRepositoryManager.setRemoteType(type)
+
+            // Ensure Drive service is initialized immediately when switching to Google Drive
+            if (type == com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) {
+                checkGoogleSignIn(context)
+            }
         }
     }
 
