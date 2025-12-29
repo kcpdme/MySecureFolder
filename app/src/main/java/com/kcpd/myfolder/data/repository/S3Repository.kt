@@ -197,7 +197,7 @@ class S3Repository @Inject constructor(
     }
 
     private fun mapToUserFacingError(error: Exception): Exception {
-        val message = when (error) {
+        val message: String = when (error) {
             is java.io.FileNotFoundException ->
                 "Local file not found. Please try again."
 
@@ -208,7 +208,7 @@ class S3Repository @Inject constructor(
                 "S3 connection timed out. Please try again."
 
             else -> {
-                val raw = error.message?.orEmpty()
+                val raw = error.message ?: ""
                 when {
                     raw.contains("AccessDenied", ignoreCase = true) -> "S3 access denied. Check Access Key/Secret Key and bucket policy."
                     raw.contains("SignatureDoesNotMatch", ignoreCase = true) -> "S3 signature mismatch. Verify access key/secret key and region."
