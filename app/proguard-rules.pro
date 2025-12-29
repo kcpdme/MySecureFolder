@@ -182,3 +182,39 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# ===================================
+# SECURITY: Strip ALL Log statements in Release
+# This prevents sensitive data from being leaked via logcat
+# ===================================
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
+    public static int wtf(...);
+    public static int println(...);
+}
+
+# Also strip Timber logs if used
+-assumenosideeffects class timber.log.Timber {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+}
+
+# Strip kotlin println/print
+-assumenosideeffects class kotlin.io.ConsoleKt {
+    public static void println(...);
+    public static void print(...);
+}
+
+# Strip System.out/err
+-assumenosideeffects class java.io.PrintStream {
+    public void println(...);
+    public void print(...);
+}

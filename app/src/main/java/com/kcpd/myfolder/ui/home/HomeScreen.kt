@@ -52,20 +52,15 @@ fun HomeScreen(
     
     val activeRemoteType by viewModel.activeRemoteType.collectAsState()
 
-    // VERSION VERIFICATION LOGGING
+    // Debug logging only in debug builds
     LaunchedEffect(Unit) {
-        val buildTime = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-        android.util.Log.d("HomeScreen", "═══════════════════════════════════════")
-        android.util.Log.d("HomeScreen", "🏠 HOME SCREEN v2.0 LOADED 🏠")
-        android.util.Log.d("HomeScreen", "Build Time: $buildTime")
-        android.util.Log.d("HomeScreen", "Photo orientation: Tella approach (pre-rotate before encryption)")
-        android.util.Log.d("HomeScreen", "Camera controls: Bottom layout")
-        android.util.Log.d("HomeScreen", "═══════════════════════════════════════")
-
-        snackbarHostState.showSnackbar(
-            message = "✅ App v2.0 - Build: $buildTime",
-            duration = SnackbarDuration.Long
-        )
+        if (com.kcpd.myfolder.BuildConfig.DEBUG) {
+            val buildTime = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            android.util.Log.d("HomeScreen", "═══════════════════════════════════════")
+            android.util.Log.d("HomeScreen", "🏠 HOME SCREEN v2.0 LOADED 🏠")
+            android.util.Log.d("HomeScreen", "Build Time: $buildTime")
+            android.util.Log.d("HomeScreen", "═══════════════════════════════════════")
+        }
     }
 
     var selectedItem by remember { mutableStateOf("Folders") }
