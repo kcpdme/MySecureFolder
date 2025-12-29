@@ -12,6 +12,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.minio.MinioClient
 import io.minio.PutObjectArgs
 import io.minio.StatObjectArgs
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -190,8 +192,36 @@ class S3Repository @Inject constructor(
 
         } catch (e: Exception) {
             Log.e("S3Repository", "Upload failed", e)
-            Result.failure(e)
+            Result.failure(mapToUserFacingError(e))
         }
+    }
+
+    private fun mapToUserFacingError(error: Exception): Exception {
+        val message = when (error) {
+            is java.io.FileNotFoundException ->
+                "Local file not found. Please try again."
+
+            is UnknownHostException ->
+                "Can't reach S3 endpoint. Check your internet connection and the endpoint URL."
+
+            is SocketTimeoutException ->
+                "S3 connection timed out. Please try again."
+
+            else -> {
+                val raw = error.message?.orEmpty()
+                when {
+                    raw.contains("AccessDenied", ignoreCase = true) -> "S3 access denied. Check Access Key/Secret Key and bucket policy."
+                    raw.contains("SignatureDoesNotMatch", ignoreCase = true) -> "S3 signature mismatch. Verify access key/secret key and region."
+                    raw.contains("InvalidAccessKeyId", ignoreCase = true) -> "Invalid S3 access key. Please re-check S3 settings."
+                    raw.contains("NoSuchBucket", ignoreCase = true) -> "S3 bucket not found. Please check the bucket name."
+                    raw.contains("SSL", ignoreCase = true) || raw.contains("handshake", ignoreCase = true) ->
+                        "S3 TLS/SSL error. If using https, ensure the certificate is valid (or switch to http for local MinIO)."
+                    else -> raw.takeIf { it.isNotBlank() } ?: "S3 upload failed."
+                }
+            }
+        }
+
+        return if (error is UserFacingException) error else UserFacingException(message, error)
     }
 
 

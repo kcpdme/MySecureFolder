@@ -5,6 +5,8 @@ import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.api.client.extensions.android.http.AndroidHttp
+import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.FileContent
 import com.google.api.client.json.gson.GsonFactory
@@ -17,6 +19,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +38,15 @@ class GoogleDriveRepository @Inject constructor(
     // CRITICAL: Synchronization lock to prevent race condition when creating folders
     // Without this, parallel uploads can create duplicate folders with the same name
     private val folderCreationLock = Any()
+
+    /**
+     * Clears the folder ID cache. Call this when folders may have been deleted externally
+     * (e.g., user deleted MyFolderPrivate from Google Drive web UI).
+     */
+    fun clearFolderCache() {
+        folderIdCache.clear()
+        Log.d("GoogleDriveRepository", "Folder ID cache cleared")
+    }
 
     init {
         // Check if already signed in
@@ -72,7 +85,11 @@ class GoogleDriveRepository @Inject constructor(
 
     override suspend fun uploadFile(mediaFile: MediaFile): Result<String> = withContext(Dispatchers.IO) {
         if (driveService == null) {
-            return@withContext Result.failure(Exception("Not signed in to Google Drive"))
+            return@withContext Result.failure(
+                UserFacingException(
+                    "Google Drive is not ready. Open Settings → Google Drive and sign in again."
+                )
+            )
         }
 
         try {
@@ -158,8 +175,34 @@ class GoogleDriveRepository @Inject constructor(
 
         } catch (e: Exception) {
             Log.e("GoogleDriveRepository", "Upload failed", e)
-            Result.failure(e)
+            Result.failure(mapToUserFacingError(e))
         }
+    }
+
+    private fun mapToUserFacingError(error: Exception): Exception {
+        val message = when (error) {
+            is java.io.FileNotFoundException ->
+                "Local file not found. If you just switched storage providers, reopen the folder screen and try again."
+
+            is UserRecoverableAuthIOException ->
+                "Google Drive authorization is required. Open Settings → Google Drive and sign in again."
+
+            is GoogleJsonResponseException -> {
+                when (error.statusCode) {
+                    401 -> "Google Drive session expired. Please sign in again."
+                    403 -> "Google Drive access denied. Check permissions and that Drive API access is enabled for this app."
+                    404 -> "Google Drive folder not found. Please try again."
+                    else -> "Google Drive error (${error.statusCode}). Please try again."
+                }
+            }
+
+            is UnknownHostException -> "Can't reach Google Drive. Check your internet connection."
+            is SocketTimeoutException -> "Google Drive connection timed out. Please try again."
+
+            else -> error.message?.takeIf { it.isNotBlank() } ?: "Google Drive upload failed."
+        }
+
+        return if (error is UserFacingException) error else UserFacingException(message, error)
     }
 
 
