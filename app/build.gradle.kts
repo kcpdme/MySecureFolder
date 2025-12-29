@@ -26,10 +26,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            // Enable BuildConfig field for debug checks
-            buildConfigField("Boolean", "DEBUG", "true")
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -37,7 +33,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("Boolean", "DEBUG", "false")
         }
     }
 
