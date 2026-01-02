@@ -400,6 +400,11 @@ class GoogleDriveRepositoryInstance(
 /**
  * WebDAV repository instance for services like Koofr, Icedrive, Nextcloud, etc.
  * Uses sardine-android library (OkHttp-based WebDAV client).
+ *
+ * Optimizations:
+ * - Uses preemptive Basic authentication to avoid 401 retry cycles
+ * - Caches created folders to skip redundant MKCOL/exists checks
+ * - Uses MKCOL directly instead of exists() check to reduce requests
  */
 class WebDavRepositoryInstance(
     private val config: RemoteConfig.WebDavRemote,
@@ -414,12 +419,33 @@ class WebDavRepositoryInstance(
     @Volatile
     private var clientInitialized = false
 
-    // Cache the Sardine WebDAV client to avoid recreating for every upload
+    // Cache created folder paths to avoid redundant MKCOL calls
+    private val createdFoldersCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    // Create OkHttpClient with preemptive Basic authentication
+    // This avoids the 401 -> retry cycle that causes slowness
+    private val okHttpClient: okhttp3.OkHttpClient by lazy {
+        val credentials = okhttp3.Credentials.basic(config.username, config.password)
+        okhttp3.OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                // Add Authorization header preemptively to avoid 401 challenge
+                val request = chain.request().newBuilder()
+                    .header("Authorization", credentials)
+                    .build()
+                chain.proceed(request)
+            }
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
+    // Cache the Sardine WebDAV client with custom OkHttpClient
     private val sardineClient: com.thegrizzlylabs.sardineandroid.Sardine by lazy {
         android.util.Log.d(TAG, "Creating WebDAV client for: ${config.serverUrl}")
         val startTime = System.currentTimeMillis()
-        val client = com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine()
-        client.setCredentials(config.username, config.password)
+        val client = com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine(okHttpClient)
+        // Note: setCredentials not needed since we're using preemptive auth via interceptor
         val elapsed = System.currentTimeMillis() - startTime
         android.util.Log.d(TAG, "WebDAV client created in ${elapsed}ms for ${config.name}")
         clientInitialized = true
@@ -453,31 +479,55 @@ class WebDavRepositoryInstance(
                         // Build full path: serverUrl/basePath/MyFolderPrivate/{category}/{userFolderPath}
                         val baseUrl = config.serverUrl.trimEnd('/')
                         val basePath = config.basePath.trim('/').let { if (it.isNotEmpty()) "/$it" else "" }
-                        
+
                         val folderComponents = mutableListOf("MyFolderPrivate", category.path)
                         if (userFolderPath.isNotEmpty()) {
                             folderComponents.addAll(userFolderPath.split("/"))
                         }
 
                         // Ensure all folders exist (WebDAV requires explicit folder creation)
+                        // Optimization: Use MKCOL directly and cache results to avoid redundant requests
                         var currentPath = "$baseUrl$basePath"
                         for (folder in folderComponents) {
                             currentPath = "$currentPath/$folder"
                             val folderUrl = "$currentPath/"
+
+                            // Skip if we already know this folder exists (cached)
+                            if (createdFoldersCache.containsKey(folderUrl)) {
+                                continue
+                            }
+
                             try {
-                                if (!sardineClient.exists(folderUrl)) {
-                                    sardineClient.createDirectory(folderUrl)
-                                    android.util.Log.d(TAG, "Created WebDAV folder: $folderUrl")
+                                // Try to create the directory directly (MKCOL)
+                                // This is faster than exists() check + create
+                                // If folder exists, server returns 405 (Method Not Allowed) or similar
+                                sardineClient.createDirectory(folderUrl)
+                                android.util.Log.d(TAG, "Created WebDAV folder: $folderUrl")
+                                createdFoldersCache[folderUrl] = true
+                            } catch (e: com.thegrizzlylabs.sardineandroid.impl.SardineException) {
+                                // 405 = Method Not Allowed (folder exists)
+                                // 409 = Conflict (intermediate folder missing - shouldn't happen with our sequential creation)
+                                // 301/302 = Redirect (folder exists)
+                                val statusCode = e.statusCode
+                                if (statusCode == 405 || statusCode == 409 || statusCode == 301 || statusCode == 302) {
+                                    // Folder already exists, cache it
+                                    createdFoldersCache[folderUrl] = true
+                                    android.util.Log.d(TAG, "Folder already exists: $folderUrl (status: $statusCode)")
+                                } else {
+                                    android.util.Log.w(TAG, "Folder creation failed for $folderUrl: ${e.message} (status: $statusCode)")
+                                    // Continue anyway - folder might exist despite error
+                                    createdFoldersCache[folderUrl] = true
                                 }
                             } catch (e: Exception) {
-                                // Folder might already exist or we don't have permission to check
+                                // Other errors - assume folder exists and continue
                                 android.util.Log.d(TAG, "Folder check/create for $folderUrl: ${e.message}")
+                                createdFoldersCache[folderUrl] = true
                             }
                         }
 
                         // Upload the file
                         val fileUrl = "$currentPath/${fileToUpload.name}"
-                        
+
                         // sardine-android put() accepts File directly
                         sardineClient.put(fileUrl, fileToUpload, "application/octet-stream")
 
