@@ -74,7 +74,7 @@
 
 # Keep NodeBuilder and its static initialization - this is the class that fails on async threads
 -keep class org.simpleframework.xml.stream.NodeBuilder {
-    <clinit>;
+    static <clinit>();
     *;
 }
 -keep class org.simpleframework.xml.stream.StreamProvider {
