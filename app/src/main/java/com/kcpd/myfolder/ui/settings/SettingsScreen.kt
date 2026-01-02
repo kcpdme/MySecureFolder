@@ -39,6 +39,7 @@ class SettingsViewModel @Inject constructor(
     private val remoteRepositoryManager: com.kcpd.myfolder.data.repository.RemoteRepositoryManager,
     private val googleDriveRepository: com.kcpd.myfolder.data.repository.GoogleDriveRepository,
     private val remoteConfigRepository: com.kcpd.myfolder.data.repository.RemoteConfigRepository,
+    private val remoteRepositoryFactory: com.kcpd.myfolder.data.repository.RemoteRepositoryFactory,
     private val securityManager: com.kcpd.myfolder.security.SecurityManager,
     @ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
@@ -249,10 +250,19 @@ class SettingsViewModel @Inject constructor(
                             addedCount++
                         }
                     }
+                    
+                    // Clear repository cache so new configs get fresh instances
+                    // This is important for Google Drive which needs to re-check sign-in state
+                    remoteRepositoryFactory.clearCache()
+                    
                     onResult(true, "Imported $addedCount new remote(s). ${importedRemotes.size - addedCount} already existed.")
                 } else {
                     // Replace all
                     remoteConfigRepository.importRemotes(jsonString)
+                    
+                    // Clear repository cache so new configs get fresh instances
+                    remoteRepositoryFactory.clearCache()
+                    
                     val count = remoteConfigRepository.getAllRemotes().size
                     onResult(true, "Imported $count remote configuration(s)")
                 }

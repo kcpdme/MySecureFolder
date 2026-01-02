@@ -37,6 +37,7 @@ import javax.inject.Inject
 @HiltViewModel
 class RemoteConfigurationViewModel @Inject constructor(
     private val remoteConfigRepository: RemoteConfigRepository,
+    private val remoteRepositoryFactory: com.kcpd.myfolder.data.repository.RemoteRepositoryFactory,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -319,6 +320,11 @@ class RemoteConfigurationViewModel @Inject constructor(
                 }
 
                 remoteConfigRepository.addRemote(remote)
+                
+                // Clear repository cache so the new/updated remote gets a fresh instance
+                // This is especially important for Google Drive to pick up the signed-in account
+                remoteRepositoryFactory.clearCache()
+                
                 onSuccess()
             } catch (e: Exception) {
                 _errorMessage.value = e.message ?: "Failed to save remote"

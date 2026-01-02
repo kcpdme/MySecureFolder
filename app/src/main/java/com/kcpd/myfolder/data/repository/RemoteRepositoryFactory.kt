@@ -290,11 +290,24 @@ class GoogleDriveRepositoryInstance(
     private val folderCreationLock = Any()
 
     init {
-        // Initialize Drive service for this specific account
+        // Try to initialize Drive service for this specific account
+        tryInitializeDriveService()
+    }
+
+    /**
+     * Attempt to initialize the Drive service by finding the signed-in account.
+     * This is called both at construction time and lazily at upload time.
+     * Returns true if initialization was successful.
+     */
+    private fun tryInitializeDriveService(): Boolean {
+        if (driveService != null) return true
+        
         val account = GoogleSignIn.getLastSignedInAccount(context)
         if (account?.email == accountEmail) {
             initializeDriveService(account)
+            return true
         }
+        return false
     }
 
     private fun initializeDriveService(account: GoogleSignInAccount) {
@@ -311,13 +324,23 @@ class GoogleDriveRepositoryInstance(
         )
             .setApplicationName("MyFolder")
             .build()
+        
+        android.util.Log.d("GoogleDriveInstance", "Drive service initialized for: $accountEmail")
     }
 
     override suspend fun uploadFile(mediaFile: com.kcpd.myfolder.data.model.MediaFile): Result<String> {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                // Try lazy initialization if not initialized yet
+                // This handles the case where config was imported but user signed in later
+                if (driveService == null) {
+                    tryInitializeDriveService()
+                }
+                
                 val drive = driveService ?: return@withContext Result.failure(
-                    IllegalStateException("Google Drive not initialized for $accountEmail")
+                    UserFacingException(
+                        "Google Drive not ready for $accountEmail. Please go to Settings → Remotes and sign in to Google Drive again."
+                    )
                 )
 
                 val fileToUpload = java.io.File(mediaFile.filePath)

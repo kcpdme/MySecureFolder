@@ -41,6 +41,7 @@ enum class RemoteTypeSelection {
 @HiltViewModel
 class AddEditRemoteViewModel @Inject constructor(
     private val remoteConfigRepository: RemoteConfigRepository,
+    private val remoteRepositoryFactory: com.kcpd.myfolder.data.repository.RemoteRepositoryFactory,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -373,6 +374,10 @@ class AddEditRemoteViewModel @Inject constructor(
                 } else {
                     remoteConfigRepository.addRemote(remote)
                 }
+
+                // Clear repository cache so the new/updated remote gets a fresh instance
+                // This is especially important for Google Drive to pick up the signed-in account
+                remoteRepositoryFactory.clearCache()
 
                 onSuccess()
             } catch (e: Exception) {
