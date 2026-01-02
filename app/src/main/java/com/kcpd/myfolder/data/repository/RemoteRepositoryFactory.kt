@@ -425,8 +425,9 @@ class GoogleDriveRepositoryInstance(
  *
  * Optimizations:
  * - Uses preemptive Basic authentication to avoid 401 retry cycles
- * - Caches created folders to skip redundant MKCOL/exists checks
+ * - Global folder cache shared across all instances (persists for app lifetime)
  * - Uses MKCOL directly instead of exists() check to reduce requests
+ * - Streaming upload for large files (no memory issues with 100MB+ files)
  */
 class WebDavRepositoryInstance(
     private val config: RemoteConfig.WebDavRemote,
@@ -435,14 +436,16 @@ class WebDavRepositoryInstance(
 
     companion object {
         private const val TAG = "WebDavRepository"
+
+        // Global folder cache shared across ALL WebDavRepositoryInstance instances
+        // This persists for the app's lifetime, avoiding redundant folder checks
+        // Key format: "serverUrl/path/" -> true
+        private val globalFolderCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     }
 
     // Track if client has been initialized for logging
     @Volatile
     private var clientInitialized = false
-
-    // Cache created folder paths to avoid redundant MKCOL calls
-    private val createdFoldersCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
     // Create OkHttpClient with preemptive Basic authentication
     // This avoids the 401 -> retry cycle that causes slowness
@@ -456,9 +459,11 @@ class WebDavRepositoryInstance(
                     .build()
                 chain.proceed(request)
             }
+            .retryOnConnectionFailure(true)
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+            // Extended write timeout for large files (100MB+ at slow speeds)
+            .writeTimeout(300, java.util.concurrent.TimeUnit.SECONDS)
             .build()
     }
 
@@ -508,14 +513,14 @@ class WebDavRepositoryInstance(
                         }
 
                         // Ensure all folders exist (WebDAV requires explicit folder creation)
-                        // Optimization: Use MKCOL directly and cache results to avoid redundant requests
+                        // Optimization: Use global cache to skip folder checks across sessions
                         var currentPath = "$baseUrl$basePath"
                         for (folder in folderComponents) {
                             currentPath = "$currentPath/$folder"
                             val folderUrl = "$currentPath/"
 
-                            // Skip if we already know this folder exists (cached)
-                            if (createdFoldersCache.containsKey(folderUrl)) {
+                            // Skip if we already know this folder exists (global cache)
+                            if (globalFolderCache.containsKey(folderUrl)) {
                                 continue
                             }
 
@@ -525,7 +530,7 @@ class WebDavRepositoryInstance(
                                 // If folder exists, server returns 405 (Method Not Allowed) or similar
                                 sardineClient.createDirectory(folderUrl)
                                 android.util.Log.d(TAG, "Created WebDAV folder: $folderUrl")
-                                createdFoldersCache[folderUrl] = true
+                                globalFolderCache[folderUrl] = true
                             } catch (e: com.thegrizzlylabs.sardineandroid.impl.SardineException) {
                                 // 405 = Method Not Allowed (folder exists)
                                 // 409 = Conflict (intermediate folder missing - shouldn't happen with our sequential creation)
@@ -533,24 +538,25 @@ class WebDavRepositoryInstance(
                                 val statusCode = e.statusCode
                                 if (statusCode == 405 || statusCode == 409 || statusCode == 301 || statusCode == 302) {
                                     // Folder already exists, cache it
-                                    createdFoldersCache[folderUrl] = true
+                                    globalFolderCache[folderUrl] = true
                                     android.util.Log.d(TAG, "Folder already exists: $folderUrl (status: $statusCode)")
                                 } else {
                                     android.util.Log.w(TAG, "Folder creation failed for $folderUrl: ${e.message} (status: $statusCode)")
                                     // Continue anyway - folder might exist despite error
-                                    createdFoldersCache[folderUrl] = true
+                                    globalFolderCache[folderUrl] = true
                                 }
                             } catch (e: Exception) {
                                 // Other errors - assume folder exists and continue
                                 android.util.Log.d(TAG, "Folder check/create for $folderUrl: ${e.message}")
-                                createdFoldersCache[folderUrl] = true
+                                globalFolderCache[folderUrl] = true
                             }
                         }
 
-                        // Upload the file
+                        // Upload the file using streaming (efficient for large files 100MB+)
                         val fileUrl = "$currentPath/${fileToUpload.name}"
 
-                        // sardine-android put() accepts File directly
+                        // sardine-android put(url, File, contentType) streams the file internally
+                        // It uses OkHttp's RequestBody.create(file, contentType) which is memory-efficient
                         sardineClient.put(fileUrl, fileToUpload, "application/octet-stream")
 
                         val url = "webdav://${config.name}/${folderComponents.joinToString("/")}/${fileToUpload.name}"

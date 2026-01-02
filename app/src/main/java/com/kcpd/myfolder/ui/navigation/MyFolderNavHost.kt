@@ -113,6 +113,9 @@ fun MyFolderNavHost(
                 onSettingsClick = {
                     navController.navigate("settings")
                 },
+                onCloudRemotesClick = {
+                    navController.navigate("remote_management")
+                },
                 onCameraClick = {
                     navController.navigate("photo_camera")
                 },

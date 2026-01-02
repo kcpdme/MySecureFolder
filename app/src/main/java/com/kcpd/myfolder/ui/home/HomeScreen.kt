@@ -5,6 +5,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Folder
@@ -27,6 +28,7 @@ import com.kcpd.myfolder.data.model.FolderCategory
 fun HomeScreen(
     onFolderClick: (FolderCategory) -> Unit,
     onSettingsClick: () -> Unit,
+    onCloudRemotesClick: () -> Unit,
     onCameraClick: () -> Unit,
     onRecorderClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
@@ -80,6 +82,9 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onCloudRemotesClick) {
+                        Icon(Icons.Default.Cloud, contentDescription = "Cloud Remotes")
+                    }
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
