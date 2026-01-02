@@ -31,21 +31,19 @@ fun MultiRemoteUploadSheet(
     onRetry: (fileId: String, remoteId: String) -> Unit,
     onClearCompleted: () -> Unit
 ) {
-    val sortedStates = remember(uploadStates) {
-        uploadStates.values.toList().sortedByDescending { state ->
-            // Sort: in-progress first, then queued, then completed
-            when {
-                state.activeCount > 0 -> 3
-                state.queuedCount > 0 -> 2
-                else -> 1
-            }
-        }
+    // Keep states in stable order - don't re-sort when status changes
+    // This prevents cards from jumping around while user is watching
+    val stableStates = remember(uploadStates.keys) {
+        uploadStates.keys.toList()
     }
+    
+    // Get current states in stable order
+    val orderedStates = stableStates.mapNotNull { uploadStates[it] }
 
-    val totalFiles = sortedStates.size
-    val completedFiles = sortedStates.count { it.isComplete }
-    val hasCompletedFiles = sortedStates.any { it.isComplete }
-    val hasActiveUploads = sortedStates.any { it.activeCount > 0 }
+    val totalFiles = orderedStates.size
+    val completedFiles = orderedStates.count { it.isComplete }
+    val hasCompletedFiles = orderedStates.any { it.isComplete }
+    val hasActiveUploads = orderedStates.any { it.activeCount > 0 }
 
     // Fullscreen sheet - can be dismissed by swipe or close button
     // User can always bring it back using the upload status icon in toolbar
@@ -108,7 +106,7 @@ fun MultiRemoteUploadSheet(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                if (sortedStates.isEmpty()) {
+                if (orderedStates.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -135,7 +133,7 @@ fun MultiRemoteUploadSheet(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(sortedStates, key = { it.fileId }) { state ->
+                        items(orderedStates, key = { it.fileId }) { state ->
                             FileUploadCard(
                                 uploadState = state,
                                 onRetry = { remoteId -> onRetry(state.fileId, remoteId) }
