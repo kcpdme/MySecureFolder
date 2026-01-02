@@ -339,7 +339,7 @@ class GoogleDriveRepositoryInstance(
                 
                 val drive = driveService ?: return@withContext Result.failure(
                     UserFacingException(
-                        "Google Drive not ready for $accountEmail. Please go to Settings → Remotes and sign in to Google Drive again."
+                        "Google Drive not ready for $accountEmail. Go to Settings → Remotes, edit this remote, and tap 'Re-authenticate with Google'."
                     )
                 )
 

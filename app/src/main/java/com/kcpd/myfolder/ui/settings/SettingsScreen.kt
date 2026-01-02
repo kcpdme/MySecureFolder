@@ -40,6 +40,7 @@ class SettingsViewModel @Inject constructor(
     private val googleDriveRepository: com.kcpd.myfolder.data.repository.GoogleDriveRepository,
     private val remoteConfigRepository: com.kcpd.myfolder.data.repository.RemoteConfigRepository,
     private val remoteRepositoryFactory: com.kcpd.myfolder.data.repository.RemoteRepositoryFactory,
+    private val uploadSettingsRepository: com.kcpd.myfolder.data.repository.UploadSettingsRepository,
     private val securityManager: com.kcpd.myfolder.security.SecurityManager,
     @ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
@@ -52,6 +53,13 @@ class SettingsViewModel @Inject constructor(
 
     private val _storageInfo = MutableStateFlow<Map<String, Long>>(emptyMap())
     val storageInfo: StateFlow<Map<String, Long>> = _storageInfo.asStateFlow()
+    
+    // Upload concurrency setting
+    val uploadConcurrency = uploadSettingsRepository.uploadConcurrency.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_CONCURRENCY
+    )
 
     val activeRemoteType = remoteRepositoryManager.activeRemoteType.stateIn(
         viewModelScope,
@@ -69,6 +77,22 @@ class SettingsViewModel @Inject constructor(
             _googleAccountEmail.value = account.email
             googleDriveRepository.setSignedInAccount(account)
         }
+    }
+    
+    /**
+     * Set the upload concurrency (number of parallel uploads)
+     */
+    fun setUploadConcurrency(value: Int) {
+        viewModelScope.launch {
+            uploadSettingsRepository.setUploadConcurrency(value)
+        }
+    }
+    
+    /**
+     * Get display text for a concurrency value
+     */
+    fun getConcurrencyDisplayText(value: Int): String {
+        return uploadSettingsRepository.getConcurrencyDisplayText(value)
     }
 
     fun setRemoteType(type: com.kcpd.myfolder.data.model.RemoteType) {
@@ -536,6 +560,77 @@ fun SettingsScreen(
                     navController.navigate("remote_management")
                 }
             )
+
+            HorizontalDivider()
+            
+            // Upload Concurrency Setting
+            val uploadConcurrency by viewModel.uploadConcurrency.collectAsState()
+            var showConcurrencyDialog by remember { mutableStateOf(false) }
+            
+            SettingsItem(
+                icon = Icons.Default.Speed,
+                title = "Upload Concurrency",
+                description = "Parallel uploads: ${viewModel.getConcurrencyDisplayText(uploadConcurrency)}",
+                onClick = {
+                    showConcurrencyDialog = true
+                }
+            )
+            
+            // Concurrency selection dialog
+            if (showConcurrencyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showConcurrencyDialog = false },
+                    title = { Text("Upload Concurrency") },
+                    text = {
+                        Column {
+                            Text(
+                                text = "Choose how many files upload simultaneously. Higher values are faster but may be unstable on slow connections.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            com.kcpd.myfolder.data.repository.UploadSettingsRepository.CONCURRENCY_OPTIONS.forEach { value ->
+                                val isSelected = value == uploadConcurrency
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.setUploadConcurrency(value)
+                                            showConcurrencyDialog = false
+                                        },
+                                    color = if (isSelected)
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.surface
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = {
+                                                viewModel.setUploadConcurrency(value)
+                                                showConcurrencyDialog = false
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = viewModel.getConcurrencyDisplayText(value),
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showConcurrencyDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
 
             HorizontalDivider()
 

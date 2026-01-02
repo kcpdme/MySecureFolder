@@ -742,6 +742,7 @@ fun GoogleDriveConfigFields(
     onSignInClick: () -> Unit
 ) {
     val accountEmail by viewModel.googleAccountEmail.collectAsState()
+    val isEditMode = viewModel.isEditMode
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
@@ -783,28 +784,52 @@ fun GoogleDriveConfigFields(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = "Signed in as",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                        Text(
-                            text = accountEmail,
-                            style = MaterialTheme.typography.bodyLarge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Account",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Text(
+                                text = accountEmail,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Account configured",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Signed in",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    
+                    // Always show re-authenticate button in edit mode
+                    // This is important when config was imported but user hasn't signed in on this device
+                    if (isEditMode) {
+                        HorizontalDivider()
+                        Text(
+                            text = "If uploads fail with 'not ready' error, re-authenticate below:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = onSignInClick,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Re-authenticate with Google")
+                        }
+                    }
                 }
             }
         }

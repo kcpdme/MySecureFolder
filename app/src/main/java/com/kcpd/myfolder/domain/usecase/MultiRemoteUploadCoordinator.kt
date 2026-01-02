@@ -4,6 +4,7 @@ import android.util.Log
 import com.kcpd.myfolder.data.model.MediaFile
 import com.kcpd.myfolder.data.repository.RemoteConfigRepository
 import com.kcpd.myfolder.data.repository.RemoteRepositoryFactory
+import com.kcpd.myfolder.data.repository.UploadSettingsRepository
 import com.kcpd.myfolder.domain.model.FileUploadState
 import com.kcpd.myfolder.domain.model.RemoteConfig
 import com.kcpd.myfolder.domain.model.RemoteUploadResult
@@ -30,28 +31,31 @@ import javax.inject.Singleton
  * Coordinates uploads to multiple remote storage providers.
  * Manages upload state, progress tracking, and concurrency control.
  * 
- * Uses limited concurrency (2 remotes at a time) to balance:
+ * Uses configurable concurrency to balance speed and stability.
+ * Default is 2 concurrent uploads which balances:
  * - Speed: Faster than fully sequential
  * - Stability: No bandwidth saturation or connection pool exhaustion
  */
 @Singleton
 class MultiRemoteUploadCoordinator @Inject constructor(
     private val remoteConfigRepository: RemoteConfigRepository,
-    private val repositoryFactory: RemoteRepositoryFactory
+    private val repositoryFactory: RemoteRepositoryFactory,
+    private val uploadSettingsRepository: UploadSettingsRepository
 ) {
     companion object {
         private const val TAG = "MultiRemoteUploadCoordinator"
-        // Max concurrent remote uploads per file
-        // 2 is a good balance: faster than sequential, stable unlike full parallel
-        private const val MAX_CONCURRENT_REMOTES = 2
     }
 
     // Own scope with SupervisorJob - isolated from caller's scope
     // This ensures multiple upload batches can run independently
     private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
-    // Semaphore to limit concurrent remote uploads
-    private val uploadSemaphore = Semaphore(MAX_CONCURRENT_REMOTES)
+    // Dynamic semaphore - recreated when concurrency setting changes
+    @Volatile
+    private var uploadSemaphore = Semaphore(UploadSettingsRepository.DEFAULT_CONCURRENCY)
+    
+    @Volatile
+    private var currentConcurrency = UploadSettingsRepository.DEFAULT_CONCURRENCY
 
     // Mutex for thread-safe state updates
     private val stateMutex = Mutex()
@@ -63,18 +67,31 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     // Active uploads count
     private val _activeUploadsCount = MutableStateFlow(0)
     val activeUploadsCount: StateFlow<Int> = _activeUploadsCount.asStateFlow()
+    
+    /**
+     * Update the semaphore with the new concurrency value.
+     * Called when user changes the setting.
+     */
+    private suspend fun updateConcurrency() {
+        val newConcurrency = uploadSettingsRepository.getUploadConcurrencySync()
+        if (newConcurrency != currentConcurrency) {
+            currentConcurrency = newConcurrency
+            uploadSemaphore = Semaphore(newConcurrency)
+            Log.d(TAG, "Upload concurrency updated to: $newConcurrency")
+        }
+    }
 
     /**
      * Upload multiple files to all active remotes.
      * For each file:
-     *   1. Upload to remotes with LIMITED concurrency (MAX_CONCURRENT_REMOTES at a time)
+     *   1. Upload to remotes with LIMITED concurrency (configurable by user)
      *   2. Wait for all remotes to complete (success or failure)
      *   3. Move to next file
      * 
-     * Limited concurrency (2 at a time) provides:
-     * - Faster total upload time than fully sequential
-     * - Stable performance without bandwidth saturation
-     * - Consistent upload times for all remote types (S3, WebDAV, Google Drive)
+     * Concurrency is configurable in Settings (1-5):
+     * - 1: Sequential, most stable for slow connections
+     * - 2: Balanced (default), good for most users
+     * - 3-5: Faster, requires good network
      * 
      * This function launches uploads in the background and returns immediately.
      * It does NOT block the caller - uploads continue asynchronously.
@@ -92,11 +109,14 @@ class MultiRemoteUploadCoordinator @Inject constructor(
         }
 
         Log.d(TAG, "Starting upload of ${files.size} files to ${activeRemotes.size} remotes")
-        Log.d(TAG, "Max $MAX_CONCURRENT_REMOTES concurrent remote uploads per file")
 
         // Initialize ALL file states UPFRONT so UI shows total count immediately
         // This runs synchronously before launching background work
         uploadScope.launch {
+            // Update concurrency from settings before starting
+            updateConcurrency()
+            Log.d(TAG, "Using $currentConcurrency concurrent uploads")
+            
             // First, initialize all file states so user sees X/Y total immediately
             files.forEach { file ->
                 initializeFileState(file, activeRemotes)
@@ -108,7 +128,7 @@ class MultiRemoteUploadCoordinator @Inject constructor(
                 Log.d(TAG, "Processing file: ${file.fileName}")
 
                 // Upload this file to remotes with LIMITED concurrency
-                // Semaphore ensures only MAX_CONCURRENT_REMOTES upload at once
+                // Semaphore controls how many concurrent uploads based on user setting
                 val uploadJobs = activeRemotes.map { remote ->
                     async {
                         uploadSemaphore.withPermit {
