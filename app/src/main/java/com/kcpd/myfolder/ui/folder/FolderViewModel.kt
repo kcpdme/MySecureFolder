@@ -30,6 +30,8 @@ class FolderViewModel @Inject constructor(
     private val remoteStorageRepository: RemoteStorageRepository,
     private val s3SessionManager: com.kcpd.myfolder.data.repository.S3SessionManager,
     private val importMediaUseCase: com.kcpd.myfolder.domain.usecase.ImportMediaUseCase,
+    private val multiRemoteUploadCoordinator: com.kcpd.myfolder.domain.usecase.MultiRemoteUploadCoordinator,
+    private val remoteConfigRepository: com.kcpd.myfolder.data.repository.RemoteConfigRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -84,16 +86,27 @@ class FolderViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Multi-remote upload state
+    val uploadStates = multiRemoteUploadCoordinator.uploadStates
+    val activeUploadsCount = multiRemoteUploadCoordinator.activeUploadsCount
+
+    // Legacy upload state (deprecated - kept for backward compatibility during migration)
+    @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     private val _uploadingFiles = MutableStateFlow<Set<String>>(emptySet())
+    @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     val uploadingFiles: StateFlow<Set<String>> = _uploadingFiles.asStateFlow()
 
+    @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     private val _uploadQueue = MutableStateFlow<List<String>>(emptyList())
+    @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     val uploadQueue: StateFlow<List<String>> = _uploadQueue.asStateFlow()
 
+    @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     private val _uploadResults = MutableStateFlow<Map<String, UploadResult>>(emptyMap())
+    @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     val uploadResults: StateFlow<Map<String, UploadResult>> = _uploadResults.asStateFlow()
 
-    // Semaphore to limit concurrent uploads (2 for Google Drive, 3 for B2)
+    @Deprecated("No longer needed - MultiRemoteUploadCoordinator manages concurrency")
     private val uploadSemaphore = Semaphore(2)
 
     fun navigateToFolder(folderId: String?) {
@@ -210,63 +223,80 @@ class FolderViewModel @Inject constructor(
     }
 
     /**
-     * Upload a single file with rate limiting and concurrency control.
-     * Uses a semaphore to limit concurrent uploads to 2-3 at a time.
+     * Upload a single file to all active remotes.
+     * Uses MultiRemoteUploadCoordinator for parallel multi-remote upload.
      */
     fun uploadFile(mediaFile: MediaFile) {
         viewModelScope.launch {
-            // Add to queue first
-            _uploadQueue.value = _uploadQueue.value + mediaFile.id
-            // Clear previous result
-            _uploadResults.value = _uploadResults.value.minus(mediaFile.id)
-
-            // Wait for available slot (max 2 concurrent uploads)
-            uploadSemaphore.withPermit {
-                // Remove from queue, add to uploading - create new collections to trigger StateFlow
-                _uploadQueue.value = _uploadQueue.value.filterNot { it == mediaFile.id }
-                _uploadingFiles.value = _uploadingFiles.value + mediaFile.id
-
-                android.util.Log.d("FolderViewModel", "Upload started for: ${mediaFile.fileName}, uploading: ${_uploadingFiles.value.size}, queued: ${_uploadQueue.value.size}")
-                try {
-                    val result = remoteStorageRepository.uploadFile(mediaFile)
-                    result.onSuccess { url ->
-                        android.util.Log.d("FolderViewModel", "File uploaded successfully: ${mediaFile.fileName} -> $url")
-                        _uploadResults.value = _uploadResults.value + (mediaFile.id to UploadResult.Success)
-                    }.onFailure { error ->
-                        android.util.Log.e("FolderViewModel", "Upload failed for ${mediaFile.fileName}", error)
-                        val errorMessage = error.message ?: "Unknown upload error"
-                        _uploadResults.value = _uploadResults.value + (mediaFile.id to UploadResult.Error(errorMessage))
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("FolderViewModel", "Upload exception for ${mediaFile.fileName}", e)
-                    val errorMessage = e.message ?: "Unknown upload error"
-                    _uploadResults.value = _uploadResults.value + (mediaFile.id to UploadResult.Error(errorMessage))
-                } finally {
-                    // Remove from uploading set - create new set to trigger StateFlow update
-                    _uploadingFiles.value = _uploadingFiles.value.filterNot { it == mediaFile.id }.toSet()
-                    android.util.Log.d("FolderViewModel", "Upload finished for: ${mediaFile.fileName}, remaining: ${_uploadingFiles.value.size}, current set: ${_uploadingFiles.value}")
-
-                    // Rate limiting: delay before next upload
-                    // Google Drive: max 1000 requests/100s = ~10 req/s = 100ms delay
-                    // B2: max 1000 requests/day for free tier = be conservative
-                    delay(150)
+            try {
+                // Check if any active remotes are configured
+                if (!remoteConfigRepository.hasActiveRemotes()) {
+                    android.util.Log.w("FolderViewModel", "No active remotes configured")
+                    // TODO: Show error to user via UI state
+                    return@launch
                 }
+
+                multiRemoteUploadCoordinator.uploadFile(mediaFile, viewModelScope)
+                android.util.Log.d("FolderViewModel", "Started multi-remote upload for: ${mediaFile.fileName}")
+            } catch (e: Exception) {
+                android.util.Log.e("FolderViewModel", "Failed to initiate upload for ${mediaFile.fileName}", e)
             }
         }
     }
 
     /**
-     * Upload multiple files in batches with proper rate limiting.
-     * Recommended for bulk operations.
+     * Upload multiple files to all active remotes in parallel.
+     * Each file will be uploaded to all configured remotes concurrently.
      */
     fun uploadFiles(mediaFiles: List<MediaFile>) {
-        mediaFiles.forEach { file ->
-            uploadFile(file)
+        viewModelScope.launch {
+            try {
+                // Check if any active remotes are configured
+                if (!remoteConfigRepository.hasActiveRemotes()) {
+                    android.util.Log.w("FolderViewModel", "No active remotes configured")
+                    // TODO: Show error to user via UI state
+                    return@launch
+                }
+
+                android.util.Log.d("FolderViewModel", "Starting multi-remote upload for ${mediaFiles.size} files to ${remoteConfigRepository.getActiveRemoteCount()} remotes")
+                multiRemoteUploadCoordinator.uploadFiles(mediaFiles, viewModelScope)
+            } catch (e: Exception) {
+                android.util.Log.e("FolderViewModel", "Failed to initiate uploads", e)
+            }
         }
     }
 
+    /**
+     * Retry a failed upload for a specific file to a specific remote
+     */
+    fun retryUpload(fileId: String, remoteId: String) {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.retryUpload(fileId, remoteId, viewModelScope)
+        }
+    }
+
+    /**
+     * Clear completed uploads from the UI
+     */
+    fun clearCompletedUploads() {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.clearCompleted()
+        }
+    }
+
+    /**
+     * Check if a file is currently being uploaded
+     */
     fun isUploading(fileId: String): Boolean {
-        return _uploadingFiles.value.contains(fileId)
+        val state = multiRemoteUploadCoordinator.getFileUploadState(fileId)
+        return state != null && !state.isComplete
+    }
+
+    /**
+     * Check if any uploads are in progress
+     */
+    fun hasActiveUploads(): Boolean {
+        return multiRemoteUploadCoordinator.hasActiveUploads()
     }
 
     fun shareMediaFile(mediaFile: MediaFile) {
@@ -287,11 +317,13 @@ class FolderViewModel @Inject constructor(
         _searchQuery.value = ""
     }
 
+    @Deprecated("Use clearCompletedUploads() instead")
     fun clearUploadResult(fileId: String) {
         _uploadResults.value = _uploadResults.value.minus(fileId)
     }
 }
 
+@Deprecated("Use FileUploadState from MultiRemoteUploadCoordinator instead")
 sealed class UploadResult {
     object Success : UploadResult()
     data class Error(val message: String) : UploadResult()

@@ -51,6 +51,12 @@ fun FolderScreen(
     val currentFolder by viewModel.currentFolder.collectAsState()
     val currentFolderId by viewModel.currentFolderId.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+
+    // Multi-remote upload states
+    val uploadStates by viewModel.uploadStates.collectAsState()
+    val activeUploadsCount by viewModel.activeUploadsCount.collectAsState()
+
+    // Legacy upload states (for backward compatibility - deprecated)
     val uploadingFiles by viewModel.uploadingFiles.collectAsState()
     val uploadQueue by viewModel.uploadQueue.collectAsState()
     val uploadResults by viewModel.uploadResults.collectAsState()
@@ -875,19 +881,18 @@ fun FolderScreen(
             }
         }
 
-        // Upload Queue Bottom Sheet
-        if (showUploadQueue) {
-            ModalBottomSheet(
-                onDismissRequest = { showUploadQueue = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            ) {
-                UploadQueueSheet(
-                    uploadingFiles = uploadingFiles,
-                    queuedFiles = uploadQueue,
-                    allFiles = mediaFiles,
-                    onDismiss = { showUploadQueue = false }
-                )
-            }
+        // Multi-Remote Upload Progress Sheet
+        if (uploadStates.isNotEmpty()) {
+            MultiRemoteUploadSheet(
+                uploadStates = uploadStates,
+                onDismiss = { /* Allow dismissing while uploads continue */ },
+                onRetry = { fileId, remoteId ->
+                    viewModel.retryUpload(fileId, remoteId)
+                },
+                onClearCompleted = {
+                    viewModel.clearCompletedUploads()
+                }
+            )
         }
 
         // Share Options Dialog - styled to match app theme

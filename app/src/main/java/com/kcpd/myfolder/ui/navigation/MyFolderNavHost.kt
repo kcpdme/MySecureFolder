@@ -30,6 +30,8 @@ import com.kcpd.myfolder.ui.gallery.MediaViewerScreen
 import com.kcpd.myfolder.ui.home.HomeScreen
 import com.kcpd.myfolder.ui.note.NoteEditorScreen
 import com.kcpd.myfolder.ui.scanner.DocumentScannerScreen
+import com.kcpd.myfolder.ui.settings.AddEditRemoteScreen
+import com.kcpd.myfolder.ui.settings.RemoteManagementScreen
 import com.kcpd.myfolder.ui.settings.S3ConfigScreen
 import com.kcpd.myfolder.ui.settings.SettingsScreen
 import com.kcpd.myfolder.ui.viewer.AudioViewerScreen
@@ -293,6 +295,23 @@ fun MyFolderNavHost(
 
         composable("s3_config") {
             S3ConfigScreen(navController = navController)
+        }
+
+        composable("remote_management") {
+            RemoteManagementScreen(navController = navController)
+        }
+
+        composable("add_remote") {
+            AddEditRemoteScreen(navController = navController)
+        }
+
+        composable(
+            route = "edit_remote/{remoteId}",
+            arguments = listOf(
+                navArgument("remoteId") { type = NavType.StringType }
+            )
+        ) {
+            AddEditRemoteScreen(navController = navController)
         }
 
         composable(

@@ -434,6 +434,17 @@ fun SettingsScreen(
                 modifier = Modifier.padding(16.dp)
             )
 
+            SettingsItem(
+                icon = Icons.Default.Cloud,
+                title = "Cloud Remotes",
+                description = "Configure multiple upload destinations",
+                onClick = {
+                    navController.navigate("remote_management")
+                }
+            )
+
+            HorizontalDivider()
+
             // Remote Type Selector
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
