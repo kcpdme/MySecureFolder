@@ -77,13 +77,17 @@ class MultiRemoteUploadCoordinator @Inject constructor(
         Log.d(TAG, "Starting SEQUENTIAL upload of ${files.size} files to ${activeRemotes.size} remotes")
         Log.d(TAG, "Each file will upload to all ${activeRemotes.size} remotes in parallel, then move to next file")
 
-        // Launch the entire upload process in background - returns immediately
+        // Initialize ALL file states UPFRONT so UI shows total count immediately
+        // This runs synchronously before launching background work
         uploadScope.launch {
-            // Process files ONE AT A TIME
+            // First, initialize all file states so user sees X/Y total immediately
             files.forEach { file ->
-                // Initialize upload state for this file
                 initializeFileState(file, activeRemotes)
+            }
+            Log.d(TAG, "Initialized ${files.size} files for upload - all visible in UI now")
 
+            // Now process files ONE AT A TIME
+            files.forEach { file ->
                 Log.d(TAG, "Processing file: ${file.fileName}")
 
                 // Upload this file to ALL remotes in parallel using uploadScope
