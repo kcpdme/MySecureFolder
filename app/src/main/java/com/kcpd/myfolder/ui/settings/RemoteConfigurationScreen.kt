@@ -73,6 +73,12 @@ class RemoteConfigurationViewModel @Inject constructor(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
+    private val _isTesting = MutableStateFlow(false)
+    val isTesting: StateFlow<Boolean> = _isTesting.asStateFlow()
+
+    private val _testResult = MutableStateFlow<String?>(null)
+    val testResult: StateFlow<String?> = _testResult.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
@@ -109,6 +115,53 @@ class RemoteConfigurationViewModel @Inject constructor(
 
     fun updateGoogleAccountEmail(value: String) {
         _googleAccountEmail.value = value
+    }
+
+    fun testConnection() {
+        if (!isS3()) {
+            _testResult.value = "Test connection is only available for S3 remotes"
+            return
+        }
+
+        viewModelScope.launch {
+            _isTesting.value = true
+            _testResult.value = null
+
+            try {
+                // Validation
+                if (_s3Endpoint.value.isBlank() || _s3AccessKey.value.isBlank() ||
+                    _s3SecretKey.value.isBlank() || _s3BucketName.value.isBlank()) {
+                    _testResult.value = "Please fill in all S3 fields first"
+                    _isTesting.value = false
+                    return@launch
+                }
+
+                // Test S3 connection
+                val minioClient = io.minio.MinioClient.builder()
+                    .endpoint(_s3Endpoint.value)
+                    .credentials(_s3AccessKey.value, _s3SecretKey.value)
+                    .region(_s3Region.value)
+                    .build()
+
+                // Check if bucket exists
+                val bucketExists = minioClient.bucketExists(
+                    io.minio.BucketExistsArgs.builder()
+                        .bucket(_s3BucketName.value)
+                        .build()
+                )
+
+                _testResult.value = if (bucketExists) {
+                    "✓ Connection successful! Bucket '${_s3BucketName.value}' is accessible."
+                } else {
+                    "✗ Bucket '${_s3BucketName.value}' not found. Please check the bucket name."
+                }
+            } catch (e: Exception) {
+                _testResult.value = "✗ Connection failed: ${e.message ?: "Unknown error"}"
+                android.util.Log.e("RemoteConfiguration", "Test connection failed", e)
+            } finally {
+                _isTesting.value = false
+            }
+        }
     }
 
     fun saveRemote(onSuccess: () -> Unit) {
@@ -193,6 +246,8 @@ fun RemoteConfigurationScreen(
     val name by viewModel.name.collectAsState()
     val selectedColor by viewModel.selectedColor.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
+    val isTesting by viewModel.isTesting.collectAsState()
+    val testResult by viewModel.testResult.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -296,7 +351,12 @@ fun RemoteConfigurationScreen(
 
             // Type-specific configuration
             if (viewModel.isS3()) {
-                S3ConfigurationFields(viewModel)
+                S3ConfigurationFields(
+                    viewModel = viewModel,
+                    isTesting = isTesting,
+                    testResult = testResult,
+                    onTestClick = { viewModel.testConnection() }
+                )
             } else {
                 GoogleDriveConfigurationFields(
                     viewModel = viewModel,
@@ -362,7 +422,12 @@ fun RemoteColorPicker(
 }
 
 @Composable
-fun S3ConfigurationFields(viewModel: RemoteConfigurationViewModel) {
+fun S3ConfigurationFields(
+    viewModel: RemoteConfigurationViewModel,
+    isTesting: Boolean,
+    testResult: String?,
+    onTestClick: () -> Unit
+) {
     val endpoint by viewModel.s3Endpoint.collectAsState()
     val accessKey by viewModel.s3AccessKey.collectAsState()
     val secretKey by viewModel.s3SecretKey.collectAsState()
@@ -450,6 +515,70 @@ fun S3ConfigurationFields(viewModel: RemoteConfigurationViewModel) {
                 Icon(Icons.Default.Public, contentDescription = null)
             }
         )
+
+        // Test Connection Button
+        Button(
+            onClick = onTestClick,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isTesting
+        ) {
+            if (isTesting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Testing Connection...")
+            } else {
+                Icon(Icons.Default.Cloud, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Test Connection")
+            }
+        }
+
+        // Test Result
+        testResult?.let { result ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (result.startsWith("✓")) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer
+                    }
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (result.startsWith("✓")) {
+                            Icons.Default.CheckCircle
+                        } else {
+                            Icons.Default.Error
+                        },
+                        contentDescription = null,
+                        tint = if (result.startsWith("✓")) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        }
+                    )
+                    Text(
+                        text = result,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (result.startsWith("✓")) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
