@@ -243,6 +243,20 @@ fun AddEditRemoteScreen(
     val remoteType by viewModel.remoteType.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Google Sign-In launcher
+    val googleSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            viewModel.updateGoogleAccountEmail(account.email ?: "")
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            android.util.Log.w("AddEditRemoteScreen", "signInResult:failed code=" + e.statusCode)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -347,7 +361,21 @@ fun AddEditRemoteScreen(
             // Type-specific fields
             when (remoteType) {
                 RemoteTypeSelection.S3 -> S3ConfigFields(viewModel)
-                RemoteTypeSelection.GOOGLE_DRIVE -> GoogleDriveConfigFields(viewModel)
+                RemoteTypeSelection.GOOGLE_DRIVE -> GoogleDriveConfigFields(
+                    viewModel = viewModel,
+                    onSignInClick = {
+                        val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                            com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+                        )
+                        .requestEmail()
+                        .requestScopes(com.google.android.gms.common.api.Scope(com.google.api.services.drive.DriveScopes.DRIVE_FILE))
+                        .requestScopes(com.google.android.gms.common.api.Scope(com.google.api.services.drive.DriveScopes.DRIVE_APPDATA))
+                        .build()
+
+                        val client = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+                        googleSignInLauncher.launch(client.signInIntent)
+                    }
+                )
             }
         }
     }
@@ -470,7 +498,10 @@ fun S3ConfigFields(viewModel: AddEditRemoteViewModel) {
 }
 
 @Composable
-fun GoogleDriveConfigFields(viewModel: AddEditRemoteViewModel) {
+fun GoogleDriveConfigFields(
+    viewModel: AddEditRemoteViewModel,
+    onSignInClick: () -> Unit
+) {
     val accountEmail by viewModel.googleAccountEmail.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -497,9 +528,8 @@ fun GoogleDriveConfigFields(viewModel: AddEditRemoteViewModel) {
                         text = "Please sign in with your Google account to configure this remote.",
                         style = MaterialTheme.typography.bodySmall
                     )
-                    // TODO: Add Google Sign-In button here
                     Button(
-                        onClick = { /* TODO: Trigger Google Sign-In */ },
+                        onClick = onSignInClick,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.AccountCircle, contentDescription = null)
