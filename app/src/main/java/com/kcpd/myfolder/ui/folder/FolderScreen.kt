@@ -415,25 +415,28 @@ fun FolderScreen(
                         
                         // Upload Status icon - shows when there are uploads (active or completed)
                         if (uploadStates.isNotEmpty()) {
+                            // Count pending files (not yet complete)
+                            val pendingFilesCount = uploadStates.values.count { !it.isComplete }
+
                             BadgedBox(
                                 badge = {
-                                    if (activeUploadsCount > 0) {
+                                    if (pendingFilesCount > 0) {
                                         Badge(
                                             containerColor = MaterialTheme.colorScheme.primary
                                         ) {
-                                            Text("$activeUploadsCount")
+                                            Text("$pendingFilesCount")
                                         }
                                     }
                                 }
                             ) {
                                 IconButton(onClick = { viewModel.showUploadSheet() }) {
                                     Icon(
-                                        imageVector = if (activeUploadsCount > 0) 
-                                            Icons.Default.CloudSync 
-                                        else 
+                                        imageVector = if (pendingFilesCount > 0)
+                                            Icons.Default.CloudSync
+                                        else
                                             Icons.Default.CloudDone,
                                         contentDescription = "Upload Status",
-                                        tint = if (activeUploadsCount > 0)
+                                        tint = if (pendingFilesCount > 0)
                                             MaterialTheme.colorScheme.primary
                                         else
                                             MaterialTheme.colorScheme.onSurface
