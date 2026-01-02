@@ -55,9 +55,9 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/DEPENDENCIES"
-            // NOTE: Don't exclude MANIFEST.MF completely - MinIO needs it for version info
-            // Instead, merge all manifests to avoid conflicts
-            merges += "META-INF/MANIFEST.MF"
+            // Exclude MinIO's MANIFEST.MF which causes parsing issues
+            // The SDK handles the version lookup failure gracefully
+            excludes += "META-INF/MANIFEST.MF"
             
             // CRITICAL: Merge META-INF/services for XML parser factory discovery
             // This is required for MinIO SDK to find Woodstox StAX implementation

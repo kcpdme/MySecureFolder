@@ -118,7 +118,37 @@ class S3RepositoryInstance(
     private val s3SessionManager: dagger.Lazy<S3SessionManager>
 ) : RemoteStorageRepository {
 
+    companion object {
+        private const val TAG = "S3RepositoryInstance"
+    }
+
+    // Track if client has been initialized for logging
+    @Volatile
+    private var clientInitialized = false
+
+    // Cache the MinIO client to avoid recreating it for every upload
+    // This eliminates the manifest parsing overhead on each upload
+    private val minioClient: MinioClient by lazy {
+        android.util.Log.d(TAG, "Creating MinIO client for endpoint: ${config.endpoint} (bucket: ${config.bucketName})")
+        val startTime = System.currentTimeMillis()
+        val client = MinioClient.builder()
+            .endpoint(config.endpoint)
+            .credentials(config.accessKey, config.secretKey)
+            .region(config.region)
+            .build()
+        val elapsed = System.currentTimeMillis() - startTime
+        android.util.Log.d(TAG, "MinIO client created in ${elapsed}ms for ${config.bucketName}")
+        clientInitialized = true
+        client
+    }
+
     override suspend fun uploadFile(mediaFile: com.kcpd.myfolder.data.model.MediaFile): Result<String> {
+        // Log whether we're using cached client or creating new one
+        if (clientInitialized) {
+            android.util.Log.d(TAG, "Using CACHED MinIO client for ${config.bucketName}")
+        } else {
+            android.util.Log.d(TAG, "First upload - will initialize MinIO client for ${config.bucketName}")
+        }
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val fileToUpload = java.io.File(mediaFile.filePath)
@@ -131,13 +161,7 @@ class S3RepositoryInstance(
 
                 for (attempt in 1..maxRetries) {
                     try {
-                        // Create MinIO client for this specific config
-                        val minioClient = MinioClient.builder()
-                            .endpoint(config.endpoint)
-                            .credentials(config.accessKey, config.secretKey)
-                            .region(config.region)
-                            .build()
-
+                        // Use cached MinIO client (created lazily on first use)
                         // Build folder path hierarchy
                         val folderPath = buildFolderPath(mediaFile.folderId)
                         val category = com.kcpd.myfolder.data.model.FolderCategory.fromMediaType(mediaFile.mediaType)
@@ -153,17 +177,20 @@ class S3RepositoryInstance(
                         // partSize of -1 uses default (5MB), but we can increase for better throughput
                         val partSize = 10L * 1024 * 1024 // 10MB parts for better performance
 
-                        minioClient.putObject(
-                            PutObjectArgs.builder()
-                                .bucket(config.bucketName)
-                                .`object`(objectName)
-                                .stream(fileToUpload.inputStream(), fileToUpload.length(), partSize)
-                                .contentType("application/octet-stream")
-                                .build()
-                        )
+                        // Use use{} to ensure stream is properly closed after upload
+                        fileToUpload.inputStream().use { inputStream ->
+                            minioClient.putObject(
+                                PutObjectArgs.builder()
+                                    .bucket(config.bucketName)
+                                    .`object`(objectName)
+                                    .stream(inputStream, fileToUpload.length(), partSize)
+                                    .contentType("application/octet-stream")
+                                    .build()
+                            )
+                        }
 
                         val url = "s3://${config.bucketName}/$objectName"
-                        android.util.Log.d("S3RepositoryInstance", "Upload successful: $url")
+                        android.util.Log.d(TAG, "Upload successful: $url")
                         return@withContext Result.success(url)
 
                     } catch (e: Exception) {
