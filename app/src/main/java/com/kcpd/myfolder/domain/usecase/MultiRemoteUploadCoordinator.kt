@@ -19,14 +19,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Coordinates uploads to multiple remote storage providers in parallel.
+ * Coordinates uploads to multiple remote storage providers.
  * Manages upload state, progress tracking, and concurrency control.
+ * 
+ * Uses limited concurrency (2 remotes at a time) to balance:
+ * - Speed: Faster than fully sequential
+ * - Stability: No bandwidth saturation or connection pool exhaustion
  */
 @Singleton
 class MultiRemoteUploadCoordinator @Inject constructor(
@@ -35,11 +41,17 @@ class MultiRemoteUploadCoordinator @Inject constructor(
 ) {
     companion object {
         private const val TAG = "MultiRemoteUploadCoordinator"
+        // Max concurrent remote uploads per file
+        // 2 is a good balance: faster than sequential, stable unlike full parallel
+        private const val MAX_CONCURRENT_REMOTES = 2
     }
 
     // Own scope with SupervisorJob - isolated from caller's scope
     // This ensures multiple upload batches can run independently
     private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    
+    // Semaphore to limit concurrent remote uploads
+    private val uploadSemaphore = Semaphore(MAX_CONCURRENT_REMOTES)
 
     // Mutex for thread-safe state updates
     private val stateMutex = Mutex()
@@ -53,11 +65,16 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     val activeUploadsCount: StateFlow<Int> = _activeUploadsCount.asStateFlow()
 
     /**
-     * Upload multiple files to all active remotes SEQUENTIALLY.
+     * Upload multiple files to all active remotes.
      * For each file:
-     *   1. Upload to all remotes in parallel
+     *   1. Upload to remotes with LIMITED concurrency (MAX_CONCURRENT_REMOTES at a time)
      *   2. Wait for all remotes to complete (success or failure)
      *   3. Move to next file
+     * 
+     * Limited concurrency (2 at a time) provides:
+     * - Faster total upload time than fully sequential
+     * - Stable performance without bandwidth saturation
+     * - Consistent upload times for all remote types (S3, WebDAV, Google Drive)
      * 
      * This function launches uploads in the background and returns immediately.
      * It does NOT block the caller - uploads continue asynchronously.
@@ -74,8 +91,8 @@ class MultiRemoteUploadCoordinator @Inject constructor(
             return
         }
 
-        Log.d(TAG, "Starting SEQUENTIAL upload of ${files.size} files to ${activeRemotes.size} remotes")
-        Log.d(TAG, "Each file will upload to all ${activeRemotes.size} remotes in parallel, then move to next file")
+        Log.d(TAG, "Starting upload of ${files.size} files to ${activeRemotes.size} remotes")
+        Log.d(TAG, "Max $MAX_CONCURRENT_REMOTES concurrent remote uploads per file")
 
         // Initialize ALL file states UPFRONT so UI shows total count immediately
         // This runs synchronously before launching background work
@@ -86,15 +103,17 @@ class MultiRemoteUploadCoordinator @Inject constructor(
             }
             Log.d(TAG, "Initialized ${files.size} files for upload - all visible in UI now")
 
-            // Now process files ONE AT A TIME
+            // Process files ONE AT A TIME
             files.forEach { file ->
                 Log.d(TAG, "Processing file: ${file.fileName}")
 
-                // Upload this file to ALL remotes in parallel using uploadScope
-                // SupervisorJob ensures one failure doesn't cancel others
+                // Upload this file to remotes with LIMITED concurrency
+                // Semaphore ensures only MAX_CONCURRENT_REMOTES upload at once
                 val uploadJobs = activeRemotes.map { remote ->
                     async {
-                        uploadToRemote(file, remote)
+                        uploadSemaphore.withPermit {
+                            uploadToRemote(file, remote)
+                        }
                     }
                 }
 
