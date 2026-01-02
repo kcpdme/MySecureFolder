@@ -1,14 +1,1 @@
-   I  ViewPostIme pointer 1
-2025-12-29 02:45:13.679 30907-31050 MediaRepository         com.kcpd.myfolder                    D  Decrypting file for viewing...
-2025-12-29 02:45:13.679 30907-31050 MediaRepository         com.kcpd.myfolder                    D    Original filename: NewPipe_v0.28.0 (1).apk
-2025-12-29 02:45:13.679 30907-31050 MediaRepository         com.kcpd.myfolder                    D    Encrypted file: /data/user/0/com.kcpd.myfolder/files/secure_media/others/f9b4084f-4b20-4f25-9a20-3f4796a765a5.enc
-2025-12-29 02:45:13.680 30907-31050 MediaRepository         com.kcpd.myfolder                    D    Starting decryption...
-2025-12-29 02:45:13.680 30907-31050 SecureFileManager       com.kcpd.myfolder                    D  🔓 Starting streaming decryption for: f9b4084f-4b20-4f25-9a20-3f4796a765a5.enc
-2025-12-29 02:45:13.681 30907-31050 SecureFileManager       com.kcpd.myfolder                    D  📖 Header IV: 7b,42,50,06,13,ce,4e,73,61,a4,59,3f
-2025-12-29 02:45:13.681 30907-31050 SecureFileManager       com.kcpd.myfolder                    D  🔑 Master key available: 32 bytes
-2025-12-29 02:45:13.681 30907-31050 SecureFileManager       com.kcpd.myfolder                    D  ✅ FEK unwrapped successfully
-2025-12-29 02:45:13.682 30907-31050 SecureFileManager       com.kcpd.myfolder                    D  📖 Body IV (padded): 7b,42,50,06,13,ce,4e,73,61,a4,59,3f,00,00,00,00
-2025-12-29 02:45:13.682 30907-31050 SecureFileManager       com.kcpd.myfolder                    D  ✅ Cipher initialized for body decryption
-2025-12-29 02:45:13.924 30907-31050 MediaRepository         com.kcpd.myfolder                    D    ✓ Decrypted to: /data/user/0/com.kcpd.myfolder/cache/temp_NewPipe_v0.28.0 (1).apk (12088809 bytes)
-2025-12-29 02:45:13.926 30907-30907 CompatChangeReporter    com.kcpd.myfolder                    D  Compat change id reported: 312399441; UID 10916; state: ENABLED
-2025-12-29 02:45:14.032 30907-30907 ImeFocusController      com.kcpd.myfolder                    I  onPr
+/bin/bash: line 1: gradle: command not found

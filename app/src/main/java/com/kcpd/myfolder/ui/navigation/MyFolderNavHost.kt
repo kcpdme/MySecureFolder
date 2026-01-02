@@ -32,6 +32,8 @@ import com.kcpd.myfolder.ui.note.NoteEditorScreen
 import com.kcpd.myfolder.ui.scanner.DocumentScannerScreen
 import com.kcpd.myfolder.ui.settings.AddEditRemoteScreen
 import com.kcpd.myfolder.ui.settings.RemoteManagementScreen
+import com.kcpd.myfolder.ui.settings.RemoteTypeSelectionScreen
+import com.kcpd.myfolder.ui.settings.RemoteConfigurationScreen
 import com.kcpd.myfolder.ui.settings.S3ConfigScreen
 import com.kcpd.myfolder.ui.settings.SettingsScreen
 import com.kcpd.myfolder.ui.viewer.AudioViewerScreen
@@ -301,10 +303,22 @@ fun MyFolderNavHost(
             RemoteManagementScreen(navController = navController)
         }
 
-        composable("add_remote") {
-            AddEditRemoteScreen(navController = navController)
+        // Step 1: Select remote type (new flow for adding remotes)
+        composable("select_remote_type") {
+            RemoteTypeSelectionScreen(navController = navController)
         }
 
+        // Step 2: Configure remote (new flow for adding remotes)
+        composable(
+            route = "configure_remote/{remoteType}",
+            arguments = listOf(
+                navArgument("remoteType") { type = NavType.StringType }
+            )
+        ) {
+            RemoteConfigurationScreen(navController = navController)
+        }
+
+        // Edit remote (uses existing AddEditRemoteScreen)
         composable(
             route = "edit_remote/{remoteId}",
             arguments = listOf(

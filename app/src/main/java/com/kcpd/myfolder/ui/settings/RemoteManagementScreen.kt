@@ -74,7 +74,7 @@ fun RemoteManagementScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { navController.navigate("add_remote") }
+                onClick = { navController.navigate("select_remote_type") }
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Remote")
             }
