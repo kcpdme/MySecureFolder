@@ -148,9 +148,10 @@ class S3RepositoryInstance(
         okhttp3.OkHttpClient.Builder()
             // Retry on connection failure - handles stale connections gracefully
             .retryOnConnectionFailure(true)
-            // Connection pool: max 5 idle connections, 30s keep-alive
-            // Shorter keep-alive prevents stale connection issues with B2/R2
-            .connectionPool(okhttp3.ConnectionPool(5, 30, java.util.concurrent.TimeUnit.SECONDS))
+            // Connection pool: max 2 idle connections, 10s keep-alive
+            // Very short keep-alive prevents stale connection issues with B2
+            // B2 aggressively closes idle connections server-side
+            .connectionPool(okhttp3.ConnectionPool(2, 10, java.util.concurrent.TimeUnit.SECONDS))
             // Timeouts optimized for large file uploads
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
@@ -179,6 +180,9 @@ class S3RepositoryInstance(
         // Log whether we're using cached client or creating new one
         if (clientInitialized) {
             android.util.Log.d(TAG, "Using CACHED MinIO client for ${config.bucketName}")
+            // Evict any stale idle connections before upload
+            // B2 aggressively closes server-side, causing "unexpected end of stream" on first use
+            okHttpClient.connectionPool.evictAll()
         } else {
             android.util.Log.d(TAG, "First upload - will initialize MinIO client for ${config.bucketName}")
         }
@@ -230,6 +234,9 @@ class S3RepositoryInstance(
                         lastException = e
                         android.util.Log.w("S3RepositoryInstance", "Upload attempt $attempt failed", e)
                         if (attempt < maxRetries) {
+                            // Evict idle connections before retry to avoid stale connection reuse
+                            // This is especially important for B2 which aggressively closes idle connections
+                            okHttpClient.connectionPool.evictAll()
                             kotlinx.coroutines.delay(1000L * attempt)
                         }
                     }
