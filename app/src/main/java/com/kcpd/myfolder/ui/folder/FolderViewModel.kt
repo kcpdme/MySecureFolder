@@ -90,6 +90,11 @@ class FolderViewModel @Inject constructor(
     val uploadStates = multiRemoteUploadCoordinator.uploadStates
     val activeUploadsCount = multiRemoteUploadCoordinator.activeUploadsCount
 
+    // Control visibility of upload sheet (allows user to hide it while uploads continue in background)
+    // Starts as false, becomes true when uploads start
+    private val _showUploadSheet = MutableStateFlow(false)
+    val showUploadSheet: StateFlow<Boolean> = _showUploadSheet.asStateFlow()
+
     // Legacy upload state (deprecated - kept for backward compatibility during migration)
     @Deprecated("Use uploadStates from MultiRemoteUploadCoordinator instead")
     private val _uploadingFiles = MutableStateFlow<Set<String>>(emptySet())
@@ -237,6 +242,7 @@ class FolderViewModel @Inject constructor(
                 }
 
                 multiRemoteUploadCoordinator.uploadFile(mediaFile, viewModelScope)
+                _showUploadSheet.value = true // Show sheet when upload starts
                 android.util.Log.d("FolderViewModel", "Started multi-remote upload for: ${mediaFile.fileName}")
             } catch (e: Exception) {
                 android.util.Log.e("FolderViewModel", "Failed to initiate upload for ${mediaFile.fileName}", e)
@@ -260,6 +266,7 @@ class FolderViewModel @Inject constructor(
 
                 android.util.Log.d("FolderViewModel", "Starting multi-remote upload for ${mediaFiles.size} files to ${remoteConfigRepository.getActiveRemoteCount()} remotes")
                 multiRemoteUploadCoordinator.uploadFiles(mediaFiles, viewModelScope)
+                _showUploadSheet.value = true // Show sheet when uploads start
             } catch (e: Exception) {
                 android.util.Log.e("FolderViewModel", "Failed to initiate uploads", e)
             }
@@ -282,6 +289,13 @@ class FolderViewModel @Inject constructor(
         viewModelScope.launch {
             multiRemoteUploadCoordinator.clearCompleted()
         }
+    }
+
+    /**
+     * Dismiss the upload sheet (uploads continue in background)
+     */
+    fun dismissUploadSheet() {
+        _showUploadSheet.value = false
     }
 
     /**

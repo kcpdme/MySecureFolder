@@ -148,11 +148,16 @@ class S3RepositoryInstance(
                             "MyFolderPrivate/${category.path}/${fileToUpload.name}"
                         }
 
+                        // Optimize multipart upload settings for better performance
+                        // Use larger part size (10MB) for faster uploads to R2/B2
+                        // partSize of -1 uses default (5MB), but we can increase for better throughput
+                        val partSize = 10L * 1024 * 1024 // 10MB parts for better performance
+
                         minioClient.putObject(
                             PutObjectArgs.builder()
                                 .bucket(config.bucketName)
                                 .`object`(objectName)
-                                .stream(fileToUpload.inputStream(), fileToUpload.length(), -1)
+                                .stream(fileToUpload.inputStream(), fileToUpload.length(), partSize)
                                 .contentType("application/octet-stream")
                                 .build()
                         )
@@ -163,6 +168,7 @@ class S3RepositoryInstance(
 
                     } catch (e: Exception) {
                         lastException = e
+                        android.util.Log.w("S3RepositoryInstance", "Upload attempt $attempt failed", e)
                         if (attempt < maxRetries) {
                             kotlinx.coroutines.delay(1000L * attempt)
                         }

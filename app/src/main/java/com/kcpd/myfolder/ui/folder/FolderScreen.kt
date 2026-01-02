@@ -55,6 +55,7 @@ fun FolderScreen(
     // Multi-remote upload states
     val uploadStates by viewModel.uploadStates.collectAsState()
     val activeUploadsCount by viewModel.activeUploadsCount.collectAsState()
+    val showUploadSheet by viewModel.showUploadSheet.collectAsState()
 
     // Legacy upload states (for backward compatibility - deprecated)
     val uploadingFiles by viewModel.uploadingFiles.collectAsState()
@@ -882,10 +883,12 @@ fun FolderScreen(
         }
 
         // Multi-Remote Upload Progress Sheet
-        if (uploadStates.isNotEmpty()) {
+        if (uploadStates.isNotEmpty() && showUploadSheet) {
             MultiRemoteUploadSheet(
                 uploadStates = uploadStates,
-                onDismiss = { /* Allow dismissing while uploads continue */ },
+                onDismiss = {
+                    viewModel.dismissUploadSheet() // Allow dismissing while uploads continue in background
+                },
                 onRetry = { fileId, remoteId ->
                     viewModel.retryUpload(fileId, remoteId)
                 },

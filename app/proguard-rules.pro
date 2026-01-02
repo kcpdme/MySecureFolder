@@ -26,20 +26,69 @@
 -keep class com.fasterxml.jackson.** { *; }
 -keep class org.codehaus.stax2.** { *; }
 -keep class com.ctc.wstx.** { *; }
-# Explicitly keep the factories referenced by reflection/system property
--keep class com.ctc.wstx.stax.WstxInputFactory { *; }
--keep class com.ctc.wstx.stax.WstxOutputFactory { *; }
--keep class com.ctc.wstx.stax.WstxEventFactory { *; }
+
+# Explicitly keep the Woodstox factory classes and their constructors
+# These are instantiated via reflection by javax.xml.stream.XMLInputFactory.newInstance()
+-keep class com.ctc.wstx.stax.WstxInputFactory {
+    public <init>();
+    <methods>;
+}
+-keep class com.ctc.wstx.stax.WstxOutputFactory {
+    public <init>();
+    <methods>;
+}
+-keep class com.ctc.wstx.stax.WstxEventFactory {
+    public <init>();
+    <methods>;
+}
+
+# Keep service loader configuration files
+-keep class META-INF.services.** { *; }
+-keepnames class META-INF.services.**
+
+# Keep the factory finder implementation
+-keep class javax.xml.stream.FactoryFinder {
+    *;
+}
+
+# Keep service provider lookup mechanism
+-keepclassmembers class * implements javax.xml.stream.XMLInputFactory {
+    public <init>();
+}
+-keepclassmembers class * implements javax.xml.stream.XMLOutputFactory {
+    public <init>();
+}
+-keepclassmembers class * implements javax.xml.stream.XMLEventFactory {
+    public <init>();
+}
 
 -dontwarn com.ctc.wstx.**
 -dontwarn org.codehaus.stax2.**
 -dontwarn javax.xml.stream.**
 
-# Keep SimpleXML (used by MinIO)
+# Keep SimpleXML (used by MinIO for XML parsing)
+# CRITICAL: NodeBuilder uses XMLInputFactory in its static initializer
 -keep class org.simpleframework.xml.** { *; }
 -keep class org.simpleframework.xml.core.** { *; }
 -keep class org.simpleframework.xml.stream.** { *; }
--dontwarn org.simpleframework.xml.stream.**
+
+# Keep NodeBuilder and its static initialization - this is the class that fails on async threads
+-keep class org.simpleframework.xml.stream.NodeBuilder {
+    <clinit>;
+    *;
+}
+-keep class org.simpleframework.xml.stream.StreamProvider {
+    public <init>();
+    *;
+}
+-keep class org.simpleframework.xml.stream.ProviderFactory {
+    *;
+}
+-keep class org.simpleframework.xml.core.Persister {
+    public <init>();
+    *;
+}
+-dontwarn org.simpleframework.xml.**
 
 # ===================================
 # AndroidX Security Crypto

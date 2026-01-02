@@ -24,21 +24,10 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
 
-        // Configure StAX for MinIO (Android doesn't have a default StAX provider)
-        // This fixes javax.xml.stream.FactoryConfigurationError: Provider com.bea.xml.stream.MXParserFactory not found
-        System.setProperty("javax.xml.stream.XMLInputFactory", "com.ctc.wstx.stax.WstxInputFactory")
-        System.setProperty("javax.xml.stream.XMLOutputFactory", "com.ctc.wstx.stax.WstxOutputFactory")
-        System.setProperty("javax.xml.stream.XMLEventFactory", "com.ctc.wstx.stax.WstxEventFactory")
-
-        // Verify Woodstox is available (critical for S3 multipart uploads)
-        try {
-            // Force load the class to ensure ProGuard hasn't stripped it
-            val factoryClass = Class.forName("com.ctc.wstx.stax.WstxInputFactory")
-            val factory = factoryClass.getDeclaredConstructor().newInstance()
-            android.util.Log.d("MyFolderApp", "Woodstox XML loaded successfully: ${factory.javaClass.name}")
-        } catch (e: Throwable) {
-            android.util.Log.e("MyFolderApp", "CRITICAL: Failed to load Woodstox XML provider. S3 uploads may fail.", e)
-        }
+        // Initialize StAX/Woodstox XML parser for MinIO S3 multipart uploads
+        // This MUST be done on the main thread BEFORE any MinIO operations
+        // to ensure the factory is cached before OkHttp async callbacks try to use it
+        initializeStaxXmlParser()
 
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(this)
@@ -178,5 +167,74 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader {
         return imageLoader
+    }
+
+    /**
+     * Initialize StAX/Woodstox XML parser for MinIO S3 multipart uploads.
+     * 
+     * This is CRITICAL: MinIO uses SimpleXML which uses StAX under the hood.
+     * On Android, there's no default StAX provider, so we must use Woodstox.
+     * 
+     * The problem is that SimpleXML's NodeBuilder class gets initialized lazily
+     * on OkHttp's async callback threads. These threads have a different
+     * thread context classloader, which breaks the service provider lookup.
+     * 
+     * The fix is to PRE-INITIALIZE all these classes on the main thread
+     * during Application.onCreate() so they're already cached when
+     * OkHttp callbacks try to use them.
+     */
+    private fun initializeStaxXmlParser() {
+        try {
+            // Step 1: Set system properties FIRST
+            System.setProperty("javax.xml.stream.XMLInputFactory", "com.ctc.wstx.stax.WstxInputFactory")
+            System.setProperty("javax.xml.stream.XMLOutputFactory", "com.ctc.wstx.stax.WstxOutputFactory")
+            System.setProperty("javax.xml.stream.XMLEventFactory", "com.ctc.wstx.stax.WstxEventFactory")
+
+            // Step 2: Force-load Woodstox classes to ensure they're in the classloader
+            val inputFactoryClass = Class.forName("com.ctc.wstx.stax.WstxInputFactory")
+            val outputFactoryClass = Class.forName("com.ctc.wstx.stax.WstxOutputFactory")
+            val eventFactoryClass = Class.forName("com.ctc.wstx.stax.WstxEventFactory")
+            android.util.Log.d("MyFolderApp", "Woodstox classes loaded: ${inputFactoryClass.name}")
+
+            // Step 3: Create factory instances to cache them in the JVM
+            val xmlInputFactory = javax.xml.stream.XMLInputFactory.newInstance()
+            val xmlOutputFactory = javax.xml.stream.XMLOutputFactory.newInstance()
+            android.util.Log.d("MyFolderApp", "XMLInputFactory: ${xmlInputFactory.javaClass.name}")
+            android.util.Log.d("MyFolderApp", "XMLOutputFactory: ${xmlOutputFactory.javaClass.name}")
+
+            // Step 4: CRITICAL - Pre-initialize SimpleXML's NodeBuilder
+            // This class is the one that fails on async threads because it
+            // calls XMLInputFactory.newInstance() during static initialization.
+            // By forcing it to load NOW on the main thread, we avoid the issue.
+            try {
+                val nodeBuilderClass = Class.forName("org.simpleframework.xml.stream.NodeBuilder")
+                android.util.Log.d("MyFolderApp", "SimpleXML NodeBuilder pre-initialized: ${nodeBuilderClass.name}")
+            } catch (e: Exception) {
+                android.util.Log.w("MyFolderApp", "Could not pre-initialize NodeBuilder (may be OK)", e)
+            }
+
+            // Step 5: Pre-initialize the Persister class which is what MinIO actually uses
+            try {
+                val persisterClass = Class.forName("org.simpleframework.xml.core.Persister")
+                // Create an instance to trigger full static initialization
+                val persister = persisterClass.getDeclaredConstructor().newInstance()
+                android.util.Log.d("MyFolderApp", "SimpleXML Persister initialized: ${persister.javaClass.name}")
+            } catch (e: Exception) {
+                android.util.Log.w("MyFolderApp", "Could not pre-initialize Persister (may be OK)", e)
+            }
+
+            // Step 6: Pre-initialize MinIO's Xml helper class
+            try {
+                val minioXmlClass = Class.forName("io.minio.Xml")
+                android.util.Log.d("MyFolderApp", "MinIO Xml class loaded: ${minioXmlClass.name}")
+            } catch (e: Exception) {
+                android.util.Log.w("MyFolderApp", "Could not pre-initialize MinIO Xml class", e)
+            }
+
+            android.util.Log.i("MyFolderApp", "StAX/Woodstox XML parser fully initialized for S3 uploads")
+
+        } catch (e: Throwable) {
+            android.util.Log.e("MyFolderApp", "CRITICAL: Failed to initialize StAX/Woodstox. S3 multipart uploads will fail!", e)
+        }
     }
 }

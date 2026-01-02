@@ -55,8 +55,17 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/DEPENDENCIES"
-            pickFirst("META-INF/MANIFEST.MF") // Fix for MinIO SDK invalid header field
-            // Don't exclude MANIFEST.MF - MinIO SDK needs it to read version info
+            // NOTE: Don't exclude MANIFEST.MF completely - MinIO needs it for version info
+            // Instead, merge all manifests to avoid conflicts
+            merges += "META-INF/MANIFEST.MF"
+            
+            // CRITICAL: Merge META-INF/services for XML parser factory discovery
+            // This is required for MinIO SDK to find Woodstox StAX implementation
+            // Using merges instead of pickFirsts ensures all providers are included
+            merges += "META-INF/services/javax.xml.stream.XMLInputFactory"
+            merges += "META-INF/services/javax.xml.stream.XMLOutputFactory"
+            merges += "META-INF/services/javax.xml.stream.XMLEventFactory"
+            merges += "META-INF/services/*"
         }
         jniLibs {
             useLegacyPackaging = false
