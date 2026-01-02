@@ -120,6 +120,11 @@ class RemoteRepositoryFactory @Inject constructor(
 /**
  * S3Repository instance that doesn't use singleton DataStore.
  * Each instance has its own configuration passed via constructor.
+ *
+ * Optimizations:
+ * - Uses custom OkHttpClient with proper connection pool settings
+ * - Shorter keep-alive to avoid stale connection errors on B2/R2
+ * - retryOnConnectionFailure for resilience on mobile networks
  */
 class S3RepositoryInstance(
     private val context: Context,
@@ -137,6 +142,22 @@ class S3RepositoryInstance(
     @Volatile
     private var clientInitialized = false
 
+    // Custom OkHttpClient optimized for S3/B2/R2 uploads
+    // Fixes: stale connection reuse causing "unexpected end of stream" errors
+    private val okHttpClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            // Retry on connection failure - handles stale connections gracefully
+            .retryOnConnectionFailure(true)
+            // Connection pool: max 5 idle connections, 30s keep-alive
+            // Shorter keep-alive prevents stale connection issues with B2/R2
+            .connectionPool(okhttp3.ConnectionPool(5, 30, java.util.concurrent.TimeUnit.SECONDS))
+            // Timeouts optimized for large file uploads
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
     // Cache the MinIO client to avoid recreating it for every upload
     // This eliminates the manifest parsing overhead on each upload
     private val minioClient: MinioClient by lazy {
@@ -146,6 +167,7 @@ class S3RepositoryInstance(
             .endpoint(config.endpoint)
             .credentials(config.accessKey, config.secretKey)
             .region(config.region)
+            .httpClient(okHttpClient)
             .build()
         val elapsed = System.currentTimeMillis() - startTime
         android.util.Log.d(TAG, "MinIO client created in ${elapsed}ms for ${config.bucketName}")
