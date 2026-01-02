@@ -45,14 +45,23 @@ fun MultiRemoteUploadSheet(
     val totalFiles = sortedStates.size
     val completedFiles = sortedStates.count { it.isComplete }
     val hasCompletedFiles = sortedStates.any { it.isComplete }
+    val hasActiveUploads = sortedStates.any { it.activeCount > 0 }
+
+    // Fullscreen sheet - can be dismissed by swipe or close button
+    // User can always bring it back using the upload status icon in toolbar
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxHeight(0.75f)
+        sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .fillMaxHeight()
                 .padding(bottom = 16.dp)
         ) {
             // Header
@@ -65,12 +74,15 @@ fun MultiRemoteUploadSheet(
             ) {
                 Column {
                     Text(
-                        text = "Uploading Files",
+                        text = "Upload Status",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "$completedFiles of $totalFiles files completed",
+                        text = if (hasActiveUploads) 
+                            "$completedFiles of $totalFiles files completed" 
+                        else 
+                            "All uploads completed",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -88,41 +100,47 @@ fun MultiRemoteUploadSheet(
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             // Upload list
-            if (sortedStates.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                if (sortedStates.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "All uploads completed",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "All uploads completed",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(sortedStates, key = { it.fileId }) { state ->
-                        FileUploadCard(
-                            uploadState = state,
-                            onRetry = { remoteId -> onRetry(state.fileId, remoteId) }
-                        )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(sortedStates, key = { it.fileId }) { state ->
+                            FileUploadCard(
+                                uploadState = state,
+                                onRetry = { remoteId -> onRetry(state.fileId, remoteId) }
+                            )
+                        }
                     }
                 }
             }

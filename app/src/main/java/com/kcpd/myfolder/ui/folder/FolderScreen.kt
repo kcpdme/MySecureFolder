@@ -412,6 +412,36 @@ fun FolderScreen(
                                 )
                             }
                         }
+                        
+                        // Upload Status icon - shows when there are uploads (active or completed)
+                        if (uploadStates.isNotEmpty()) {
+                            BadgedBox(
+                                badge = {
+                                    if (activeUploadsCount > 0) {
+                                        Badge(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        ) {
+                                            Text("$activeUploadsCount")
+                                        }
+                                    }
+                                }
+                            ) {
+                                IconButton(onClick = { viewModel.showUploadSheet() }) {
+                                    Icon(
+                                        imageVector = if (activeUploadsCount > 0) 
+                                            Icons.Default.CloudSync 
+                                        else 
+                                            Icons.Default.CloudDone,
+                                        contentDescription = "Upload Status",
+                                        tint = if (activeUploadsCount > 0)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        
                         if (hasContent) {
                             IconButton(onClick = {
                                 isMultiSelectMode = true

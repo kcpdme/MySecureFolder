@@ -8,9 +8,14 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.kcpd.myfolder.domain.model.RemoteConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -29,6 +34,9 @@ class RemoteConfigRepository @Inject constructor(
     )
 
     private val dataStore = context.remoteConfigDataStore
+    
+    // Scope for maintaining cached state
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -38,6 +46,10 @@ class RemoteConfigRepository @Inject constructor(
     companion object {
         private val REMOTES_KEY = stringPreferencesKey("remotes_list")
     }
+    
+    // Cached list of all remotes - stays up to date automatically
+    private val _cachedRemotes = getAllRemotesFlow()
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     /**
      * Get all configured remotes as a Flow
@@ -74,6 +86,14 @@ class RemoteConfigRepository @Inject constructor(
      */
     suspend fun getActiveRemotes(): List<RemoteConfig> {
         return getActiveRemotesFlow().first()
+    }
+    
+    /**
+     * Get only active remotes synchronously (uses cached data)
+     * Safe to call from any thread - returns cached value
+     */
+    fun getActiveRemotesSync(): List<RemoteConfig> {
+        return _cachedRemotes.value.filter { it.isActive }
     }
 
     /**

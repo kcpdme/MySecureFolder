@@ -230,60 +230,52 @@ class FolderViewModel @Inject constructor(
     /**
      * Upload a single file to all active remotes.
      * Uses MultiRemoteUploadCoordinator for parallel multi-remote upload.
+     * Non-blocking - returns immediately while uploads happen in background.
      */
     fun uploadFile(mediaFile: MediaFile) {
-        viewModelScope.launch {
-            try {
-                // Check if any active remotes are configured
-                if (!remoteConfigRepository.hasActiveRemotes()) {
-                    android.util.Log.w("FolderViewModel", "No active remotes configured")
-                    // TODO: Show error to user via UI state
-                    return@launch
-                }
-
-                // Show sheet IMMEDIATELY before starting upload
-                _showUploadSheet.value = true
-                android.util.Log.d("FolderViewModel", "Starting multi-remote upload for: ${mediaFile.fileName}")
-                
-                multiRemoteUploadCoordinator.uploadFile(mediaFile, viewModelScope)
-            } catch (e: Exception) {
-                android.util.Log.e("FolderViewModel", "Failed to initiate upload for ${mediaFile.fileName}", e)
-            }
+        // Check if any active remotes are configured
+        if (remoteConfigRepository.getActiveRemotesSync().isEmpty()) {
+            android.util.Log.w("FolderViewModel", "No active remotes configured")
+            // TODO: Show error to user via UI state
+            return
         }
+
+        // Show sheet IMMEDIATELY before starting upload
+        _showUploadSheet.value = true
+        android.util.Log.d("FolderViewModel", "Starting multi-remote upload for: ${mediaFile.fileName}")
+        
+        // This returns immediately - uploads happen in background
+        multiRemoteUploadCoordinator.uploadFile(mediaFile, viewModelScope)
     }
 
     /**
      * Upload multiple files to all active remotes in parallel.
      * Each file will be uploaded to all configured remotes concurrently.
+     * Non-blocking - returns immediately while uploads happen in background.
      */
     fun uploadFiles(mediaFiles: List<MediaFile>) {
-        viewModelScope.launch {
-            try {
-                // Check if any active remotes are configured
-                if (!remoteConfigRepository.hasActiveRemotes()) {
-                    android.util.Log.w("FolderViewModel", "No active remotes configured")
-                    // TODO: Show error to user via UI state
-                    return@launch
-                }
-
-                android.util.Log.d("FolderViewModel", "Starting multi-remote upload for ${mediaFiles.size} files to ${remoteConfigRepository.getActiveRemoteCount()} remotes")
-                // Show sheet IMMEDIATELY before starting uploads
-                _showUploadSheet.value = true
-                
-                multiRemoteUploadCoordinator.uploadFiles(mediaFiles, viewModelScope)
-            } catch (e: Exception) {
-                android.util.Log.e("FolderViewModel", "Failed to initiate uploads", e)
-            }
+        val activeRemotes = remoteConfigRepository.getActiveRemotesSync()
+        
+        // Check if any active remotes are configured
+        if (activeRemotes.isEmpty()) {
+            android.util.Log.w("FolderViewModel", "No active remotes configured")
+            // TODO: Show error to user via UI state
+            return
         }
+
+        android.util.Log.d("FolderViewModel", "Starting multi-remote upload for ${mediaFiles.size} files to ${activeRemotes.size} remotes")
+        // Show sheet IMMEDIATELY before starting uploads
+        _showUploadSheet.value = true
+        
+        // This returns immediately - uploads happen in background
+        multiRemoteUploadCoordinator.uploadFiles(mediaFiles, viewModelScope)
     }
 
     /**
      * Retry a failed upload for a specific file to a specific remote
      */
     fun retryUpload(fileId: String, remoteId: String) {
-        viewModelScope.launch {
-            multiRemoteUploadCoordinator.retryUpload(fileId, remoteId, viewModelScope)
-        }
+        multiRemoteUploadCoordinator.retryUpload(fileId, remoteId, viewModelScope)
     }
 
     /**
@@ -301,6 +293,13 @@ class FolderViewModel @Inject constructor(
     fun dismissUploadSheet() {
         _showUploadSheet.value = false
     }
+    
+    /**
+     * Show the upload status sheet
+     */
+    fun showUploadSheet() {
+        _showUploadSheet.value = true
+    }
 
     /**
      * Check if a file is currently being uploaded
@@ -311,10 +310,17 @@ class FolderViewModel @Inject constructor(
     }
 
     /**
-     * Check if any uploads are in progress
+     * Check if any uploads are in progress or have results to show
      */
     fun hasActiveUploads(): Boolean {
         return multiRemoteUploadCoordinator.hasActiveUploads()
+    }
+    
+    /**
+     * Check if there are any upload states to show (active or completed)
+     */
+    fun hasUploadStates(): Boolean {
+        return uploadStates.value.isNotEmpty()
     }
 
     fun shareMediaFile(mediaFile: MediaFile) {

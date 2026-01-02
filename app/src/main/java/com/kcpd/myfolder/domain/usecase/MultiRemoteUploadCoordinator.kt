@@ -10,6 +10,7 @@ import com.kcpd.myfolder.domain.model.RemoteUploadResult
 import com.kcpd.myfolder.domain.model.UploadStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +36,10 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     companion object {
         private const val TAG = "MultiRemoteUploadCoordinator"
     }
+
+    // Own scope with SupervisorJob - isolated from caller's scope
+    // This ensures multiple upload batches can run independently
+    private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Mutex for thread-safe state updates
     private val stateMutex = Mutex()
@@ -52,50 +58,58 @@ class MultiRemoteUploadCoordinator @Inject constructor(
      *   1. Upload to all remotes in parallel
      *   2. Wait for all remotes to complete (success or failure)
      *   3. Move to next file
+     * 
+     * This function launches uploads in the background and returns immediately.
+     * It does NOT block the caller - uploads continue asynchronously.
+     * The scope parameter is kept for backward compatibility but is no longer used.
      */
-    suspend fun uploadFiles(
+    fun uploadFiles(
         files: List<MediaFile>,
-        scope: CoroutineScope
+        @Suppress("UNUSED_PARAMETER") scope: CoroutineScope
     ) {
-        val activeRemotes = remoteConfigRepository.getActiveRemotes()
+        val activeRemotes = remoteConfigRepository.getActiveRemotesSync()
 
         if (activeRemotes.isEmpty()) {
             Log.w(TAG, "No active remotes configured")
-            throw IllegalStateException("No active remotes configured. Please enable at least one remote in settings.")
+            return
         }
 
         Log.d(TAG, "Starting SEQUENTIAL upload of ${files.size} files to ${activeRemotes.size} remotes")
         Log.d(TAG, "Each file will upload to all ${activeRemotes.size} remotes in parallel, then move to next file")
 
-        // Process files ONE AT A TIME
-        files.forEach { file ->
-            // Initialize upload state for this file
-            initializeFileState(file, activeRemotes)
+        // Launch the entire upload process in background - returns immediately
+        uploadScope.launch {
+            // Process files ONE AT A TIME
+            files.forEach { file ->
+                // Initialize upload state for this file
+                initializeFileState(file, activeRemotes)
 
-            Log.d(TAG, "Processing file: ${file.fileName}")
+                Log.d(TAG, "Processing file: ${file.fileName}")
 
-            // Upload this file to ALL remotes in parallel and WAIT for completion
-            val uploadJobs = activeRemotes.map { remote ->
-                scope.async(Dispatchers.IO) {
-                    uploadToRemote(file, remote)
+                // Upload this file to ALL remotes in parallel using uploadScope
+                // SupervisorJob ensures one failure doesn't cancel others
+                val uploadJobs = activeRemotes.map { remote ->
+                    async {
+                        uploadToRemote(file, remote)
+                    }
                 }
+
+                // Wait for ALL remotes to complete for this file
+                uploadJobs.awaitAll()
+
+                Log.d(TAG, "Completed file: ${file.fileName} - Moving to next file")
             }
 
-            // Wait for ALL remotes to complete for this file
-            uploadJobs.awaitAll()
-
-            Log.d(TAG, "Completed file: ${file.fileName} - Moving to next file")
+            Log.d(TAG, "All ${files.size} files processed")
         }
-
-        Log.d(TAG, "All ${files.size} files processed")
     }
 
     /**
      * Upload a single file to all active remotes
      */
-    suspend fun uploadFile(
+    fun uploadFile(
         file: MediaFile,
-        scope: CoroutineScope
+        @Suppress("UNUSED_PARAMETER") scope: CoroutineScope
     ) {
         uploadFiles(listOf(file), scope)
     }
@@ -103,10 +117,10 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     /**
      * Retry upload for a specific file to a specific remote
      */
-    suspend fun retryUpload(
+    fun retryUpload(
         fileId: String,
         remoteId: String,
-        scope: CoroutineScope
+        @Suppress("UNUSED_PARAMETER") scope: CoroutineScope
     ) {
         val uploadState = _uploadStates.value[fileId] ?: run {
             Log.w(TAG, "Cannot retry: File state not found for $fileId")
@@ -118,23 +132,23 @@ class MultiRemoteUploadCoordinator @Inject constructor(
             return
         }
 
-        // Get the remote config
-        val remote = remoteConfigRepository.getRemoteById(remoteId) ?: run {
-            Log.w(TAG, "Cannot retry: Remote config not found for $remoteId")
-            return
-        }
+        // Launch retry in uploadScope - all suspend operations happen inside
+        uploadScope.launch {
+            // Get the remote config
+            val remote = remoteConfigRepository.getRemoteById(remoteId) ?: run {
+                Log.w(TAG, "Cannot retry: Remote config not found for $remoteId")
+                return@launch
+            }
 
-        // Reset state to queued
-        updateRemoteStatus(
-            fileId = fileId,
-            remoteId = remoteId,
-            status = UploadStatus.QUEUED,
-            remoteName = remoteResult.remoteName,
-            remoteColor = remoteResult.remoteColor
-        )
+            // Reset state to queued
+            updateRemoteStatus(
+                fileId = fileId,
+                remoteId = remoteId,
+                status = UploadStatus.QUEUED,
+                remoteName = remoteResult.remoteName,
+                remoteColor = remoteResult.remoteColor
+            )
 
-        // Launch retry
-        scope.launch(Dispatchers.IO) {
             // Note: We need the original MediaFile for retry
             // This is a limitation - consider storing MediaFile reference in FileUploadState
             Log.d(TAG, "Retry initiated for file $fileId to remote $remoteId")
