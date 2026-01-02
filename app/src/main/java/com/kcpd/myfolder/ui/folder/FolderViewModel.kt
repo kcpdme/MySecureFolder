@@ -241,9 +241,11 @@ class FolderViewModel @Inject constructor(
                     return@launch
                 }
 
+                // Show sheet IMMEDIATELY before starting upload
+                _showUploadSheet.value = true
+                android.util.Log.d("FolderViewModel", "Starting multi-remote upload for: ${mediaFile.fileName}")
+                
                 multiRemoteUploadCoordinator.uploadFile(mediaFile, viewModelScope)
-                _showUploadSheet.value = true // Show sheet when upload starts
-                android.util.Log.d("FolderViewModel", "Started multi-remote upload for: ${mediaFile.fileName}")
             } catch (e: Exception) {
                 android.util.Log.e("FolderViewModel", "Failed to initiate upload for ${mediaFile.fileName}", e)
             }
@@ -265,8 +267,10 @@ class FolderViewModel @Inject constructor(
                 }
 
                 android.util.Log.d("FolderViewModel", "Starting multi-remote upload for ${mediaFiles.size} files to ${remoteConfigRepository.getActiveRemoteCount()} remotes")
+                // Show sheet IMMEDIATELY before starting uploads
+                _showUploadSheet.value = true
+                
                 multiRemoteUploadCoordinator.uploadFiles(mediaFiles, viewModelScope)
-                _showUploadSheet.value = true // Show sheet when uploads start
             } catch (e: Exception) {
                 android.util.Log.e("FolderViewModel", "Failed to initiate uploads", e)
             }
