@@ -131,6 +131,7 @@ class RemoteConfigRepository @Inject constructor(
                 currentRemotes[index] = when (remote) {
                     is RemoteConfig.S3Remote -> remote.copy(isActive = !remote.isActive)
                     is RemoteConfig.GoogleDriveRemote -> remote.copy(isActive = !remote.isActive)
+                    is RemoteConfig.WebDavRemote -> remote.copy(isActive = !remote.isActive)
                 }
                 preferences[REMOTES_KEY] = json.encodeToString(currentRemotes)
             }

@@ -69,6 +69,19 @@ class RemoteConfigurationViewModel @Inject constructor(
     private val _googleAccountEmail = MutableStateFlow("")
     val googleAccountEmail: StateFlow<String> = _googleAccountEmail.asStateFlow()
 
+    // WebDAV fields
+    private val _webdavServerUrl = MutableStateFlow("")
+    val webdavServerUrl: StateFlow<String> = _webdavServerUrl.asStateFlow()
+
+    private val _webdavUsername = MutableStateFlow("")
+    val webdavUsername: StateFlow<String> = _webdavUsername.asStateFlow()
+
+    private val _webdavPassword = MutableStateFlow("")
+    val webdavPassword: StateFlow<String> = _webdavPassword.asStateFlow()
+
+    private val _webdavBasePath = MutableStateFlow("")
+    val webdavBasePath: StateFlow<String> = _webdavBasePath.asStateFlow()
+
     // UI state
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
@@ -84,6 +97,7 @@ class RemoteConfigurationViewModel @Inject constructor(
 
     fun isGoogleDrive(): Boolean = remoteType == "google_drive"
     fun isS3(): Boolean = remoteType == "s3"
+    fun isWebDav(): Boolean = remoteType == "webdav"
 
     fun updateName(value: String) {
         _name.value = value
@@ -117,9 +131,25 @@ class RemoteConfigurationViewModel @Inject constructor(
         _googleAccountEmail.value = value
     }
 
+    fun updateWebdavServerUrl(value: String) {
+        _webdavServerUrl.value = value
+    }
+
+    fun updateWebdavUsername(value: String) {
+        _webdavUsername.value = value
+    }
+
+    fun updateWebdavPassword(value: String) {
+        _webdavPassword.value = value
+    }
+
+    fun updateWebdavBasePath(value: String) {
+        _webdavBasePath.value = value
+    }
+
     fun testConnection() {
-        if (!isS3()) {
-            _testResult.value = "Test connection is only available for S3 remotes"
+        if (isGoogleDrive()) {
+            _testResult.value = "Test connection is not available for Google Drive"
             return
         }
 
@@ -128,39 +158,73 @@ class RemoteConfigurationViewModel @Inject constructor(
             _testResult.value = null
 
             try {
-                // Validation
-                if (_s3Endpoint.value.isBlank() || _s3AccessKey.value.isBlank() ||
-                    _s3SecretKey.value.isBlank() || _s3BucketName.value.isBlank()) {
-                    _testResult.value = "Please fill in all S3 fields first"
-                    _isTesting.value = false
-                    return@launch
+                when {
+                    isS3() -> testS3Connection()
+                    isWebDav() -> testWebDavConnection()
                 }
-
-                // Test S3 connection
-                val minioClient = io.minio.MinioClient.builder()
-                    .endpoint(_s3Endpoint.value)
-                    .credentials(_s3AccessKey.value, _s3SecretKey.value)
-                    .region(_s3Region.value)
-                    .build()
-
-                // Check if bucket exists
-                val bucketExists = minioClient.bucketExists(
-                    io.minio.BucketExistsArgs.builder()
-                        .bucket(_s3BucketName.value)
-                        .build()
-                )
-
-                _testResult.value = if (bucketExists) {
-                    "✓ Connection successful! Bucket '${_s3BucketName.value}' is accessible."
-                } else {
-                    "✗ Bucket '${_s3BucketName.value}' not found. Please check the bucket name."
-                }
-            } catch (e: Exception) {
-                _testResult.value = "✗ Connection failed: ${e.message ?: "Unknown error"}"
-                android.util.Log.e("RemoteConfiguration", "Test connection failed", e)
             } finally {
                 _isTesting.value = false
             }
+        }
+    }
+
+    private suspend fun testS3Connection() {
+        try {
+            // Validation
+            if (_s3Endpoint.value.isBlank() || _s3AccessKey.value.isBlank() ||
+                _s3SecretKey.value.isBlank() || _s3BucketName.value.isBlank()) {
+                _testResult.value = "Please fill in all S3 fields first"
+                return
+            }
+
+            // Test S3 connection
+            val minioClient = io.minio.MinioClient.builder()
+                .endpoint(_s3Endpoint.value)
+                .credentials(_s3AccessKey.value, _s3SecretKey.value)
+                .region(_s3Region.value)
+                .build()
+
+            // Check if bucket exists
+            val bucketExists = minioClient.bucketExists(
+                io.minio.BucketExistsArgs.builder()
+                    .bucket(_s3BucketName.value)
+                    .build()
+            )
+
+            _testResult.value = if (bucketExists) {
+                "✓ Connection successful! Bucket '${_s3BucketName.value}' is accessible."
+            } else {
+                "✗ Bucket '${_s3BucketName.value}' not found. Please check the bucket name."
+            }
+        } catch (e: Exception) {
+            _testResult.value = "✗ Connection failed: ${e.message ?: "Unknown error"}"
+            android.util.Log.e("RemoteConfiguration", "Test S3 connection failed", e)
+        }
+    }
+
+    private suspend fun testWebDavConnection() {
+        try {
+            // Validation
+            if (_webdavServerUrl.value.isBlank() || _webdavUsername.value.isBlank() ||
+                _webdavPassword.value.isBlank()) {
+                _testResult.value = "Please fill in server URL, username, and password"
+                return
+            }
+
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val sardine = com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine()
+                sardine.setCredentials(_webdavUsername.value, _webdavPassword.value)
+
+                val testUrl = _webdavServerUrl.value.trimEnd('/') + 
+                    (_webdavBasePath.value.let { if (it.isNotBlank()) "/${it.trim('/')}" else "" }) + "/"
+
+                // Try to list the directory to test connection
+                val resources = sardine.list(testUrl)
+                _testResult.value = "✓ Connection successful! Found ${resources.size} items."
+            }
+        } catch (e: Exception) {
+            _testResult.value = "✗ Connection failed: ${e.message ?: "Unknown error"}"
+            android.util.Log.e("RemoteConfiguration", "Test WebDAV connection failed", e)
         }
     }
 
@@ -210,7 +274,7 @@ class RemoteConfigurationViewModel @Inject constructor(
                         bucketName = _s3BucketName.value,
                         region = _s3Region.value
                     )
-                } else {
+                } else if (isGoogleDrive()) {
                     if (_googleAccountEmail.value.isBlank()) {
                         _errorMessage.value = "Please sign in with Google"
                         _isSaving.value = false
@@ -223,6 +287,34 @@ class RemoteConfigurationViewModel @Inject constructor(
                         color = _selectedColor.value,
                         isActive = true,
                         accountEmail = _googleAccountEmail.value
+                    )
+                } else {
+                    // WebDAV
+                    if (_webdavServerUrl.value.isBlank()) {
+                        _errorMessage.value = "Please enter WebDAV server URL"
+                        _isSaving.value = false
+                        return@launch
+                    }
+                    if (_webdavUsername.value.isBlank()) {
+                        _errorMessage.value = "Please enter username"
+                        _isSaving.value = false
+                        return@launch
+                    }
+                    if (_webdavPassword.value.isBlank()) {
+                        _errorMessage.value = "Please enter password"
+                        _isSaving.value = false
+                        return@launch
+                    }
+
+                    RemoteConfig.WebDavRemote(
+                        id = java.util.UUID.randomUUID().toString(),
+                        name = _name.value,
+                        color = _selectedColor.value,
+                        isActive = true,
+                        serverUrl = _webdavServerUrl.value,
+                        username = _webdavUsername.value,
+                        password = _webdavPassword.value,
+                        basePath = _webdavBasePath.value
                     )
                 }
 
@@ -269,7 +361,12 @@ fun RemoteConfigurationScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (viewModel.isS3()) "Configure S3 Remote" else "Configure Google Drive"
+                        when {
+                            viewModel.isS3() -> "Configure S3 Remote"
+                            viewModel.isGoogleDrive() -> "Configure Google Drive"
+                            viewModel.isWebDav() -> "Configure WebDAV Remote"
+                            else -> "Configure Remote"
+                        }
                     )
                 },
                 navigationIcon = {
@@ -329,7 +426,16 @@ fun RemoteConfigurationScreen(
                 value = name,
                 onValueChange = { viewModel.updateName(it) },
                 label = { Text("Remote Name") },
-                placeholder = { Text(if (viewModel.isS3()) "My S3 Backup" else "My Google Drive") },
+                placeholder = { 
+                    Text(
+                        when {
+                            viewModel.isS3() -> "My S3 Backup"
+                            viewModel.isGoogleDrive() -> "My Google Drive"
+                            viewModel.isWebDav() -> "My WebDAV Storage"
+                            else -> "My Remote"
+                        }
+                    ) 
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = {
@@ -350,15 +456,14 @@ fun RemoteConfigurationScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             // Type-specific configuration
-            if (viewModel.isS3()) {
-                S3ConfigurationFields(
+            when {
+                viewModel.isS3() -> S3ConfigurationFields(
                     viewModel = viewModel,
                     isTesting = isTesting,
                     testResult = testResult,
                     onTestClick = { viewModel.testConnection() }
                 )
-            } else {
-                GoogleDriveConfigurationFields(
+                viewModel.isGoogleDrive() -> GoogleDriveConfigurationFields(
                     viewModel = viewModel,
                     onSignInClick = {
                         val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
@@ -376,6 +481,12 @@ fun RemoteConfigurationScreen(
                             googleSignInLauncher.launch(client.signInIntent)
                         }
                     }
+                )
+                viewModel.isWebDav() -> WebDavConfigurationFields(
+                    viewModel = viewModel,
+                    isTesting = isTesting,
+                    testResult = testResult,
+                    onTestClick = { viewModel.testConnection() }
                 )
             }
         }
@@ -670,6 +781,154 @@ fun GoogleDriveConfigurationFields(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun WebDavConfigurationFields(
+    viewModel: RemoteConfigurationViewModel,
+    isTesting: Boolean,
+    testResult: String?,
+    onTestClick: () -> Unit
+) {
+    val serverUrl by viewModel.webdavServerUrl.collectAsState()
+    val username by viewModel.webdavUsername.collectAsState()
+    val password by viewModel.webdavPassword.collectAsState()
+    val basePath by viewModel.webdavBasePath.collectAsState()
+    var showPassword by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "WebDAV Configuration",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        // Preset hints card
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Common WebDAV URLs:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "• Koofr: https://app.koofr.net/dav/Koofr",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = "• Icedrive: https://webdav.icedrive.io",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = "• Nextcloud: https://your-server.com/remote.php/dav/files/username",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = serverUrl,
+            onValueChange = { viewModel.updateWebdavServerUrl(it) },
+            label = { Text("Server URL *") },
+            placeholder = { Text("https://app.koofr.net/dav/Koofr") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+            supportingText = { Text("Full WebDAV endpoint URL") }
+        )
+
+        OutlinedTextField(
+            value = username,
+            onValueChange = { viewModel.updateWebdavUsername(it) },
+            label = { Text("Username *") },
+            placeholder = { Text("your-email@example.com") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
+        )
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { viewModel.updateWebdavPassword(it) },
+            label = { Text("Password / App Password *") },
+            placeholder = { Text("App-specific password recommended") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+            visualTransformation = if (showPassword) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            trailingIcon = {
+                IconButton(onClick = { showPassword = !showPassword }) {
+                    Icon(
+                        imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (showPassword) "Hide password" else "Show password"
+                    )
+                }
+            },
+            supportingText = { Text("Use app-specific password for services like Koofr") }
+        )
+
+        OutlinedTextField(
+            value = basePath,
+            onValueChange = { viewModel.updateWebdavBasePath(it) },
+            label = { Text("Base Path (optional)") },
+            placeholder = { Text("MyFolder") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+            supportingText = { Text("Subfolder within your WebDAV storage") }
+        )
+
+        // Test connection button
+        Button(
+            onClick = onTestClick,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isTesting && serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+        ) {
+            if (isTesting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Testing...")
+            } else {
+                Icon(Icons.Default.Wifi, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Test Connection")
+            }
+        }
+
+        // Test result
+        if (testResult != null) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (testResult.startsWith("✓")) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer
+                    }
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = testResult,
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
         }
     }

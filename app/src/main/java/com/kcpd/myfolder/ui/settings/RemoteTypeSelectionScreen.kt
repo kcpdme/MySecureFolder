@@ -93,6 +93,11 @@ fun RemoteTypeSelectionScreen(
                                             popUpTo("select_remote_type") { inclusive = true }
                                         }
                                     }
+                                    RemoteTypeSelection.WEBDAV -> {
+                                        navController.navigate("configure_remote/webdav") {
+                                            popUpTo("select_remote_type") { inclusive = true }
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -180,6 +185,21 @@ fun RemoteTypeSelectionScreen(
                         viewModel.selectType(RemoteTypeSelection.GOOGLE_DRIVE)
                     }
                 }
+            )
+
+            // WebDAV Card
+            RemoteTypeCard(
+                icon = Icons.Default.Folder,
+                title = "WebDAV",
+                description = "Connect to WebDAV servers like Koofr, Icedrive, Nextcloud, and more.",
+                benefits = listOf(
+                    "Unlimited remotes",
+                    "Many providers supported",
+                    "Standard protocol"
+                ),
+                isSelected = viewModel.isTypeSelected(RemoteTypeSelection.WEBDAV),
+                isEnabled = true,
+                onClick = { viewModel.selectType(RemoteTypeSelection.WEBDAV) }
             )
 
             Spacer(modifier = Modifier.weight(1f))

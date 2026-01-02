@@ -137,6 +137,13 @@ dependencies {
     // OkHttp (Latest stable)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // WebDAV client (sardine-android - OkHttp based, for Koofr, Icedrive, Nextcloud, etc.)
+    // Exclude conflicting StAX and SimpleXML dependencies that clash with MinIO's XML libraries
+    implementation("com.github.thegrizzlylabs:sardine-android:0.9") {
+        exclude(group = "stax", module = "stax-api")
+        exclude(group = "org.simpleframework", module = "simple-xml")
+    }
+
     // Coroutines (Latest stable)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
 

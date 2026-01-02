@@ -49,6 +49,7 @@ class RemoteRepositoryManager @Inject constructor(
         return when (type) {
             RemoteType.S3_MINIO -> s3Repository
             RemoteType.GOOGLE_DRIVE -> googleDriveRepository
+            RemoteType.WEBDAV -> s3Repository // WebDAV uses multi-remote system, fallback to S3
         }
     }
 

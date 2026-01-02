@@ -47,6 +47,22 @@ sealed class RemoteConfig {
         val refreshToken: String? = null
     ) : RemoteConfig()
 
+    /**
+     * WebDAV remote storage configuration (Koofr, Icedrive, Nextcloud, etc.)
+     */
+    @Serializable
+    data class WebDavRemote(
+        override val id: String = UUID.randomUUID().toString(),
+        override val name: String,
+        @Serializable(with = ColorSerializer::class)
+        override val color: Color,
+        override val isActive: Boolean = true,
+        val serverUrl: String,       // e.g., "https://app.koofr.net/dav/Koofr" or "https://webdav.icedrive.io"
+        val username: String,
+        val password: String,
+        val basePath: String = ""    // Optional base path within the WebDAV server
+    ) : RemoteConfig()
+
     companion object {
         /**
          * Available colors for remote visual identification

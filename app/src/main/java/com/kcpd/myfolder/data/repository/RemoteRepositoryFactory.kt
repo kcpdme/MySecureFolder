@@ -50,6 +50,7 @@ class RemoteRepositoryFactory @Inject constructor(
         return when (remoteConfig) {
             is RemoteConfig.S3Remote -> createS3Repository(remoteConfig)
             is RemoteConfig.GoogleDriveRemote -> createGoogleDriveRepository(remoteConfig)
+            is RemoteConfig.WebDavRemote -> createWebDavRepository(remoteConfig)
         }
     }
 
@@ -80,6 +81,16 @@ class RemoteRepositoryFactory @Inject constructor(
             context = context,
             accountEmail = config.accountEmail,
             secureFileManager = secureFileManager,
+            folderRepository = folderRepository
+        )
+    }
+
+    /**
+     * Create a WebDAV repository instance with the given configuration
+     */
+    private fun createWebDavRepository(config: RemoteConfig.WebDavRemote): RemoteStorageRepository {
+        return WebDavRepositoryInstance(
+            config = config,
             folderRepository = folderRepository
         )
     }
@@ -361,6 +372,135 @@ class GoogleDriveRepositoryInstance(
         }
 
         return currentParentId
+    }
+
+    /**
+     * Build the folder path hierarchy.
+     */
+    private fun buildFolderPath(folderId: String?): String {
+        if (folderId == null) return ""
+
+        val folderNames = mutableListOf<String>()
+        var currentFolderId: String? = folderId
+
+        while (currentFolderId != null) {
+            val folder = folderRepository.getFolderById(currentFolderId)
+            if (folder != null) {
+                folderNames.add(0, folder.name)
+                currentFolderId = folder.parentFolderId
+            } else {
+                break
+            }
+        }
+
+        return folderNames.joinToString("/")
+    }
+}
+
+/**
+ * WebDAV repository instance for services like Koofr, Icedrive, Nextcloud, etc.
+ * Uses sardine-android library (OkHttp-based WebDAV client).
+ */
+class WebDavRepositoryInstance(
+    private val config: RemoteConfig.WebDavRemote,
+    private val folderRepository: FolderRepository
+) : RemoteStorageRepository {
+
+    companion object {
+        private const val TAG = "WebDavRepository"
+    }
+
+    // Track if client has been initialized for logging
+    @Volatile
+    private var clientInitialized = false
+
+    // Cache the Sardine WebDAV client to avoid recreating for every upload
+    private val sardineClient: com.thegrizzlylabs.sardineandroid.Sardine by lazy {
+        android.util.Log.d(TAG, "Creating WebDAV client for: ${config.serverUrl}")
+        val startTime = System.currentTimeMillis()
+        val client = com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine()
+        client.setCredentials(config.username, config.password)
+        val elapsed = System.currentTimeMillis() - startTime
+        android.util.Log.d(TAG, "WebDAV client created in ${elapsed}ms for ${config.name}")
+        clientInitialized = true
+        client
+    }
+
+    override suspend fun uploadFile(mediaFile: com.kcpd.myfolder.data.model.MediaFile): Result<String> {
+        // Log whether we're using cached client or creating new one
+        if (clientInitialized) {
+            android.util.Log.d(TAG, "Using CACHED WebDAV client for ${config.name}")
+        } else {
+            android.util.Log.d(TAG, "First upload - will initialize WebDAV client for ${config.name}")
+        }
+
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val fileToUpload = java.io.File(mediaFile.filePath)
+                if (!fileToUpload.exists()) {
+                    throw java.io.FileNotFoundException("Encrypted file not found: ${mediaFile.filePath}")
+                }
+
+                var lastException: Exception? = null
+                val maxRetries = 3
+
+                for (attempt in 1..maxRetries) {
+                    try {
+                        // Build folder path hierarchy
+                        val userFolderPath = buildFolderPath(mediaFile.folderId)
+                        val category = com.kcpd.myfolder.data.model.FolderCategory.fromMediaType(mediaFile.mediaType)
+
+                        // Build full path: serverUrl/basePath/MyFolderPrivate/{category}/{userFolderPath}
+                        val baseUrl = config.serverUrl.trimEnd('/')
+                        val basePath = config.basePath.trim('/').let { if (it.isNotEmpty()) "/$it" else "" }
+                        
+                        val folderComponents = mutableListOf("MyFolderPrivate", category.path)
+                        if (userFolderPath.isNotEmpty()) {
+                            folderComponents.addAll(userFolderPath.split("/"))
+                        }
+
+                        // Ensure all folders exist (WebDAV requires explicit folder creation)
+                        var currentPath = "$baseUrl$basePath"
+                        for (folder in folderComponents) {
+                            currentPath = "$currentPath/$folder"
+                            val folderUrl = "$currentPath/"
+                            try {
+                                if (!sardineClient.exists(folderUrl)) {
+                                    sardineClient.createDirectory(folderUrl)
+                                    android.util.Log.d(TAG, "Created WebDAV folder: $folderUrl")
+                                }
+                            } catch (e: Exception) {
+                                // Folder might already exist or we don't have permission to check
+                                android.util.Log.d(TAG, "Folder check/create for $folderUrl: ${e.message}")
+                            }
+                        }
+
+                        // Upload the file
+                        val fileUrl = "$currentPath/${fileToUpload.name}"
+                        
+                        // sardine-android put() accepts File directly
+                        sardineClient.put(fileUrl, fileToUpload, "application/octet-stream")
+
+                        val url = "webdav://${config.name}/${folderComponents.joinToString("/")}/${fileToUpload.name}"
+                        android.util.Log.d(TAG, "Upload successful: $url")
+                        return@withContext Result.success(url)
+
+                    } catch (e: Exception) {
+                        lastException = e
+                        android.util.Log.w(TAG, "Upload attempt $attempt failed", e)
+                        if (attempt < maxRetries) {
+                            kotlinx.coroutines.delay(1000L * attempt)
+                        }
+                    }
+                }
+
+                Result.failure(lastException ?: Exception("Upload failed"))
+
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Upload failed", e)
+                Result.failure(e)
+            }
+        }
     }
 
     /**
