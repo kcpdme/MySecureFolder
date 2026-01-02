@@ -38,6 +38,7 @@ class SettingsViewModel @Inject constructor(
     private val mediaRepository: com.kcpd.myfolder.data.repository.MediaRepository,
     private val remoteRepositoryManager: com.kcpd.myfolder.data.repository.RemoteRepositoryManager,
     private val googleDriveRepository: com.kcpd.myfolder.data.repository.GoogleDriveRepository,
+    private val remoteConfigRepository: com.kcpd.myfolder.data.repository.RemoteConfigRepository,
     private val securityManager: com.kcpd.myfolder.security.SecurityManager,
     @ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
@@ -205,6 +206,62 @@ class SettingsViewModel @Inject constructor(
     fun isPanicPinSet(): Boolean {
         return passwordManager.isPanicPinSet()
     }
+
+    /**
+     * Export all cloud remote configurations to JSON string
+     */
+    fun exportRemoteConfigs(onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val json = remoteConfigRepository.exportRemotes()
+                onResult(json)
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Failed to export remote configs", e)
+                onResult(null)
+            }
+        }
+    }
+
+    /**
+     * Import cloud remote configurations from JSON string
+     * @param merge If true, adds to existing configs. If false, replaces all.
+     */
+    fun importRemoteConfigs(jsonString: String, merge: Boolean = true, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                if (merge) {
+                    // Parse the incoming configs
+                    val json = kotlinx.serialization.json.Json {
+                        ignoreUnknownKeys = true
+                        encodeDefaults = true
+                    }
+                    val importedRemotes = json.decodeFromString<List<com.kcpd.myfolder.domain.model.RemoteConfig>>(jsonString)
+                    
+                    // Get existing configs
+                    val existingRemotes = remoteConfigRepository.getAllRemotes()
+                    val existingIds = existingRemotes.map { it.id }.toSet()
+                    
+                    // Add only new configs (by ID)
+                    var addedCount = 0
+                    for (remote in importedRemotes) {
+                        if (remote.id !in existingIds) {
+                            remoteConfigRepository.addRemote(remote)
+                            addedCount++
+                        }
+                    }
+                    onResult(true, "Imported $addedCount new remote(s). ${importedRemotes.size - addedCount} already existed.")
+                } else {
+                    // Replace all
+                    remoteConfigRepository.importRemotes(jsonString)
+                    val count = remoteConfigRepository.getAllRemotes().size
+                    onResult(true, "Imported $count remote configuration(s)")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Failed to import remote configs", e)
+                onResult(false, "Import failed: ${e.message}")
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -230,6 +287,33 @@ fun SettingsScreen(
     ) { result ->
         val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
         viewModel.handleGoogleSignInResult(task)
+    }
+
+    // File picker for importing remote configurations
+    val importFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                val jsonContent = inputStream?.bufferedReader()?.use { reader -> reader.readText() }
+                inputStream?.close()
+                
+                if (jsonContent != null) {
+                    viewModel.importRemoteConfigs(jsonContent, merge = true) { success, message ->
+                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    android.widget.Toast.makeText(context, "Could not read file", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Import failed: ${e.message}",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -440,6 +524,58 @@ fun SettingsScreen(
                 description = "Configure multiple upload destinations",
                 onClick = {
                     navController.navigate("remote_management")
+                }
+            )
+
+            HorizontalDivider()
+
+            SettingsItem(
+                icon = Icons.Default.Upload,
+                title = "Export Remote Configs",
+                description = "Save cloud configurations to a file",
+                onClick = {
+                    viewModel.exportRemoteConfigs { json ->
+                        if (json != null) {
+                            // Save to Downloads folder
+                            try {
+                                val fileName = "myfolder_remotes_${System.currentTimeMillis()}.json"
+                                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                                    android.os.Environment.DIRECTORY_DOWNLOADS
+                                )
+                                val file = java.io.File(downloadsDir, fileName)
+                                file.writeText(json)
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Exported to Downloads/$fileName",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Export failed: ${e.message}",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        } else {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Export failed",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            )
+
+            HorizontalDivider()
+
+            SettingsItem(
+                icon = Icons.Default.Download,
+                title = "Import Remote Configs",
+                description = "Load cloud configurations from a file",
+                onClick = {
+                    // Launch file picker for JSON
+                    importFileLauncher.launch(arrayOf("application/json", "*/*"))
                 }
             )
 
