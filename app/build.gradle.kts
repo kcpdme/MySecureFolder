@@ -155,6 +155,10 @@ dependencies {
     ksp("com.google.dagger:hilt-android-compiler:2.52")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
+    // Jetpack Glance for home screen widgets
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
+
     // DataStore for preferences (Latest)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 

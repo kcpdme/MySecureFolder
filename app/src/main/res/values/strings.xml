@@ -13,4 +13,11 @@
     <string name="permission_required">Permission Required</string>
     <string name="camera_permission_required">Camera permission is required to take photos and videos</string>
     <string name="audio_permission_required">Microphone permission is required to record audio</string>
+
+    <!-- Widget strings -->
+    <string name="widget_name">Quick Capture</string>
+    <string name="widget_description">Quickly capture photos, videos, or audio</string>
+    <string name="photo">Photo</string>
+    <string name="video">Video</string>
+    <string name="audio">Audio</string>
 </resources>
