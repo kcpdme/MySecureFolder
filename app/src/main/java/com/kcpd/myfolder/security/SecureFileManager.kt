@@ -514,31 +514,130 @@ class SecureFileManager @Inject constructor(
     }
 
     /**
-     * Securely deletes a file.
+     * Securely deletes a file using the configured deletion level.
+     * 
+     * Levels:
+     * - QUICK: Single-pass random overwrite (default, good for SSDs/flash)
+     * - DOD: DoD 5220.22-M 3-pass (zeros, ones, random)
+     * - GUTMANN: 35-pass (maximum security, very slow)
      */
-    suspend fun secureDelete(file: File): Boolean = withContext(Dispatchers.IO) {
+    suspend fun secureDelete(file: File, level: SecureDeleteLevel = SecureDeleteLevel.QUICK): Boolean = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext false
         try {
             val length = file.length()
             if (length > 0) {
-                // Single pass random overwrite is usually sufficient for flash storage/SSD
-                // and avoids excessive wear
-                overwriteFileRandom(file, length)
+                when (level) {
+                    SecureDeleteLevel.QUICK -> {
+                        // Single pass random overwrite - good for modern SSDs/flash
+                        overwriteWithPattern(file, length, OverwritePattern.RANDOM)
+                    }
+                    SecureDeleteLevel.DOD -> {
+                        // DoD 5220.22-M: Pass 1 = 0x00, Pass 2 = 0xFF, Pass 3 = Random
+                        android.util.Log.d("SecureFileManager", "🔒 DoD 5220.22-M secure delete: ${file.name}")
+                        overwriteWithPattern(file, length, OverwritePattern.ZEROS)
+                        overwriteWithPattern(file, length, OverwritePattern.ONES)
+                        overwriteWithPattern(file, length, OverwritePattern.RANDOM)
+                        android.util.Log.d("SecureFileManager", "✅ DoD 3-pass complete: ${file.name}")
+                    }
+                    SecureDeleteLevel.GUTMANN -> {
+                        // Gutmann 35-pass method
+                        android.util.Log.d("SecureFileManager", "🔒 Gutmann 35-pass secure delete: ${file.name}")
+                        performGutmannWipe(file, length)
+                        android.util.Log.d("SecureFileManager", "✅ Gutmann 35-pass complete: ${file.name}")
+                    }
+                }
             }
             file.delete()
         } catch (e: Exception) {
+            android.util.Log.e("SecureFileManager", "Secure delete failed, falling back to simple delete", e)
             file.delete()
         }
     }
 
-    private fun overwriteFileRandom(file: File, size: Long) {
-        val random = SecureRandom()
+    /**
+     * Simple secure delete for backwards compatibility - uses QUICK level.
+     */
+    suspend fun secureDelete(file: File): Boolean = secureDelete(file, SecureDeleteLevel.QUICK)
+
+    private enum class OverwritePattern {
+        ZEROS,    // 0x00
+        ONES,     // 0xFF
+        RANDOM    // SecureRandom bytes
+    }
+
+    private fun overwriteWithPattern(file: File, size: Long, pattern: OverwritePattern) {
+        val random = if (pattern == OverwritePattern.RANDOM) SecureRandom() else null
         FileOutputStream(file).use { fos ->
             val buffer = ByteArray(BUFFER_SIZE)
             var remaining = size
+            
+            // Pre-fill buffer for fixed patterns
+            when (pattern) {
+                OverwritePattern.ZEROS -> buffer.fill(0x00)
+                OverwritePattern.ONES -> buffer.fill(0xFF.toByte())
+                OverwritePattern.RANDOM -> {} // Filled per iteration below
+            }
+            
             while (remaining > 0) {
                 val toWrite = minOf(remaining, BUFFER_SIZE.toLong()).toInt()
-                random.nextBytes(buffer)
+                if (pattern == OverwritePattern.RANDOM) {
+                    random!!.nextBytes(buffer)
+                }
+                fos.write(buffer, 0, toWrite)
+                remaining -= toWrite
+            }
+            fos.fd.sync() // Force flush to disk
+        }
+    }
+
+    /**
+     * Performs the Gutmann 35-pass secure wipe.
+     * 
+     * Passes 1-4: Random
+     * Passes 5-31: Specific patterns (designed for older magnetic media)
+     * Passes 32-35: Random
+     */
+    private fun performGutmannWipe(file: File, size: Long) {
+        val random = SecureRandom()
+        
+        // Gutmann pattern bytes for passes 5-31
+        val gutmannPatterns: List<ByteArray> = listOf(
+            byteArrayOf(0x55), byteArrayOf(0xAA.toByte()), byteArrayOf(0x92.toByte(), 0x49, 0x24),
+            byteArrayOf(0x49, 0x24, 0x92.toByte()), byteArrayOf(0x24, 0x92.toByte(), 0x49),
+            byteArrayOf(0x00), byteArrayOf(0x11), byteArrayOf(0x22),
+            byteArrayOf(0x33), byteArrayOf(0x44), byteArrayOf(0x55),
+            byteArrayOf(0x66), byteArrayOf(0x77), byteArrayOf(0x88.toByte()),
+            byteArrayOf(0x99.toByte()), byteArrayOf(0xAA.toByte()), byteArrayOf(0xBB.toByte()),
+            byteArrayOf(0xCC.toByte()), byteArrayOf(0xDD.toByte()), byteArrayOf(0xEE.toByte()),
+            byteArrayOf(0xFF.toByte()), byteArrayOf(0x92.toByte(), 0x49, 0x24),
+            byteArrayOf(0x49, 0x24, 0x92.toByte()), byteArrayOf(0x24, 0x92.toByte(), 0x49),
+            byteArrayOf(0x6D, 0xB6.toByte(), 0xDB.toByte()), byteArrayOf(0xB6.toByte(), 0xDB.toByte(), 0x6D),
+            byteArrayOf(0xDB.toByte(), 0x6D, 0xB6.toByte())
+        )
+        
+        // Passes 1-4: Random
+        repeat(4) { overwriteWithPattern(file, size, OverwritePattern.RANDOM) }
+        
+        // Passes 5-31: Gutmann specific patterns
+        gutmannPatterns.forEach { pattern ->
+            overwriteWithRepeatingPattern(file, size, pattern)
+        }
+        
+        // Passes 32-35: Random
+        repeat(4) { overwriteWithPattern(file, size, OverwritePattern.RANDOM) }
+    }
+
+    private fun overwriteWithRepeatingPattern(file: File, size: Long, pattern: ByteArray) {
+        FileOutputStream(file).use { fos ->
+            val buffer = ByteArray(BUFFER_SIZE)
+            // Fill buffer with repeating pattern
+            for (i in buffer.indices) {
+                buffer[i] = pattern[i % pattern.size]
+            }
+            
+            var remaining = size
+            while (remaining > 0) {
+                val toWrite = minOf(remaining, BUFFER_SIZE.toLong()).toInt()
                 fos.write(buffer, 0, toWrite)
                 remaining -= toWrite
             }

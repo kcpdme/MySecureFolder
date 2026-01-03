@@ -19,6 +19,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import com.kcpd.myfolder.security.BiometricManager
 import com.kcpd.myfolder.security.PasswordManager
+import com.kcpd.myfolder.security.SecureDeleteConfigRepository
+import com.kcpd.myfolder.security.SecureDeleteLevel
 import com.kcpd.myfolder.security.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     private val remoteRepositoryFactory: com.kcpd.myfolder.data.repository.RemoteRepositoryFactory,
     private val uploadSettingsRepository: com.kcpd.myfolder.data.repository.UploadSettingsRepository,
     private val securityManager: com.kcpd.myfolder.security.SecurityManager,
+    private val secureDeleteConfigRepository: SecureDeleteConfigRepository,
     @ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
@@ -60,6 +63,19 @@ class SettingsViewModel @Inject constructor(
         SharingStarted.WhileSubscribed(5000),
         com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_CONCURRENCY
     )
+    
+    // Secure delete level setting
+    val secureDeleteLevel = secureDeleteConfigRepository.secureDeleteLevel.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        SecureDeleteLevel.QUICK
+    )
+    
+    fun setSecureDeleteLevel(level: SecureDeleteLevel) {
+        viewModelScope.launch {
+            secureDeleteConfigRepository.setSecureDeleteLevel(level)
+        }
+    }
 
     val activeRemoteType = remoteRepositoryManager.activeRemoteType.stateIn(
         viewModelScope,
@@ -459,6 +475,96 @@ fun SettingsScreen(
                     showLockTimeoutDialog = true
                 }
             )
+
+            HorizontalDivider()
+            
+            // Secure Delete Level Setting
+            val secureDeleteLevel by viewModel.secureDeleteLevel.collectAsState()
+            var showSecureDeleteDialog by remember { mutableStateOf(false) }
+            
+            SettingsItem(
+                icon = Icons.Default.DeleteSweep,
+                title = "Secure Delete Level",
+                description = secureDeleteLevel.displayName,
+                onClick = {
+                    showSecureDeleteDialog = true
+                }
+            )
+            
+            // Secure Delete Level dialog
+            if (showSecureDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSecureDeleteDialog = false },
+                    title = { Text("Secure Delete Level") },
+                    text = {
+                        Column {
+                            Text(
+                                text = "Choose how thoroughly files are overwritten before deletion. More passes = slower but more secure.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "⚠️ On SSDs/flash, multiple passes have diminishing returns due to wear leveling.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            SecureDeleteLevel.entries.forEach { level ->
+                                val isSelected = level == secureDeleteLevel
+                                val description = when (level) {
+                                    SecureDeleteLevel.QUICK -> "1 random pass (fast, good for SSDs)"
+                                    SecureDeleteLevel.DOD -> "3 passes: zeros → ones → random"
+                                    SecureDeleteLevel.GUTMANN -> "35 passes (very slow, for magnetic drives)"
+                                }
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.setSecureDeleteLevel(level)
+                                            showSecureDeleteDialog = false
+                                        },
+                                    color = if (isSelected)
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.surface
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = {
+                                                viewModel.setSecureDeleteLevel(level)
+                                                showSecureDeleteDialog = false
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = level.displayName,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                            Text(
+                                                text = description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSecureDeleteDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
 
             HorizontalDivider()
 
