@@ -1,12 +1,25 @@
 package com.kcpd.myfolder.ui.note
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.kcpd.myfolder.data.model.MediaType
@@ -25,20 +38,45 @@ fun NoteEditorScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     var noteTitle by remember { mutableStateOf("") }
     var noteContent by remember { mutableStateOf("") }
+    val contentFocusRequester = remember { FocusRequester() }
+
+    val canSave = noteTitle.isNotEmpty() || noteContent.isNotEmpty()
+
+    // Background gradient
+    val backgroundGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF0F0F1A),
+            Color(0xFF1A1A2E),
+            Color(0xFF16213E)
+        )
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create Note") },
+                title = { },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(
+                            Icons.Default.ArrowBack, 
+                            "Back",
+                            tint = Color.White
+                        )
                     }
                 },
                 actions = {
-                    IconButton(
+                    // Character count
+                    Text(
+                        text = "${noteContent.length}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    
+                    // Save button
+                    FilledIconButton(
                         onClick = {
-                            if (noteTitle.isNotEmpty() || noteContent.isNotEmpty()) {
+                            if (canSave) {
                                 val fileName = if (noteTitle.isNotEmpty()) {
                                     "${noteTitle.take(50)}.txt"
                                 } else {
@@ -54,46 +92,120 @@ fun NoteEditorScreen(
                                 navController.navigateUp()
                             }
                         },
-                        enabled = noteTitle.isNotEmpty() || noteContent.isNotEmpty()
+                        enabled = canSave,
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = if (canSave) Color(0xFF4facfe) else Color.Gray.copy(alpha = 0.3f),
+                            contentColor = Color.White
+                        )
                     ) {
                         Icon(Icons.Default.Check, "Save")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(backgroundGradient)
         ) {
-            OutlinedTextField(
-                value = noteTitle,
-                onValueChange = { noteTitle = it },
-                label = { Text("Title (optional)") },
-                placeholder = { Text("Enter note title") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            OutlinedTextField(
-                value = noteContent,
-                onValueChange = { noteContent = it },
-                label = { Text("Note Content") },
-                placeholder = { Text("Start writing your note...") },
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                minLines = 10
-            )
-
-            Text(
-                text = "Tip: Your note will be saved automatically when you tap the save icon",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 20.dp)
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Title field - minimal, large
+                BasicTextField(
+                    value = noteTitle,
+                    onValueChange = { noteTitle = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(
+                        color = Color.White,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    cursorBrush = SolidColor(Color(0xFF4facfe)),
+                    singleLine = true,
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (noteTitle.isEmpty()) {
+                                Text(
+                                    text = "Title",
+                                    style = TextStyle(
+                                        color = Color.White.copy(alpha = 0.3f),
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
+                )
+                
+                // Subtle divider
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.White.copy(alpha = 0.1f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Content field - takes most space
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    BasicTextField(
+                        value = noteContent,
+                        onValueChange = { noteContent = it },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .focusRequester(contentFocusRequester),
+                        textStyle = TextStyle(
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 16.sp,
+                            lineHeight = 26.sp
+                        ),
+                        cursorBrush = SolidColor(Color(0xFF4facfe)),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (noteContent.isEmpty()) {
+                                    Text(
+                                        text = "Start writing...",
+                                        style = TextStyle(
+                                            color = Color.White.copy(alpha = 0.3f),
+                                            fontSize = 16.sp
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }
