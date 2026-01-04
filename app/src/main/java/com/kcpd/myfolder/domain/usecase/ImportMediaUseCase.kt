@@ -59,7 +59,7 @@ class ImportMediaUseCase @Inject constructor(
             // Get file info
             android.util.Log.d("ImportMediaUseCase", "Step 1: Getting file info...")
             val fileName = getFileName(contentResolver, sourceUri)
-            val mimeType = contentResolver.getType(sourceUri)
+            var mimeType = contentResolver.getType(sourceUri)
             var mediaType = getMediaTypeFromMime(mimeType, fileName, sourceUri)
             android.util.Log.d("ImportMediaUseCase", "  ✓ File name: $fileName")
             android.util.Log.d("ImportMediaUseCase", "  ✓ MIME type: $mimeType")
@@ -130,17 +130,43 @@ class ImportMediaUseCase @Inject constructor(
 
                 if (existingMetadata != null) {
                     android.util.Log.d("ImportMediaUseCase", "  ✓ File is already encrypted! Skipping encryption.")
-                    android.util.Log.d("ImportMediaUseCase", "  Metadata: $existingMetadata")
+                    android.util.Log.d("ImportMediaUseCase", "  Metadata filename: ${existingMetadata.filename}")
+                    android.util.Log.d("ImportMediaUseCase", "  Metadata mimeType: ${existingMetadata.mimeType}")
+                    android.util.Log.d("ImportMediaUseCase", "  Metadata timestamp: ${existingMetadata.timestamp}")
 
                     // CRITICAL FIX: Use MIME type from encrypted metadata to determine correct MediaType
-                    // The import source may have generic MIME type (application/octet-stream)
-                    // but the encrypted metadata has the REAL MIME type
+                    // BUT only if it's a real MIME type, not the useless default "application/octet-stream"
+                    // Old encrypted files have the default, so we fall back to filename detection
                     val metadataMimeType = existingMetadata.mimeType
-                    if (metadataMimeType != null) {
+                    if (metadataMimeType != "application/octet-stream") {
+                        // We have a real MIME type stored - use it!
                         val detectedType = getMediaTypeFromMime(metadataMimeType, existingMetadata.filename, sourceUri)
                         if (detectedType != mediaType) {
-                            android.util.Log.d("ImportMediaUseCase", "  Correcting media type from $mediaType to $detectedType (from metadata)")
+                            android.util.Log.d("ImportMediaUseCase", "  ✓ Correcting media type from $mediaType to $detectedType (from metadata mimeType: $metadataMimeType)")
                             mediaType = detectedType
+                        }
+                    } else {
+                        // Old encrypted file with default mimeType - try to detect from filename first
+                        android.util.Log.d("ImportMediaUseCase", "  ⚠️ Metadata has default mimeType, trying filename detection...")
+                        val filenameDetectedType = getMediaTypeFromMime(null, existingMetadata.filename, sourceUri)
+                        if (filenameDetectedType != MediaType.OTHER && filenameDetectedType != mediaType) {
+                            android.util.Log.d("ImportMediaUseCase", "  ✓ Correcting media type from $mediaType to $filenameDetectedType (from filename: ${existingMetadata.filename})")
+                            mediaType = filenameDetectedType
+                        } else {
+                            // Last resort: detect from magic bytes (actual file content)
+                            android.util.Log.d("ImportMediaUseCase", "  ⚠️ Filename detection failed, trying magic byte detection...")
+                            val magicMimeType = detectMimeTypeFromMagicBytes(tempFile)
+                            if (magicMimeType != null) {
+                                val magicDetectedType = getMediaTypeFromMime(magicMimeType, existingMetadata.filename, sourceUri)
+                                if (magicDetectedType != MediaType.OTHER) {
+                                    android.util.Log.d("ImportMediaUseCase", "  ✓ Correcting media type from $mediaType to $magicDetectedType (from magic bytes: $magicMimeType)")
+                                    mediaType = magicDetectedType
+                                    // Also update the mimeType variable for database storage
+                                    mimeType = magicMimeType
+                                }
+                            } else {
+                                android.util.Log.d("ImportMediaUseCase", "  ⚠️ Could not detect type from magic bytes, keeping: $mediaType")
+                            }
                         }
                     }
 
@@ -181,11 +207,13 @@ class ImportMediaUseCase @Inject constructor(
                     android.util.Log.d("ImportMediaUseCase", "Step 6: Encrypting file...")
                     android.util.Log.d("ImportMediaUseCase", "  Using category path: ${category.path} (not mediaType.name: ${mediaType.name.lowercase()})")
                     android.util.Log.d("ImportMediaUseCase", "  Secure dir: ${secureDir.absolutePath}")
+                    android.util.Log.d("ImportMediaUseCase", "  MIME type to encrypt with: $mimeType")
                     android.util.Log.d("ImportMediaUseCase", "  Starting encryption...")
                     encryptedFile = secureFileManager.encryptFile(
                         sourceFile = tempFile,
                         destinationDir = secureDir,
-                        originalFileName = fileName
+                        originalFileName = fileName,
+                        mimeType = mimeType  // CRITICAL: Store MIME type in encrypted metadata
                     )
                 }
                 
@@ -234,6 +262,31 @@ class ImportMediaUseCase @Inject constructor(
                 android.util.Log.d("ImportMediaUseCase", "  Original filename for DB: $originalFileName")
                 android.util.Log.d("ImportMediaUseCase", "  Final media type: $mediaType")
 
+                // CRITICAL FIX: For already-encrypted files, use MIME type from encrypted metadata
+                // The contentResolver returns "application/octet-stream" for .enc files
+                // But the encrypted metadata has the REAL MIME type (if it was stored properly)
+                // OR we may have detected it from magic bytes earlier (stored in mimeType variable)
+                val finalMimeType = if (existingMetadata != null) {
+                    val metaMime = existingMetadata.mimeType
+                    if (metaMime != "application/octet-stream") {
+                        // Real MIME type stored in metadata - use it
+                        android.util.Log.d("ImportMediaUseCase", "  ✓ Using MIME type from encrypted metadata: $metaMime")
+                        metaMime
+                    } else if (mimeType != "application/octet-stream") {
+                        // Magic byte detection found a real MIME type - use it
+                        android.util.Log.d("ImportMediaUseCase", "  ✓ Using MIME type from magic byte detection: $mimeType")
+                        mimeType
+                    } else {
+                        // Try to derive from filename extension
+                        val derivedMime = getMimeTypeFromFilename(existingMetadata.filename)
+                        android.util.Log.d("ImportMediaUseCase", "  ⚠️ Derived MIME type from filename: $derivedMime")
+                        derivedMime ?: metaMime  // Fall back to default if we can't derive
+                    }
+                } else {
+                    android.util.Log.d("ImportMediaUseCase", "  Using MIME type from ContentResolver: $mimeType")
+                    mimeType
+                }
+
                 val entity = MediaFileEntity(
                     id = id,
                     originalFileName = originalFileName,  // Use extracted original name for encrypted files
@@ -248,7 +301,7 @@ class ImportMediaUseCase @Inject constructor(
                     folderId = targetFolderId,
                     verificationHash = verificationHash,
                     originalSize = originalSize,
-                    mimeType = mimeType
+                    mimeType = finalMimeType  // CRITICAL: Use correct MIME type
                 )
 
                 // Save to database
@@ -467,6 +520,82 @@ class ImportMediaUseCase @Inject constructor(
     private fun getExtensionFromMime(mimeType: String?): String {
         if (mimeType == null) return "bin"
         return MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?: "bin"
+    }
+
+    /**
+     * Gets MIME type from filename extension.
+     * Used to derive MIME type for old encrypted files that have default "application/octet-stream".
+     */
+    private fun getMimeTypeFromFilename(filename: String): String? {
+        val extension = filename.substringAfterLast('.', "").lowercase()
+        if (extension.isEmpty() || extension == filename.lowercase()) {
+            // No extension found
+            return null
+        }
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+    }
+
+    /**
+     * Detects MIME type from magic bytes (file signatures).
+     * Used as a last resort for old encrypted files with no proper MIME type and no file extension.
+     * @param encryptedFile The encrypted file to check
+     * @return Detected MIME type based on magic bytes, or null if unknown
+     */
+    private suspend fun detectMimeTypeFromMagicBytes(encryptedFile: File): String? {
+        return try {
+            android.util.Log.d("ImportMediaUseCase", "  🔍 Attempting magic byte detection...")
+            
+            // Read first 12 bytes from decrypted content
+            val magicBytes = secureFileManager.getStreamingDecryptedInputStream(encryptedFile).use { stream ->
+                val buffer = ByteArray(12)
+                val bytesRead = stream.read(buffer)
+                if (bytesRead < 4) return@use null
+                buffer.take(bytesRead).toByteArray()
+            } ?: return null
+            
+            val hex = magicBytes.joinToString("") { "%02x".format(it) }
+            android.util.Log.d("ImportMediaUseCase", "  Magic bytes (hex): $hex")
+            
+            // Common file signatures
+            val mimeType = when {
+                // PNG: 89 50 4E 47 0D 0A 1A 0A
+                hex.startsWith("89504e47") -> "image/png"
+                
+                // JPEG: FF D8 FF
+                hex.startsWith("ffd8ff") -> "image/jpeg"
+                
+                // GIF: 47 49 46 38
+                hex.startsWith("47494638") -> "image/gif"
+                
+                // WebP: 52 49 46 46 ... 57 45 42 50
+                hex.startsWith("52494646") && magicBytes.size >= 12 && 
+                    hex.substring(16, 24) == "57454250" -> "image/webp"
+                
+                // PDF: 25 50 44 46
+                hex.startsWith("25504446") -> "application/pdf"
+                
+                // MP4/MOV: ... 66 74 79 70 (ftyp at offset 4)
+                hex.length >= 16 && hex.substring(8, 16) == "66747970" -> "video/mp4"
+                
+                // MP3: FF FB or FF FA or ID3
+                hex.startsWith("fffb") || hex.startsWith("fffa") || hex.startsWith("494433") -> "audio/mpeg"
+                
+                // M4A/AAC: ... 66 74 79 70 4D 34 41 (ftyp M4A)
+                hex.length >= 16 && hex.substring(8, 16) == "66747970" -> "audio/mp4"
+                
+                // WAV: 52 49 46 46 ... 57 41 56 45
+                hex.startsWith("52494646") && magicBytes.size >= 12 && 
+                    hex.substring(16, 24) == "57415645" -> "audio/wav"
+                
+                else -> null
+            }
+            
+            android.util.Log.d("ImportMediaUseCase", "  🔍 Detected from magic bytes: ${mimeType ?: "unknown"}")
+            mimeType
+        } catch (e: Exception) {
+            android.util.Log.e("ImportMediaUseCase", "  Error detecting from magic bytes: ${e.message}")
+            null
+        }
     }
 
     /**

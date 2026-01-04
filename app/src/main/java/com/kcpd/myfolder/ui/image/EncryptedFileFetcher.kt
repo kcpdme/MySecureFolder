@@ -24,8 +24,11 @@ class EncryptedFileFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult {
+        android.util.Log.d("EncryptedFileFetcher", "═══════════════════════════════════════")
         android.util.Log.d("EncryptedFileFetcher", "Fetching: ${data.fileName}")
-        android.util.Log.d("EncryptedFileFetcher", "Encrypted path: ${data.filePath}")
+        android.util.Log.d("EncryptedFileFetcher", "  Encrypted path: ${data.filePath}")
+        android.util.Log.d("EncryptedFileFetcher", "  MIME type from DB: ${data.mimeType ?: "NULL"}")
+        android.util.Log.d("EncryptedFileFetcher", "  Media type: ${data.mediaType}")
 
         // Get the encrypted file
         val encryptedFile = File(data.filePath)
@@ -35,13 +38,14 @@ class EncryptedFileFetcher(
             throw IllegalStateException("Encrypted file does not exist: ${data.filePath}")
         }
 
-        android.util.Log.d("EncryptedFileFetcher", "Encrypted file exists, size: ${encryptedFile.length()} bytes")
+        android.util.Log.d("EncryptedFileFetcher", "  Encrypted file size: ${encryptedFile.length()} bytes")
 
         // Get STREAMING decrypted InputStream from SecureFileManager
         // This uses pipe-based streaming for better performance and lower memory usage
         val decryptedStream = secureFileManager.getStreamingDecryptedInputStream(encryptedFile)
 
-        android.util.Log.d("EncryptedFileFetcher", "Streaming decryption started for: ${data.fileName}")
+        android.util.Log.d("EncryptedFileFetcher", "  Streaming decryption started")
+        android.util.Log.d("EncryptedFileFetcher", "═══════════════════════════════════════")
 
         // Convert InputStream to BufferedSource for Coil
         val bufferedSource = decryptedStream.source().buffer()

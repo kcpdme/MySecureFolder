@@ -88,7 +88,8 @@ class MediaRepository @Inject constructor(
                         val encryptedFile = secureFileManager.encryptFile(
                             sourceFile = file,
                             destinationDir = categorySecureDir,
-                            originalFileName = file.name
+                            originalFileName = file.name,
+                            mimeType = getMimeType(file.extension)  // Store MIME type in encrypted metadata
                         )
 
                         // Generate thumbnail if applicable
@@ -244,7 +245,8 @@ class MediaRepository @Inject constructor(
             encryptedFile = secureFileManager.encryptFile(
                 sourceFile = fileToEncrypt,
                 destinationDir = secureDir,
-                originalFileName = fileName  // Use original filename, not "rotated_" temp name
+                originalFileName = fileName,  // Use original filename, not "rotated_" temp name
+                mimeType = mimeType  // Store MIME type in encrypted metadata
             )
             android.util.Log.d("MediaRepository", "  Encrypted to: ${encryptedFile.name} (original: $fileName)")
 
@@ -340,7 +342,8 @@ class MediaRepository @Inject constructor(
                 encryptedFile = secureFileManager.encryptFile(
                     sourceFile = tempFile,
                     destinationDir = secureDir,
-                    originalFileName = fileName
+                    originalFileName = fileName,
+                    mimeType = "text/plain"  // Notes are always plain text
                 )
                 android.util.Log.d("MediaRepository", "  Note encrypted to: ${encryptedFile.name} (original: $fileName)")
 

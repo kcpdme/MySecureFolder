@@ -63,12 +63,14 @@ class SecureFileManager @Inject constructor(
      * @param sourceFile The file to encrypt
      * @param destinationDir The directory where the encrypted file will be stored
      * @param originalFileName Optional original filename to store in metadata (defaults to sourceFile.name)
+     * @param mimeType Optional MIME type to store in metadata for proper file handling after decryption
      * @return The encrypted file with a random UUID-based filename
      */
     suspend fun encryptFile(
         sourceFile: File,
         destinationDir: File,
-        originalFileName: String? = null
+        originalFileName: String? = null,
+        mimeType: String? = null
     ): File = withContext(Dispatchers.IO) {
         require(sourceFile.exists()) { "Source file does not exist: ${sourceFile.path}" }
 
@@ -78,6 +80,10 @@ class SecureFileManager @Inject constructor(
         val randomFileName = java.util.UUID.randomUUID().toString()
         val encryptedFile = File(destinationDir, randomFileName + ENCRYPTED_FILE_EXTENSION)
 
+        android.util.Log.d("SecureFileManager", "🔒 Encrypting file: ${sourceFile.name}")
+        android.util.Log.d("SecureFileManager", "  Original filename: ${originalFileName ?: sourceFile.name}")
+        android.util.Log.d("SecureFileManager", "  MIME type to store: ${mimeType ?: "application/octet-stream (default)"}")
+
         // 1. Generate FEK (File Encryption Key)
         val fek = generateRandomKey(32)
 
@@ -85,9 +91,10 @@ class SecureFileManager @Inject constructor(
         val masterKey = securityManager.getActiveMasterKey()
         val (iv, encFek) = securityManager.wrapFEK(fek, masterKey)
 
-        // 3. Prepare Metadata (store original filename, not the temp/rotated filename)
+        // 3. Prepare Metadata (store original filename and MIME type)
         val metadata = FileMetadata(
             filename = originalFileName ?: sourceFile.name,
+            mimeType = mimeType ?: "application/octet-stream",
             timestamp = System.currentTimeMillis()
         )
         val metadataJson = Json.encodeToString(metadata)
