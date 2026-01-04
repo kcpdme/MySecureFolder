@@ -7,9 +7,11 @@ import android.os.Build
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.kcpd.myfolder.data.database.UploadQueueDatabase
@@ -151,6 +153,36 @@ class UploadManager @Inject constructor(
         )
         
         Log.d(TAG, "Upload work scheduled")
+        
+        // Also schedule periodic retry for failed uploads
+        schedulePeriodicRetryWork()
+    }
+    
+    /**
+     * Schedule periodic work to retry failed uploads.
+     * Runs every 15 minutes to pick up any failed uploads that are ready for retry.
+     * This ensures uploads resume even if the app is never opened again.
+     */
+    private fun schedulePeriodicRetryWork() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        
+        val periodicRequest = PeriodicWorkRequestBuilder<UploadWorker>(
+            15, TimeUnit.MINUTES,  // Run every 15 minutes
+            5, TimeUnit.MINUTES    // Flex interval - can run 5 min early
+        )
+            .setConstraints(constraints)
+            .addTag("upload_periodic")
+            .build()
+        
+        workManager.enqueueUniquePeriodicWork(
+            "periodic_upload_retry",
+            ExistingPeriodicWorkPolicy.KEEP,  // Don't replace if already scheduled
+            periodicRequest
+        )
+        
+        Log.d(TAG, "Periodic retry work scheduled (every 15 min)")
     }
     
     /**
