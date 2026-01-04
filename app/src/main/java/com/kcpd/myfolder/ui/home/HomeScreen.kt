@@ -107,8 +107,9 @@ fun HomeScreen(
                 title = { 
                     Column {
                         Text("My Folder")
+                        val activeRemotesInfo by viewModel.activeRemotesInfo.collectAsState()
                         Text(
-                            text = "Remote: ${if (activeRemoteType == com.kcpd.myfolder.data.model.RemoteType.GOOGLE_DRIVE) "Google Drive" else "S3 MinIO"}",
+                            text = activeRemotesInfo,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

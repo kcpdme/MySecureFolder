@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.repository.MediaRepository
+import com.kcpd.myfolder.data.repository.RemoteConfigRepository
 import com.kcpd.myfolder.data.repository.RemoteRepositoryManager
 import com.kcpd.myfolder.domain.usecase.MultiRemoteUploadCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +21,8 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val remoteRepositoryManager: RemoteRepositoryManager,
-    private val multiRemoteUploadCoordinator: MultiRemoteUploadCoordinator
+    private val multiRemoteUploadCoordinator: MultiRemoteUploadCoordinator,
+    private val remoteConfigRepository: RemoteConfigRepository
 ) : ViewModel() {
 
     // Upload states from the global coordinator (shared across all screens)
@@ -92,11 +94,26 @@ class HomeViewModel @Inject constructor(
         return uploadStates.value.isNotEmpty()
     }
 
+    // Legacy - kept for backward compatibility
     val activeRemoteType = remoteRepositoryManager.activeRemoteType.stateIn(
         scope = viewModelScope,
         started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
         initialValue = com.kcpd.myfolder.data.model.RemoteType.S3_MINIO
     )
+    
+    /**
+     * Active remotes info - shows count and names of active upload destinations
+     * Format: "2 remotes: MyS3, GDrive" or "No remotes configured"
+     */
+    val activeRemotesInfo: StateFlow<String> = remoteConfigRepository.getActiveRemotesFlow()
+        .map { remotes ->
+            when {
+                remotes.isEmpty() -> "No remotes configured"
+                remotes.size == 1 -> "Remote: ${remotes.first().name}"
+                else -> "${remotes.size} remotes: ${remotes.take(2).joinToString(", ") { it.name }}${if (remotes.size > 2) "..." else ""}"
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Loading...")
 
     // File counts
     val allFilesCount: StateFlow<Int> = mediaRepository.mediaFiles.map { it.size }

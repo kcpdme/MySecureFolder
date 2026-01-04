@@ -109,6 +109,27 @@ fun FolderScreen(
             )
         }
     }
+    
+    // Handle back button/gesture - navigate up folder hierarchy or exit multi-select mode
+    androidx.activity.compose.BackHandler(enabled = true) {
+        when {
+            isMultiSelectMode -> {
+                // Exit multi-select mode first
+                isMultiSelectMode = false
+                selectedFiles = emptySet()
+                selectedFolders = emptySet()
+            }
+            currentFolderId != null -> {
+                // Navigate up to parent folder
+                val parentId = currentFolder?.parentFolderId
+                viewModel.navigateToFolder(parentId)
+            }
+            else -> {
+                // At root - actually go back
+                onBackClick()
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -505,6 +526,52 @@ fun FolderScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Breadcrumb navigation
+            val breadcrumbs by viewModel.folderBreadcrumbs.collectAsState()
+            if (breadcrumbs.size > 1) { // Only show if we're in a subfolder
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    
+                    breadcrumbs.forEachIndexed { index, (folderId, folderName) ->
+                        val isLast = index == breadcrumbs.lastIndex
+                        
+                        Text(
+                            text = folderName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isLast) 
+                                MaterialTheme.colorScheme.primary
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isLast) androidx.compose.ui.text.font.FontWeight.Bold else null,
+                            modifier = if (!isLast) {
+                                Modifier.clickable { viewModel.navigateToFolder(folderId) }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        
+                        if (!isLast) {
+                            Text(
+                                text = " › ",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
             // Floating upload status indicator (replaces simple progress bar)
             val totalUploads = uploadingFiles.size + uploadQueue.size
             if (totalUploads > 0) {

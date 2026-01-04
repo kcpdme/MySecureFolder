@@ -52,6 +52,42 @@ class FolderViewModel @Inject constructor(
     val currentFolder: StateFlow<UserFolder?> = _currentFolderId.asStateFlow().combine(folderRepository.folders) { folderId, _ ->
         folderId?.let { folderRepository.getFolderById(it) }
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), null)
+    
+    /**
+     * Get the breadcrumb path from root to current folder.
+     * Returns list of (folderId, folderName) pairs where null id = root.
+     */
+    val folderBreadcrumbs: StateFlow<List<Pair<String?, String>>> = _currentFolderId.asStateFlow()
+        .combine(folderRepository.folders) { currentId, allFolders ->
+            val path = mutableListOf<Pair<String?, String>>()
+            
+            // Add root (category name)
+            path.add(null to category.displayName)
+            
+            // Build path from root to current folder
+            if (currentId != null) {
+                val pathFolders = mutableListOf<UserFolder>()
+                var folderId: String? = currentId
+                
+                while (folderId != null) {
+                    val folder = allFolders.find { it.id == folderId }
+                    if (folder != null) {
+                        pathFolders.add(0, folder) // Add to front
+                        folderId = folder.parentFolderId
+                    } else {
+                        break
+                    }
+                }
+                
+                pathFolders.forEach { folder ->
+                    path.add(folder.id to folder.name)
+                }
+            }
+            
+            path
+        }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), listOf(null to category.displayName))
+
 
     val mediaFiles: StateFlow<List<MediaFile>> = combine(
         if (category == FolderCategory.ALL_FILES) mediaRepository.mediaFiles else mediaRepository.getFilesForCategory(category),
