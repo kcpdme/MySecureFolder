@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyFolder</string>
+    <string name="calculator_app_name">Calculator</string>
     <string name="tab_camera">Camera</string>
     <string name="tab_gallery">Gallery</string>
     <string name="tab_settings">Settings</string>

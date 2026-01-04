@@ -37,6 +37,8 @@ class SettingsViewModel @Inject constructor(
     private val vaultManager: VaultManager,
     private val passwordManager: PasswordManager,
     private val biometricManager: BiometricManager,
+    private val camouflageManager: com.kcpd.myfolder.security.CamouflageManager,
+    private val securityPinManager: com.kcpd.myfolder.security.SecurityPinManager,
     private val mediaRepository: com.kcpd.myfolder.data.repository.MediaRepository,
     private val remoteRepositoryManager: com.kcpd.myfolder.data.repository.RemoteRepositoryManager,
     private val googleDriveRepository: com.kcpd.myfolder.data.repository.GoogleDriveRepository,
@@ -56,6 +58,45 @@ class SettingsViewModel @Inject constructor(
 
     private val _storageInfo = MutableStateFlow<Map<String, Long>>(emptyMap())
     val storageInfo: StateFlow<Map<String, Long>> = _storageInfo.asStateFlow()
+    
+    // Security PIN Management (unified for Camouflage and Panic Mode)
+    val securityPinSet = securityPinManager.pinSet
+    val panicModeEnabled = securityPinManager.panicModeEnabled
+    val camouflageEnabled = securityPinManager.camouflageEnabled
+    
+    fun setSecurityPin(pin: String) {
+        securityPinManager.setPin(pin)
+    }
+    
+    fun verifySecurityPin(pin: String): Boolean {
+        return securityPinManager.verifyPin(pin)
+    }
+    
+    fun isSecurityPinSet(): Boolean {
+        return securityPinManager.isPinSet()
+    }
+    
+    fun clearSecurityPin() {
+        securityPinManager.clearPin()
+    }
+    
+    fun getMinPinLength(): Int {
+        return com.kcpd.myfolder.security.SecurityPinManager.MIN_PIN_LENGTH
+    }
+    
+    fun setPanicModeEnabled(enabled: Boolean) {
+        securityPinManager.setPanicModeEnabled(enabled)
+    }
+    
+    fun setCamouflageEnabled(enabled: Boolean) {
+        securityPinManager.setCamouflageEnabled(enabled)
+        // Also handle launcher icon switching
+        camouflageManager.setStealthModeEnabled(enabled)
+    }
+    
+    suspend fun verifyVaultPassword(password: String): Boolean {
+        return passwordManager.verifyPassword(password)
+    }
     
     // Upload concurrency settings - per remote type
     val s3Concurrency = uploadSettingsRepository.s3Concurrency.stateIn(
@@ -375,7 +416,6 @@ fun SettingsScreen(
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var showStorageDialog by remember { mutableStateOf(false) }
-    var showPanicPinDialog by remember { mutableStateOf(false) }
     val lockTimeout by viewModel.lockTimeout.collectAsState()
     val biometricEnabled by viewModel.biometricEnabled.collectAsState()
     val storageInfo by viewModel.storageInfo.collectAsState()
@@ -457,15 +497,407 @@ fun SettingsScreen(
             )
 
             HorizontalDivider()
-
+            
+            // ================== SECURITY PIN SECTION ==================
+            val securityPinSet by viewModel.securityPinSet.collectAsState()
+            val panicModeEnabled by viewModel.panicModeEnabled.collectAsState()
+            val camouflageEnabled by viewModel.camouflageEnabled.collectAsState()
+            var showSecurityPinDialog by remember { mutableStateOf(false) }
+            var showChangePinDialog by remember { mutableStateOf(false) }
+            
+            // Security PIN Setup/Change
             SettingsItem(
-                icon = Icons.Default.Warning,
-                title = "Panic Wipe Setup",
-                description = if (viewModel.isPanicPinSet()) "Panic PIN is set (enters wipe mode)" else "Set a Panic PIN to instantly wipe data",
+                icon = Icons.Default.Pin,
+                title = "Security PIN",
+                description = if (securityPinSet) 
+                    "PIN is set • Used for Calculator unlock and Panic wipe" 
+                else 
+                    "Set a numeric PIN for advanced security features",
                 onClick = {
-                    showPanicPinDialog = true
+                    if (securityPinSet) {
+                        showChangePinDialog = true
+                    } else {
+                        showSecurityPinDialog = true
+                    }
                 }
             )
+            
+            // Show toggle options only if PIN is set
+            if (securityPinSet) {
+                HorizontalDivider()
+                
+                // Calculator Camouflage Toggle
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.setCamouflageEnabled(!camouflageEnabled) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Calculate,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = if (camouflageEnabled)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                androidx.compose.ui.graphics.Color.White
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Calculator Camouflage",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (camouflageEnabled)
+                                    "Active • Type PIN + = on calculator to unlock"
+                                else
+                                    "Hide app as a working calculator",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = camouflageEnabled,
+                            onCheckedChange = { viewModel.setCamouflageEnabled(it) }
+                        )
+                    }
+                }
+                
+                HorizontalDivider()
+                
+                // Panic Wipe Toggle
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.setPanicModeEnabled(!panicModeEnabled) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = if (panicModeEnabled)
+                                MaterialTheme.colorScheme.error
+                            else
+                                androidx.compose.ui.graphics.Color.White
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Panic Wipe Mode",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (panicModeEnabled)
+                                    "Active • Entering PIN at unlock wipes all data"
+                                else
+                                    "Enter Security PIN at vault unlock to wipe data",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = panicModeEnabled,
+                            onCheckedChange = { viewModel.setPanicModeEnabled(it) }
+                        )
+                    }
+                }
+            }
+            
+            // Set Security PIN Dialog
+            if (showSecurityPinDialog) {
+                var newPin by remember { mutableStateOf("") }
+                var confirmPin by remember { mutableStateOf("") }
+                var pinError by remember { mutableStateOf<String?>(null) }
+                val minPinLength = viewModel.getMinPinLength()
+                
+                AlertDialog(
+                    onDismissRequest = { showSecurityPinDialog = false },
+                    icon = {
+                        Icon(
+                            Icons.Default.Pin,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    title = { Text("Set Security PIN") },
+                    text = {
+                        Column {
+                            Text(
+                                text = "Set a numeric PIN (min $minPinLength digits) to enable:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("• Calculator Camouflage - Hide app as calculator", style = MaterialTheme.typography.bodySmall)
+                            Text("• Panic Wipe - Instantly delete all data", style = MaterialTheme.typography.bodySmall)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            OutlinedTextField(
+                                value = newPin,
+                                onValueChange = { 
+                                    if (it.all { char -> char.isDigit() }) {
+                                        newPin = it
+                                        pinError = null
+                                    }
+                                },
+                                label = { Text("Security PIN") },
+                                placeholder = { Text("Enter at least $minPinLength digits") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                                ),
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            OutlinedTextField(
+                                value = confirmPin,
+                                onValueChange = { 
+                                    if (it.all { char -> char.isDigit() }) {
+                                        confirmPin = it
+                                        pinError = null
+                                    }
+                                },
+                                label = { Text("Confirm PIN") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                                ),
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            
+                            if (pinError != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = pinError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                when {
+                                    newPin.length < minPinLength -> {
+                                        pinError = "PIN must be at least $minPinLength digits"
+                                    }
+                                    newPin != confirmPin -> {
+                                        pinError = "PINs do not match"
+                                    }
+                                    else -> {
+                                        try {
+                                            viewModel.setSecurityPin(newPin)
+                                            showSecurityPinDialog = false
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "Security PIN set successfully",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        } catch (e: Exception) {
+                                            pinError = e.message ?: "Failed to set PIN"
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = newPin.length >= minPinLength && confirmPin.isNotEmpty()
+                        ) {
+                            Text("Set PIN")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showSecurityPinDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+            
+            // Change Security PIN Dialog
+            if (showChangePinDialog) {
+                var currentPin by remember { mutableStateOf("") }
+                var newPin by remember { mutableStateOf("") }
+                var confirmPin by remember { mutableStateOf("") }
+                var pinError by remember { mutableStateOf<String?>(null) }
+                var useVaultPassword by remember { mutableStateOf(false) }
+                var vaultPassword by remember { mutableStateOf("") }
+                var isVerifying by remember { mutableStateOf(false) }
+                val minPinLength = viewModel.getMinPinLength()
+                val coroutineScope = rememberCoroutineScope()
+                
+                AlertDialog(
+                    onDismissRequest = { showChangePinDialog = false },
+                    icon = {
+                        Icon(
+                            Icons.Default.Pin,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    title = { Text("Change Security PIN") },
+                    text = {
+                        Column {
+                            if (!useVaultPassword) {
+                                OutlinedTextField(
+                                    value = currentPin,
+                                    onValueChange = { 
+                                        if (it.all { char -> char.isDigit() }) {
+                                            currentPin = it
+                                            pinError = null
+                                        }
+                                    },
+                                    label = { Text("Current PIN") },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                                    ),
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                
+                                TextButton(
+                                    onClick = { useVaultPassword = true },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Forgot PIN? Use vault password", style = MaterialTheme.typography.bodySmall)
+                                }
+                            } else {
+                                OutlinedTextField(
+                                    value = vaultPassword,
+                                    onValueChange = { 
+                                        vaultPassword = it
+                                        pinError = null
+                                    },
+                                    label = { Text("Vault Password") },
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                
+                                TextButton(
+                                    onClick = { useVaultPassword = false },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Use current PIN instead", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            OutlinedTextField(
+                                value = newPin,
+                                onValueChange = { 
+                                    if (it.all { char -> char.isDigit() }) {
+                                        newPin = it
+                                        pinError = null
+                                    }
+                                },
+                                label = { Text("New PIN") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                                ),
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            OutlinedTextField(
+                                value = confirmPin,
+                                onValueChange = { 
+                                    if (it.all { char -> char.isDigit() }) {
+                                        confirmPin = it
+                                        pinError = null
+                                    }
+                                },
+                                label = { Text("Confirm New PIN") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                                ),
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            
+                            if (pinError != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = pinError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    isVerifying = true
+                                    when {
+                                        !useVaultPassword && !viewModel.verifySecurityPin(currentPin) -> {
+                                            pinError = "Current PIN is incorrect"
+                                        }
+                                        useVaultPassword && !viewModel.verifyVaultPassword(vaultPassword) -> {
+                                            pinError = "Vault password is incorrect"
+                                        }
+                                        newPin.length < minPinLength -> {
+                                            pinError = "New PIN must be at least $minPinLength digits"
+                                        }
+                                        newPin != confirmPin -> {
+                                            pinError = "New PINs do not match"
+                                        }
+                                        else -> {
+                                            try {
+                                                viewModel.setSecurityPin(newPin)
+                                                showChangePinDialog = false
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Security PIN changed successfully",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            } catch (e: Exception) {
+                                                pinError = e.message ?: "Failed to change PIN"
+                                            }
+                                        }
+                                    }
+                                    isVerifying = false
+                                }
+                            },
+                            enabled = !isVerifying && newPin.length >= minPinLength && confirmPin.isNotEmpty() && 
+                                ((!useVaultPassword && currentPin.isNotEmpty()) || (useVaultPassword && vaultPassword.isNotEmpty()))
+                        ) {
+                            if (isVerifying) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Change PIN")
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showChangePinDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
 
             HorizontalDivider()
 
@@ -1164,67 +1596,6 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showStorageDialog = false }) {
                     Text("Close")
-                }
-            }
-        )
-    }
-
-    // Panic PIN Dialog
-    if (showPanicPinDialog) {
-        var pin by remember { mutableStateOf("") }
-        var error by remember { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = { showPanicPinDialog = false },
-            title = { Text("Set Panic PIN") },
-            text = {
-                Column {
-                    Text(
-                        text = "Entering this PIN on the lock screen will INSTANTLY wipe all data and close the app.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = pin,
-                        onValueChange = { 
-                            if (it.length <= 8 && it.all { char -> char.isDigit() }) {
-                                pin = it
-                                error = ""
-                            }
-                        },
-                        label = { Text("Panic PIN (4-8 digits)") },
-                        singleLine = true,
-                        isError = error.isNotEmpty(),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
-                        )
-                    )
-                    if (error.isNotEmpty()) {
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (pin.length >= 4) {
-                        viewModel.setPanicPin(pin)
-                        showPanicPinDialog = false
-                        android.widget.Toast.makeText(context, "Panic PIN set", android.widget.Toast.LENGTH_SHORT).show()
-                    } else {
-                        error = "PIN must be at least 4 digits"
-                    }
-                }) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPanicPinDialog = false }) {
-                    Text("Cancel")
                 }
             }
         )

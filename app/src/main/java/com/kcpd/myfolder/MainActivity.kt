@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.kcpd.myfolder.security.CamouflageManager
 import com.kcpd.myfolder.security.VaultManager
 import com.kcpd.myfolder.ui.audio.AudioPlaybackManager
 import com.kcpd.myfolder.ui.audio.MiniAudioPlayer
@@ -29,6 +30,9 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var vaultManager: VaultManager
+    
+    @Inject
+    lateinit var camouflageManager: CamouflageManager
 
     // Pending capture action from widget deep link - using StateFlow for proper observation
     private val _pendingCaptureAction = MutableStateFlow<String?>(null)
@@ -36,6 +40,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Sync launcher icon state with saved preference
+        camouflageManager.syncLauncherState()
         
         // Handle deep link intent
         handleDeepLinkIntent(intent)
@@ -83,7 +90,8 @@ class MainActivity : FragmentActivity() {
                     MyFolderNavHost(
                         modifier = Modifier.fillMaxSize(),
                         navController = navController,
-                        vaultManager = vaultManager
+                        vaultManager = vaultManager,
+                        camouflageManager = camouflageManager
                     )
                     
                     // Mini player at top of screen

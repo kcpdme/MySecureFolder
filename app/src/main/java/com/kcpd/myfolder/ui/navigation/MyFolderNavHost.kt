@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kcpd.myfolder.data.model.FolderCategory
+import com.kcpd.myfolder.security.CamouflageManager
 import com.kcpd.myfolder.security.PasswordManager
 import com.kcpd.myfolder.security.SecurityManager
 import androidx.compose.runtime.collectAsState
@@ -22,6 +23,7 @@ import com.kcpd.myfolder.security.VaultManager
 import com.kcpd.myfolder.ui.auth.PasswordChangeScreen
 import com.kcpd.myfolder.ui.auth.PasswordSetupScreen
 import com.kcpd.myfolder.ui.auth.VaultUnlockScreen
+import com.kcpd.myfolder.ui.camouflage.CalculatorScreen
 import com.kcpd.myfolder.ui.camera.AudioRecorderScreen
 import com.kcpd.myfolder.ui.camera.PhotoCameraScreen
 import com.kcpd.myfolder.ui.camera.VideoRecorderScreen
@@ -45,18 +47,30 @@ import com.kcpd.myfolder.ui.viewer.VideoViewerScreen
 fun MyFolderNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    vaultManager: VaultManager? = null
+    vaultManager: VaultManager? = null,
+    camouflageManager: CamouflageManager? = null
 ) {
     val context = LocalContext.current
     var startDestination by remember { mutableStateOf<String?>(null) }
+    
+    // Observe stealth mode state - this needs to be read BEFORE LaunchedEffect
+    val stealthModeEnabled = camouflageManager?.isStealthModeEnabled() ?: false
 
-    // Check password setup and vault status to determine start destination
+    // Check password setup, vault status, and stealth mode to determine start destination
     LaunchedEffect(Unit) {
         val securityManager = SecurityManager(context)
         val passwordManager = PasswordManager(context, securityManager)
+        
+        // If stealth mode is enabled, ALWAYS show calculator first
+        // Also lock the vault to ensure security
+        if (stealthModeEnabled) {
+            vaultManager?.lock()
+        }
 
         startDestination = when {
             !passwordManager.isPasswordSet() -> "password_setup"
+            // If stealth mode is enabled, ALWAYS show calculator (vault is locked above)
+            stealthModeEnabled -> "calculator"
             vaultManager?.isLocked() == true -> "vault_unlock"
             else -> "home"
         }
@@ -70,6 +84,17 @@ fun MyFolderNavHost(
         startDestination = startDestination!!,
         modifier = modifier
     ) {
+        // Calculator screen (stealth mode entry point)
+        composable("calculator") {
+            CalculatorScreen(
+                onUnlocked = {
+                    navController.navigate("home") {
+                        popUpTo("calculator") { inclusive = true }
+                    }
+                }
+            )
+        }
+        
         composable("password_setup") {
             PasswordSetupScreen(
                 onPasswordSet = {

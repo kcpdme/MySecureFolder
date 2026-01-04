@@ -35,6 +35,7 @@ class VaultManager @Inject constructor(
     private val securityManager: SecurityManager,
     private val secureFileManager: SecureFileManager,
     private val journalManager: PasswordRotationJournalManager,
+    private val securityPinManager: SecurityPinManager,
     private val application: Application
 ) : DefaultLifecycleObserver {
 
@@ -101,8 +102,8 @@ class VaultManager @Inject constructor(
             return false
         }
 
-        // Check for Panic PIN first!
-        if (passwordManager.verifyPanicPin(password)) {
+        // Check for Panic PIN first! (Only if panic mode is enabled)
+        if (securityPinManager.panicModeEnabled.value && securityPinManager.verifyPin(password)) {
             android.util.Log.e("VaultManager", "PANIC PIN DETECTED! INITIATING DATA WIPE.")
             // Run wipe on IO dispatcher to ensure file operations complete
             withContext(Dispatchers.IO) {
