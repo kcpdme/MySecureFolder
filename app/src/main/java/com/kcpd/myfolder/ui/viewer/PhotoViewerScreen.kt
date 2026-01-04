@@ -132,11 +132,12 @@ fun PhotoViewerScreen(
         if (showControls) {
             TopAppBar(
                 title = {
+                    val fileName = if (photoFiles.isNotEmpty()) photoFiles[pagerState.currentPage].fileName else ""
                     Text(
-                        if (photoFiles.isNotEmpty())
-                            photoFiles[pagerState.currentPage].fileName
-                        else
-                            ""
+                        text = fileName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 },
                 navigationIcon = {

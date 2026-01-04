@@ -119,9 +119,9 @@ fun AudioViewerScreen(
                             Text(
                                 text = audioFiles[pagerState.currentPage].fileName,
                                 color = Color.White,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.bodyMedium
                             )
                             if (audioFiles.size > 1) {
                                 Text(

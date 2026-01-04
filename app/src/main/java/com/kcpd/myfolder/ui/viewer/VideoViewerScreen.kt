@@ -83,11 +83,12 @@ fun VideoViewerScreen(
         if (showControls) {
             TopAppBar(
                 title = {
+                    val fileName = if (videoFiles.isNotEmpty()) videoFiles[pagerState.currentPage].fileName else ""
                     Text(
-                        if (videoFiles.isNotEmpty())
-                            videoFiles[pagerState.currentPage].fileName
-                        else
-                            ""
+                        text = fileName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 },
                 navigationIcon = {
