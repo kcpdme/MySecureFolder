@@ -45,6 +45,34 @@ class RemoteConfigRepository @Inject constructor(
 
     companion object {
         private val REMOTES_KEY = stringPreferencesKey("remotes_list")
+        
+        @Volatile
+        private var INSTANCE: RemoteConfigRepository? = null
+        
+        /**
+         * Get singleton instance for non-DI contexts (like WorkManager).
+         * DI-injected instances are preferred when available.
+         */
+        fun getInstance(context: Context): RemoteConfigRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: RemoteConfigRepository(context.applicationContext).also { 
+                    INSTANCE = it 
+                }
+            }
+        }
+    }
+    
+    init {
+        // Set singleton instance for non-DI access
+        INSTANCE = this
+    }
+    
+    /**
+     * Get a specific remote by ID synchronously (uses cached data).
+     * Safe for WorkManager use.
+     */
+    fun getRemoteByIdSync(id: String): RemoteConfig? {
+        return _cachedRemotes.value.find { it.id == id }
     }
     
     // Cached list of all remotes - stays up to date automatically

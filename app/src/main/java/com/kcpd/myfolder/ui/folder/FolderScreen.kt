@@ -916,6 +916,8 @@ fun FolderScreen(
         }
 
         // Multi-Remote Upload Progress Sheet
+        val pendingQueueCount by viewModel.pendingQueueCount.collectAsState()
+        
         if (uploadStates.isNotEmpty() && showUploadSheet) {
             MultiRemoteUploadSheet(
                 uploadStates = uploadStates,
@@ -927,7 +929,14 @@ fun FolderScreen(
                 },
                 onClearCompleted = {
                     viewModel.clearCompletedUploads()
-                }
+                },
+                onCancelAllPending = {
+                    viewModel.cancelAllPendingUploads()
+                },
+                onRetryAllFailed = {
+                    viewModel.retryAllFailedUploads()
+                },
+                pendingQueueCount = pendingQueueCount
             )
         }
 

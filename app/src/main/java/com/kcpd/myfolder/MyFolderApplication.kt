@@ -1,6 +1,8 @@
 package com.kcpd.myfolder
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.kcpd.myfolder.security.SecureFileManager
@@ -10,10 +12,13 @@ import net.sqlcipher.database.SQLiteDatabase
 import javax.inject.Inject
 
 @HiltAndroidApp
-class MyFolderApplication : Application(), ImageLoaderFactory {
+class MyFolderApplication : Application(), ImageLoaderFactory, Configuration.Provider {
 
     @Inject
     lateinit var imageLoader: ImageLoader
+    
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
     lateinit var securityManager: SecurityManager
@@ -168,6 +173,16 @@ class MyFolderApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         return imageLoader
     }
+    
+    /**
+     * Provide WorkManager configuration with Hilt worker factory.
+     * This enables @HiltWorker to inject dependencies into Workers.
+     */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(android.util.Log.INFO)
+            .build()
 
     /**
      * Initialize StAX/Woodstox XML parser for MinIO S3 multipart uploads.

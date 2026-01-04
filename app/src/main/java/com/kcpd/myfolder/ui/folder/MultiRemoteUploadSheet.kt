@@ -22,6 +22,11 @@ import com.kcpd.myfolder.domain.model.UploadStatus
 /**
  * Bottom sheet displaying multi-remote upload progress.
  * Shows each file being uploaded with status indicators for each configured remote.
+ * 
+ * Enhanced to support WorkManager queue management:
+ * - Cancel all pending uploads
+ * - Retry all failed uploads
+ * - Clear completed uploads
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,7 +34,10 @@ fun MultiRemoteUploadSheet(
     uploadStates: Map<String, FileUploadState>,
     onDismiss: () -> Unit,
     onRetry: (fileId: String, remoteId: String) -> Unit,
-    onClearCompleted: () -> Unit
+    onClearCompleted: () -> Unit,
+    onCancelAllPending: (() -> Unit)? = null,
+    onRetryAllFailed: (() -> Unit)? = null,
+    pendingQueueCount: Int = 0 // From WorkManager queue
 ) {
     // Keep states in stable order - don't re-sort when status changes
     // This prevents cards from jumping around while user is watching
@@ -42,8 +50,11 @@ fun MultiRemoteUploadSheet(
 
     val totalFiles = orderedStates.size
     val completedFiles = orderedStates.count { it.isComplete }
+    val failedFiles = orderedStates.count { it.allFailed }
     val hasCompletedFiles = orderedStates.any { it.isComplete }
+    val hasFailedFiles = failedFiles > 0
     val hasActiveUploads = orderedStates.any { it.activeCount > 0 }
+    val hasPendingUploads = pendingQueueCount > 0 || orderedStates.any { !it.isComplete && it.activeCount == 0 }
 
     // Fullscreen sheet - can be dismissed by swipe or close button
     // User can always bring it back using the upload status icon in toolbar
@@ -77,23 +88,63 @@ fun MultiRemoteUploadSheet(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (hasActiveUploads) 
-                            "$completedFiles of $totalFiles files completed" 
-                        else 
-                            "All uploads completed",
+                        text = when {
+                            pendingQueueCount > 0 -> "$pendingQueueCount pending in queue, $completedFiles completed"
+                            hasActiveUploads -> "$completedFiles of $totalFiles files completed"
+                            else -> "All uploads completed"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (hasCompletedFiles) {
-                        TextButton(onClick = onClearCompleted) {
-                            Text("Clear Completed")
-                        }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close")
+                }
+            }
+            
+            // Action buttons row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Cancel All Pending button
+                if (hasPendingUploads && onCancelAllPending != null) {
+                    OutlinedButton(
+                        onClick = onCancelAllPending,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Cancel,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Cancel All")
                     }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                }
+                
+                // Retry All Failed button
+                if (hasFailedFiles && onRetryAllFailed != null) {
+                    OutlinedButton(onClick = onRetryAllFailed) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Retry Failed ($failedFiles)")
+                    }
+                }
+                
+                // Clear Completed button
+                if (hasCompletedFiles) {
+                    TextButton(onClick = onClearCompleted) {
+                        Text("Clear Completed")
                     }
                 }
             }

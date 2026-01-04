@@ -229,8 +229,7 @@ class FolderViewModel @Inject constructor(
 
     /**
      * Upload a single file to all active remotes.
-     * Uses MultiRemoteUploadCoordinator for parallel multi-remote upload.
-     * Non-blocking - returns immediately while uploads happen in background.
+     * Uses WorkManager for reliable background upload that survives app death.
      */
     fun uploadFile(mediaFile: MediaFile) {
         // Check if any active remotes are configured
@@ -242,16 +241,23 @@ class FolderViewModel @Inject constructor(
 
         // Show sheet IMMEDIATELY before starting upload
         _showUploadSheet.value = true
-        android.util.Log.d("FolderViewModel", "Starting multi-remote upload for: ${mediaFile.fileName}")
+        android.util.Log.d("FolderViewModel", "Starting RELIABLE upload for: ${mediaFile.fileName}")
         
-        // This returns immediately - uploads happen in background
-        multiRemoteUploadCoordinator.uploadFile(mediaFile, viewModelScope)
+        // Use WorkManager-backed reliable upload
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.uploadFileReliably(mediaFile)
+        }
     }
 
     /**
      * Upload multiple files to all active remotes in parallel.
      * Each file will be uploaded to all configured remotes concurrently.
-     * Non-blocking - returns immediately while uploads happen in background.
+     * 
+     * Uses WorkManager for reliable background uploads that:
+     * - Continue even if app is minimized or killed
+     * - Automatically retry with exponential backoff
+     * - Show progress notification
+     * - Survive device reboot
      */
     fun uploadFiles(mediaFiles: List<MediaFile>) {
         val activeRemotes = remoteConfigRepository.getActiveRemotesSync()
@@ -263,12 +269,14 @@ class FolderViewModel @Inject constructor(
             return
         }
 
-        android.util.Log.d("FolderViewModel", "Starting multi-remote upload for ${mediaFiles.size} files to ${activeRemotes.size} remotes")
+        android.util.Log.d("FolderViewModel", "Starting RELIABLE multi-remote upload for ${mediaFiles.size} files to ${activeRemotes.size} remotes")
         // Show sheet IMMEDIATELY before starting uploads
         _showUploadSheet.value = true
         
-        // This returns immediately - uploads happen in background
-        multiRemoteUploadCoordinator.uploadFiles(mediaFiles, viewModelScope)
+        // Use WorkManager-backed reliable upload
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.uploadFilesReliably(mediaFiles)
+        }
     }
 
     /**
@@ -284,8 +292,35 @@ class FolderViewModel @Inject constructor(
     fun clearCompletedUploads() {
         viewModelScope.launch {
             multiRemoteUploadCoordinator.clearCompleted()
+            // Also clear from WorkManager queue
+            multiRemoteUploadCoordinator.getUploadManager().clearCompleted()
         }
     }
+    
+    /**
+     * Cancel all pending uploads in the WorkManager queue
+     */
+    fun cancelAllPendingUploads() {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.getUploadManager().cancelAllPending()
+            multiRemoteUploadCoordinator.clearAll()
+        }
+    }
+    
+    /**
+     * Retry all failed uploads via WorkManager
+     */
+    fun retryAllFailedUploads() {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.retryAllFailedReliably()
+        }
+    }
+    
+    /**
+     * Get pending queue count from WorkManager
+     */
+    val pendingQueueCount = multiRemoteUploadCoordinator.getUploadManager().getPendingCountFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), 0)
 
     /**
      * Dismiss the upload sheet (uploads continue in background)

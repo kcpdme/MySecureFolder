@@ -154,6 +154,13 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.52")
     ksp("com.google.dagger:hilt-android-compiler:2.52")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    
+    // Hilt WorkManager integration for background upload workers
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
+    
+    // WorkManager for reliable background uploads
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     // Jetpack Glance for home screen widgets
     implementation("androidx.glance:glance-appwidget:1.1.1")

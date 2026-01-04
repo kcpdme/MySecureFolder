@@ -9,6 +9,7 @@ import com.kcpd.myfolder.domain.model.FileUploadState
 import com.kcpd.myfolder.domain.model.RemoteConfig
 import com.kcpd.myfolder.domain.model.RemoteUploadResult
 import com.kcpd.myfolder.domain.model.UploadStatus
+import com.kcpd.myfolder.worker.UploadManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,9 @@ import javax.inject.Singleton
  * Coordinates uploads to multiple remote storage providers.
  * Manages upload state, progress tracking, and concurrency control.
  * 
+ * IMPORTANT: For reliable background uploads that survive app death,
+ * use uploadFilesReliably() which uses WorkManager.
+ * 
  * Uses configurable concurrency to balance speed and stability.
  * Default is 2 concurrent uploads which balances:
  * - Speed: Faster than fully sequential
@@ -40,7 +44,8 @@ import javax.inject.Singleton
 class MultiRemoteUploadCoordinator @Inject constructor(
     private val remoteConfigRepository: RemoteConfigRepository,
     private val repositoryFactory: RemoteRepositoryFactory,
-    private val uploadSettingsRepository: UploadSettingsRepository
+    private val uploadSettingsRepository: UploadSettingsRepository,
+    private val uploadManager: UploadManager
 ) {
     companion object {
         private const val TAG = "MultiRemoteUploadCoordinator"
@@ -156,6 +161,59 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     ) {
         uploadFiles(listOf(file), scope)
     }
+    
+    /**
+     * Upload files reliably using WorkManager.
+     * 
+     * PREFERRED METHOD for production use.
+     * 
+     * This method:
+     * 1. Immediately persists uploads to database (survives app death)
+     * 2. Triggers WorkManager to process uploads in background
+     * 3. Continues uploading even if app is killed or device reboots
+     * 4. Automatically retries failed uploads with exponential backoff
+     * 
+     * Use this instead of uploadFiles() for critical uploads.
+     */
+    suspend fun uploadFilesReliably(files: List<MediaFile>) {
+        val activeRemotes = remoteConfigRepository.getActiveRemotes()
+        
+        if (activeRemotes.isEmpty()) {
+            Log.w(TAG, "No active remotes configured for reliable upload")
+            return
+        }
+        
+        Log.d(TAG, "Queueing ${files.size} files for reliable upload to ${activeRemotes.size} remotes")
+        
+        // Queue to WorkManager - this returns immediately
+        uploadManager.queueBatchUploads(files, activeRemotes)
+        
+        // Also initialize in-memory state for UI feedback
+        uploadScope.launch {
+            files.forEach { file ->
+                initializeFileState(file, activeRemotes)
+            }
+        }
+    }
+    
+    /**
+     * Upload a single file reliably using WorkManager.
+     */
+    suspend fun uploadFileReliably(file: MediaFile) {
+        uploadFilesReliably(listOf(file))
+    }
+    
+    /**
+     * Retry all failed uploads via WorkManager.
+     */
+    suspend fun retryAllFailedReliably() {
+        uploadManager.retryAllFailed()
+    }
+    
+    /**
+     * Get the UploadManager for observing queue state.
+     */
+    fun getUploadManager(): UploadManager = uploadManager
 
     /**
      * Retry upload for a specific file to a specific remote
@@ -217,6 +275,15 @@ class MultiRemoteUploadCoordinator @Inject constructor(
             _uploadStates.update { states ->
                 states.filterValues { !it.isComplete }
             }
+        }
+    }
+    
+    /**
+     * Clear all upload states (cancel everything)
+     */
+    suspend fun clearAll() {
+        stateMutex.withLock {
+            _uploadStates.update { emptyMap() }
         }
     }
 

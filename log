@@ -1,34 +1,143 @@
-2026-01-03 00:37:33.780 16562-16562 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 0
-2026-01-03 00:37:33.785 16562-16562 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@af407db
-2026-01-03 00:37:33.875 16562-16562 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 1
-2026-01-03 00:37:33.879 16562-16562 FolderViewModel         com.kcpd.myfolder                    D  Starting multi-remote upload for 6 files to 4 remotes
-2026-01-03 00:37:33.879 16562-16562 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload of 6 files to 4 remotes
-2026-01-03 00:37:33.879 16562-16562 MultiRemot...oordinator com.kcpd.myfolder                    D  Max 2 concurrent remote uploads per file
-2026-01-03 00:37:33.881 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Initialized 6 files for upload - all visible in UI now
-2026-01-03 00:37:33.881 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Processing file: 20251210_182554.jpg
-2026-01-03 00:37:33.882 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251210_182554.jpg -> google1
-2026-01-03 00:37:33.882 16562-16675 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251210_182554.jpg -> R2 Bucket
-2026-01-03 00:37:33.882 16562-16675 S3RepositoryInstance    com.kcpd.myfolder                    D  First upload - will initialize MinIO client for myfolder
-2026-01-03 00:37:33.883 16562-16675 S3RepositoryInstance    com.kcpd.myfolder                    D  Creating MinIO client for endpoint: https://72e9c708db2815f6fb2f34c1a7c58ff2.r2.cloudflarestorage.com (bucket: myfolder)
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  Category: PHOTOS
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  MediaFiles count: 11
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  Uploading files: 0 files: []
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [0] File: 20251210_182554.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/9f6059e3-8e27-4ecd-ae09-e6fc3361017f.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [1] File: 20251231_155009.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/322d89ce-31f1-4255-8c9c-77bdfe8a290b.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [2] File: MEDIA_20260102_225406.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/ea02ddd3-5091-4f91-86d5-1f8994e80ab1.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [3] File: MEDIA_20260102_223920.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/275f0559-82b9-431d-aced-998e3d486ce6.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [4] File: MEDIA_20260102_223918.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/39f79f2c-6ab0-48af-bd60-9b142d20b49a.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [5] File: MEDIA_20260102_223917.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/21152714-9eaf-4fa0-bc32-8c163a029afc.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [6] File: MEDIA_20260102_223916.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/2b8fe1c7-6bfa-4bfa-b7aa-831cbea711b6.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [7] File: MEDIA_20260102_223913.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/7a1eda86-8e92-4843-92ce-0144677d40b7.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [8] File: MEDIA_20260102_223858.jpg, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/edf2a315-371c-4462-aacd-88de5bf0253c.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [9] File: Pink Watercolor Baby Shower Poster.png, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/76fdd5f1-c761-456b-a91b-360ad84b1bdc.enc
-2026-01-03 00:37:33.885 16562-16562 FolderScreen            com.kcpd.myfolder                    D  [10] File: lenskart_invoice_reimburse.png, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/4117b7de-dc2e-4319-8efb-8f1be2bc2f9a.enc
-2026-01-03 00:37:33.902 16562-16562 Dialog                  com.kcpd.myfolder                    I  mIsDeviceDefault = false, mIsSamsungBasicInteraction = false, isMetaDataInActivity = false
-2026-01-03 00:37:33.904 16562-16562 DecorView               com.kcpd.myfolder                    I  setWindowBackground: isPopOver=false color=0 d=android.graphics.drawable.ColorDrawable@67dcaf1
-2026-01-03 00:37:33.914 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [0]: 20251210_182554.jpg
-2026-01-03 00:37:33.920 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [1]: 20251231_155009.jpg
-2026-01-03 00:37:33.924 16562-16675 MinioProperties         com.kcpd.myfolder                    E  IOException occurred (Ask Gemini)
+2026-01-04 11:45:31.030 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@af407db
+2026-01-04 11:45:32.205 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:32.213 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@af407db
+2026-01-04 11:45:32.281 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:32.283 13043-13043 FolderViewModel         com.kcpd.myfolder                    D  Category: Photos, FolderId: null, Query: 
+2026-01-04 11:45:32.283 13043-13043 FolderViewModel         com.kcpd.myfolder                    D  Total files for category: 21, Filtered: 2
+2026-01-04 11:45:32.294 13043-13043 FolderScreen            com.kcpd.myfolder                    D  Category: PHOTOS
+2026-01-04 11:45:32.294 13043-13043 FolderScreen            com.kcpd.myfolder                    D  MediaFiles count: 2
+2026-01-04 11:45:32.294 13043-13043 FolderScreen            com.kcpd.myfolder                    D  Uploading files: 0 files: []
+2026-01-04 11:45:32.294 13043-13043 FolderScreen            com.kcpd.myfolder                    D  [0] File: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/a72009df-13cc-4795-ac9d-b383718fd66b.enc
+2026-01-04 11:45:32.294 13043-13043 FolderScreen            com.kcpd.myfolder                    D  [1] File: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/c9412788-badb-4bdb-b8e9-57fd5d55a29f.enc
+2026-01-04 11:45:32.335 13043-13043 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [0]: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature
+2026-01-04 11:45:32.341 13043-13165 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2026-01-04 11:45:32.342 13043-13165 MemoryEfficientDecoder  com.kcpd.myfolder                    D  Original image size: 64x96
+2026-01-04 11:45:32.342 13043-13165 MemoryEfficientDecoder  com.kcpd.myfolder                    D  Target size: 113x113, Sample size: 1
+2026-01-04 11:45:32.342 13043-13165 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2026-01-04 11:45:32.342 13043-13165 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2026-01-04 11:45:32.343 13043-13165 MemoryEfficientDecoder  com.kcpd.myfolder                    D  Decoded to 64x96 (12KB) in 2ms
+2026-01-04 11:45:32.343 13043-13043 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [1]: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature
+2026-01-04 11:45:32.349 13043-13165 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2026-01-04 11:45:32.349 13043-13165 MemoryEfficientDecoder  com.kcpd.myfolder                    D  Original image size: 64x96
+2026-01-04 11:45:32.349 13043-13165 MemoryEfficientDecoder  com.kcpd.myfolder                    D  Target size: 113x113, Sample size: 1
+2026-01-04 11:45:32.350 13043-13165 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2026-01-04 11:45:32.350 13043-13165 Kumiho-Kumiho           com.kcpd.myfolder                    I  getPackageName: com.kcpd.myfolder
+2026-01-04 11:45:32.350 13043-13165 MemoryEfficientDecoder  com.kcpd.myfolder                    D  Decoded to 64x96 (12KB) in 1ms
+2026-01-04 11:45:33.125 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:33.643 13043-13043 FolderScreen            com.kcpd.myfolder                    D  Category: PHOTOS
+2026-01-04 11:45:33.644 13043-13043 FolderScreen            com.kcpd.myfolder                    D  MediaFiles count: 2
+2026-01-04 11:45:33.644 13043-13043 FolderScreen            com.kcpd.myfolder                    D  Uploading files: 0 files: []
+2026-01-04 11:45:33.644 13043-13043 FolderScreen            com.kcpd.myfolder                    D  [0] File: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/a72009df-13cc-4795-ac9d-b383718fd66b.enc
+2026-01-04 11:45:33.644 13043-13043 FolderScreen            com.kcpd.myfolder                    D  [1] File: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/c9412788-badb-4bdb-b8e9-57fd5d55a29f.enc
+2026-01-04 11:45:33.661 13043-13043 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [0]: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature
+2026-01-04 11:45:33.663 13043-13043 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [1]: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature
+2026-01-04 11:45:34.080 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:36.906 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:36.973 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:36.979 13043-13043 FolderViewModel         com.kcpd.myfolder                    D  Folder 5978c78e-fc66-440b-815b-9a9fde70e56c: Found 19 files
+2026-01-04 11:45:36.979 13043-13043 FolderViewModel         com.kcpd.myfolder                    D  Folder 5978c78e-fc66-440b-815b-9a9fde70e56c: Found 0 subfolders
+2026-01-04 11:45:36.979 13043-13043 FolderViewModel         com.kcpd.myfolder                    D  getFilesFromFolders: Collected 19 files from 1 folders (including 1 subfolders)
+2026-01-04 11:45:36.979 13043-13043 FolderViewModel         com.kcpd.myfolder                    D  Starting RELIABLE multi-remote upload for 19 files to 2 remotes
+2026-01-04 11:45:36.986 13043-13043 FolderScreen            com.kcpd.myfolder                    D  Category: PHOTOS
+2026-01-04 11:45:36.986 13043-13043 FolderScreen            com.kcpd.myfolder                    D  MediaFiles count: 2
+2026-01-04 11:45:36.986 13043-13043 FolderScreen            com.kcpd.myfolder                    D  Uploading files: 0 files: []
+2026-01-04 11:45:36.986 13043-13043 FolderScreen            com.kcpd.myfolder                    D  [0] File: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/a72009df-13cc-4795-ac9d-b383718fd66b.enc
+2026-01-04 11:45:36.986 13043-13043 FolderScreen            com.kcpd.myfolder                    D  [1] File: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature, Type: PHOTO, Path: /data/user/0/com.kcpd.myfolder/files/secure_media/photos/c9412788-badb-4bdb-b8e9-57fd5d55a29f.enc
+2026-01-04 11:45:36.995 13043-13043 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [0]: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature
+2026-01-04 11:45:36.998 13043-13043 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [1]: Studio Ghibli inspired artwork with dreamy lighting and whimsical nature
+2026-01-04 11:45:37.034 13043-13043 MultiRemot...oordinator com.kcpd.myfolder                    D  Queueing 19 files for reliable upload to 2 remotes
+2026-01-04 11:45:37.043 13043-13043 UploadManager           com.kcpd.myfolder                    D  Queued 38 uploads (19 files x 2 remotes)
+2026-01-04 11:45:37.043 13043-13043 UploadManager           com.kcpd.myfolder                    D  Upload work scheduled
+2026-01-04 11:45:37.050 13043-13093 JobInfo                 com.kcpd.myfolder                    W  Requested important-while-foreground flag for job21 is ignored and takes no effect
+2026-01-04 11:45:37.050 13043-13093 WM-SystemJobScheduler   com.kcpd.myfolder                    D  Scheduling work ID 582ca658-c30d-4e3a-99d7-c625517d0c55Job ID 21
+2026-01-04 11:45:37.054 13043-13093 WM-GreedyScheduler      com.kcpd.myfolder                    D  Starting tracking for 582ca658-c30d-4e3a-99d7-c625517d0c55
+2026-01-04 11:45:37.057 13043-13043 Dialog                  com.kcpd.myfolder                    I  mIsDeviceDefault = false, mIsSamsungBasicInteraction = false, isMetaDataInActivity = false
+2026-01-04 11:45:37.058 13043-13093 WM-ConstraintTracker    com.kcpd.myfolder                    D  NetworkStateTracker24: initial state = NetworkState(isConnected=true, isValidated=true, isMetered=false, isNotRoaming=true)
+2026-01-04 11:45:37.058 13043-13093 WM-NetworkStateTracker  com.kcpd.myfolder                    D  Registering network callback
+2026-01-04 11:45:37.058 13043-13093 ConnectivityManager     com.kcpd.myfolder                    D  StackLog: [android.net.ConnectivityManager.sendRequestForNetwork(ConnectivityManager.java:4736)] [android.net.ConnectivityManager.registerDefaultNetworkCallbackForUid(ConnectivityManager.java:5461)] [android.net.ConnectivityManager.registerDefaultNetworkCallback(ConnectivityManager.java:5428)] [android.net.ConnectivityManager.registerDefaultNetworkCallback(ConnectivityManager.java:5402)] [androidx.work.impl.utils.NetworkApi24.registerDefaultNetworkCallbackCompat(NetworkApi24.kt:26)] [androidx.work.impl.constraints.trackers.NetworkStateTracker24.startTracking(NetworkStateTracker.kt:165)] [androidx.work.impl.constraints.trackers.ConstraintTracker.addListener(ConstraintTracker.kt:52)] [androidx.work.impl.constraints.controllers.BaseConstraintController$track$1.invokeSuspend(ContraintControllers.kt:62)] [androidx.work.impl.constraints.controllers.BaseConstraintController$track$1.invoke(Unknown Source:8)] [androidx.work.impl.constraints.controllers.BaseConstraintController$track$1.invoke(Unknown Source:4)] [kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo$suspendImpl(Builders.kt:316)] [kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo(Unknown Source:0)] [kotlinx.coroutines.flow.CallbackFlowBuilder.collectTo(Builders.kt:330)] [kotlinx.coroutines.flow.internal.ChannelFlow$collectToFun$1.invokeSuspend(ChannelFlow.kt:56)] [kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)] [kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)] [androidx.work.impl.utils.SerialExecutorImpl$Task.run(SerialExecutorImpl.java:96)] [java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1156)] [java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:651)] [java.lang.Thread.run(Thread.java:1119)]
+2026-01-04 11:45:37.059 13043-13043 DecorView               com.kcpd.myfolder                    I  setWindowBackground: isPopOver=false color=0 d=android.graphics.drawable.ColorDrawable@5060ee6
+2026-01-04 11:45:37.060 13043-13093 WM-GreedyScheduler      com.kcpd.myfolder                    D  Constraints met: Scheduling work ID WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0)
+2026-01-04 11:45:37.061 13043-13195 WM-NetworkStateTracker  com.kcpd.myfolder                    D  Network capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=79711Kbps LinkDnBandwidth>=74415Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.4, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ax, RSSI: -52, Link speed: 576Mbps, Tx Link speed: 576Mbps, Max Supported Tx Link speed: 1200Mbps, Rx Link speed: 144Mbps, Max Supported Rx Link speed: 1200Mbps, Frequency: 5180MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -52 UnderlyingNetworks: Null]
+2026-01-04 11:45:37.062 13043-13093 WM-Processor            com.kcpd.myfolder                    D  Processor: processing WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0)
+2026-01-04 11:45:37.063 13043-13043 WindowManager           com.kcpd.myfolder                    I  WindowManagerGlobal#addView, ty=2, view=com.android.internal.policy.DecorView{1e0580f V.E...... R.....I. 0,0-0,0}[MainActivity], caller=android.view.WindowManagerImpl.addView:158 android.app.Dialog.show:540 androidx.compose.material3.ModalBottomSheet_androidKt$ModalBottomSheetDialog$1$1.invoke:307 
+2026-01-04 11:45:37.064 13043-13043 ViewRootImpl            com.kcpd.myfolder                    D  desktopMode is false
+2026-01-04 11:45:37.064 13043-13043 ViewRootImpl            com.kcpd.myfolder                    I  dVRR is disabled
+2026-01-04 11:45:37.064 13043-13063 NativeCust...ncyManager com.kcpd.myfolder                    D  [NativeCFMS] BpCustomFrequencyManager::BpCustomFrequencyManager()
+2026-01-04 11:45:37.070 13043-13043 InputTransport          com.kcpd.myfolder                    D  Input channel constructed: '975314d', fd=149
+2026-01-04 11:45:37.070 13043-13043 InsetsController        com.kcpd.myfolder                    I  onStateChanged: host=com.kcpd.myfolder/com.kcpd.myfolder.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2316), mDisplayCutout=DisplayCutout{insets=Rect(0, 75 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(513, 0 - 567, 75), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2316 physicalDisplayWidth=1080 physicalDisplayHeight=2316 density={2.8125} cutoutSpec={M 0,0 H -9.466666666666667 V 26.66666666666667‬ H 9.466666666666667 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=9, center=Point(9, 9)}, RoundedCorner{position=TopRight, radius=9, center=Point(1071, 9)}, RoundedCorner{position=BottomRight, radius=9, center=Point(1071, 2307)}, RoundedCorner{position=BottomLeft, radius=9, center=Point(9, 2307)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2316), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(977, 0 - 1080, 75) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2316 physicalPixelDisplaySizeRatio=0.75 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c2d00000 mType=statusBars mFrame=[0,0][1080,75] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {c2d00005 mType=mandatorySystemGestures mFrame=[0,0][1080,103] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {c2d00006 mType=tappableElement mFrame=[0,0][1080,75] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,75] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {63440001 mType=navigationBars mFrame=[0,2281][1080,2316] mVisible=true mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {63440004 mType=systemGestures mFrame=[0,0][70,2316] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {63440005 mType=mandatorySystemGestures mFrame=[0,2241][1080,2316] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {63440006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {63440024 mType=systemGestures mFrame=[1010,0][1080,2316] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
+2026-01-04 11:45:37.070 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  synced displayState. AttachInfo displayState=2
+2026-01-04 11:45:37.072 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  setView = com.android.internal.policy.DecorView@1e0580f IsHRR=false mFlingFrameRateChange=0 TM=true
+2026-01-04 11:45:37.136 13043-13043 InsetsSourceConsumer    com.kcpd.myfolder                    I  applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=com.kcpd.myfolder/com.kcpd.myfolder.MainActivity
+2026-01-04 11:45:37.136 13043-13043 InsetsSourceConsumer    com.kcpd.myfolder                    I  applyRequestedVisibilityToControl: visible=true, type=statusBars, host=com.kcpd.myfolder/com.kcpd.myfolder.MainActivity
+2026-01-04 11:45:37.137 13043-13043 libc                    com.kcpd.myfolder                    W  Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+2026-01-04 11:45:37.137 13043-13043 BufferQueueProducer     com.kcpd.myfolder                    I  [](id:32f300000001,api:0,p:0,c:13043) setDequeueTimeout:2077252342
+2026-01-04 11:45:37.138 13043-13043 BLASTBufferQueue_Java   com.kcpd.myfolder                    I  new BLASTBufferQueue, mName= VRI[MainActivity]@1f4409c mNativeObject= 0xb400007680dcb000 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3585 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 android.view.Choreographer.doCallbacks:1367 android.view.Choreographer.doFrame:1292 android.view.Choreographer$FrameDisplayEventReceiver.run:1870 
+2026-01-04 11:45:37.138 13043-13043 BLASTBufferQueue_Java   com.kcpd.myfolder                    I  update, w= 1080 h= 2316 mName = VRI[MainActivity]@1f4409c mNativeObject= 0xb400007680dcb000 sc.mNativeObject= 0xb400007680e3afc0 format= -2 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3590 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+2026-01-04 11:45:37.138 13043-13043 libc                    com.kcpd.myfolder                    W  Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+2026-01-04 11:45:37.138 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  Relayout returned: old=(0,0,1080,2316) new=(0,0,1080,2316) relayoutAsync=false req=(1080,2316)0 dur=6 res=0x3 s={true 0xb400007680e53000} ch=true seqId=0
+2026-01-04 11:45:37.139 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  performConfigurationChange setNightDimText nightDimLevel=0
+2026-01-04 11:45:37.139 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  mThreadedRenderer.initialize() mSurface={isValid=true 0xb400007680e53000} hwInitialized=true
+2026-01-04 11:45:37.149 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  reportNextDraw android.view.ViewRootImpl.performTraversals:5443 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 
+2026-01-04 11:45:37.149 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  Setup new sync=wmsSync-VRI[MainActivity]@1f4409c#2
+2026-01-04 11:45:37.149 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  Creating new active sync group VRI[MainActivity]@1f4409c#3
+2026-01-04 11:45:37.149 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  registerCallbacksForSync syncBuffer=false
+2026-01-04 11:45:37.160 13043-13068 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  Received frameDrawingCallback syncResult=0 frameNum=1.
+2026-01-04 11:45:37.160 13043-13068 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  mWNT: t=0xb4000076e5ef1780 mBlastBufferQueue=0xb400007680dcb000 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
+2026-01-04 11:45:37.160 13043-13068 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  Setting up sync and frameCommitCallback
+2026-01-04 11:45:37.160 13043-13063 BLASTBufferQueue        com.kcpd.myfolder                    I  [VRI[MainActivity]@1f4409c#1](f:0,a:0,s:0) onFrameAvailable the first frame is available
+2026-01-04 11:45:37.161 13043-13063 SurfaceComposerClient   com.kcpd.myfolder                    I  apply transaction with the first frame. layerId: 92738, bufferData(ID: 56019258441735, frameNumber: 1)
+2026-01-04 11:45:37.161 13043-13063 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+2026-01-04 11:45:37.161 13043-13063 HWUI                    com.kcpd.myfolder                    D  CFMS:: SetUp Pid : 13043    Tid : 13063
+2026-01-04 11:45:37.161 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  reportDrawFinished seqId=0
+2026-01-04 11:45:37.162 13043-13043 WM-SystemJobService     com.kcpd.myfolder                    D  onStartJob for WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0)
+2026-01-04 11:45:37.162 13043-13087 WM-Processor            com.kcpd.myfolder                    D  Work WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0) is already enqueued for processing
+2026-01-04 11:45:37.177 13043-13043 BLASTBufferQueue_Java   com.kcpd.myfolder                    I  update, w= 1080 h= 2316 mName = VRI[MainActivity]@1f4409c mNativeObject= 0xb400007680dcb000 sc.mNativeObject= 0xb400007680e3afc0 format= -2 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3574 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+2026-01-04 11:45:37.178 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  Relayout returned: old=(0,0,1080,2316) new=(0,0,1080,2316) relayoutAsync=true req=(1080,2316)0 dur=0 res=0x0 s={true 0xb400007680e53000} ch=false seqId=0
+2026-01-04 11:45:37.178 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  registerCallbackForPendingTransactions
+2026-01-04 11:45:37.179 13043-13067 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  mWNT: t=0xb4000076e5ea6400 mBlastBufferQueue=0xb400007680dcb000 fn= 2 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$10.onFrameDraw:6536 android.view.ViewRootImpl$4.onFrameDraw:2489 android.view.ThreadedRenderer$1.onFrameDraw:718 
+2026-01-04 11:45:37.180 13043-13063 HWUI                    com.kcpd.myfolder                    D  HWUI - treat SMPTE_170M as sRGB
+2026-01-04 11:45:37.181 13043-13043 WM-WorkerWrapper        com.kcpd.myfolder                    D  Starting work for com.kcpd.myfolder.worker.UploadWorker
+2026-01-04 11:45:37.181 13043-13156 UploadWorker            com.kcpd.myfolder                    D  UploadWorker started (attempt: 1)
+2026-01-04 11:45:37.182 13043-13043 ImeFocusController      com.kcpd.myfolder                    I  onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+2026-01-04 11:45:37.182 13043-13043 ImeFocusController      com.kcpd.myfolder                    I  onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+2026-01-04 11:45:37.184 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Found 38 pending uploads
+2026-01-04 11:45:37.187 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:45:37.196 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111101.jpg -> google1
+2026-01-04 11:45:37.198 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb400007680e53000}
+2026-01-04 11:45:37.198 13043-13043 InputMethodManagerUtils com.kcpd.myfolder                    D  startInputInner - Id : 0
+2026-01-04 11:45:37.198 13043-13043 InputMethodManager      com.kcpd.myfolder                    I  startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+2026-01-04 11:45:37.200 13043-13062 InputTransport          com.kcpd.myfolder                    D  Input channel constructed: 'ClientS', fd=195
+2026-01-04 11:45:37.200 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Drive service initialized for: khemchandkumar@gmail.com
+2026-01-04 11:45:37.200 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    I  Started foreground service Intent { act=ACTION_START_FOREGROUND xflg=0x4 cmp=com.kcpd.myfolder/androidx.work.impl.foreground.SystemForegroundService (has extras) }
+2026-01-04 11:45:37.201 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:37.203 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:37.203 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:45:37.203 13043-13043 NotificationManager     com.kcpd.myfolder                    D  BOOTING pkg =com.kcpd.myfolder mBlockedChannelsForOverflowNoti=[]
+2026-01-04 11:45:37.208 13043-13043 InputMethodManager      com.kcpd.myfolder                    I  handleMessage: setImeVisibility visible=false
+2026-01-04 11:45:37.208 13043-13043 InsetsController        com.kcpd.myfolder                    D  hide(ime(), fromIme=false)
+2026-01-04 11:45:37.208 13043-13043 ImeTracker              com.kcpd.myfolder                    I  com.kcpd.myfolder:2303428e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-01-04 11:45:37.291 13043-13053 InputTransport          com.kcpd.myfolder                    D  Input channel destroyed: 'ClientS', fd=195
+2026-01-04 11:45:39.478 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:39.487 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@1f4409c
+2026-01-04 11:45:39.978 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@af407db
+2026-01-04 11:45:40.708 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:41.351 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:41.589 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:41.932 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:41.993 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:42.617 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:42.716 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:43.496 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:43.566 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 1
+2026-01-04 11:45:43.783 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1bbfpjyZGYwQEGkKVSwIQukHtIReZY6Yl
+2026-01-04 11:45:43.789 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111101.jpg -> google1
+2026-01-04 11:45:43.790 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:45:43.794 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111101.jpg -> B2
+2026-01-04 11:45:43.797 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  First upload - will initialize MinIO client for myfolderprivatebucket
+2026-01-04 11:45:43.799 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Creating MinIO client for endpoint: s3.us-east-005.backblazeb2.com (bucket: myfolderprivatebucket)
+2026-01-04 11:45:43.808 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:43.808 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:45:43.835 13043-13156 MinioProperties         com.kcpd.myfolder                    E  IOException occurred (Ask Gemini)
                                                                                                     java.io.IOException: invalid header field (line 3)
                                                                                                     	at java.util.jar.Attributes.read(Attributes.java:406)
                                                                                                     	at java.util.jar.Manifest.read(Manifest.java:291)
@@ -55,9 +164,9 @@
                                                                                                     	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:166)
                                                                                                     	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
                                                                                                     	at com.kcpd.myfolder.data.repository.S3RepositoryInstance.uploadFile-gIAlu-s(RemoteRepositoryFactory.kt:189)
-                                                                                                    	at com.kcpd.myfolder.domain.usecase.MultiRemoteUploadCoordinator.uploadToRemote(MultiRemoteUploadCoordinator.kt:254)
-                                                                                                    	at com.kcpd.myfolder.domain.usecase.MultiRemoteUploadCoordinator.access$uploadToRemote(MultiRemoteUploadCoordinator.kt:37)
-                                                                                                    	at com.kcpd.myfolder.domain.usecase.MultiRemoteUploadCoordinator$uploadFiles$1$2$uploadJobs$1$1.invokeSuspend(MultiRemoteUploadCoordinator.kt:115)
+                                                                                                    	at com.kcpd.myfolder.worker.UploadWorker.processUpload(UploadWorker.kt:166)
+                                                                                                    	at com.kcpd.myfolder.worker.UploadWorker.access$processUpload(UploadWorker.kt:38)
+                                                                                                    	at com.kcpd.myfolder.worker.UploadWorker$processUpload$1.invokeSuspend(Unknown Source:15)
                                                                                                     	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
                                                                                                     	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
                                                                                                     	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:113)
@@ -66,180 +175,310 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2026-01-03 00:37:33.924 16562-16675 S3RepositoryInstance    com.kcpd.myfolder                    D  MinIO client created in 41ms for myfolder
-2026-01-03 00:37:33.926 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [2]: MEDIA_20260102_225406.jpg
-2026-01-03 00:37:33.930 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [3]: MEDIA_20260102_223920.jpg
-2026-01-03 00:37:33.933 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [4]: MEDIA_20260102_223918.jpg
-2026-01-03 00:37:33.937 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [5]: MEDIA_20260102_223917.jpg
-2026-01-03 00:37:33.940 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [6]: MEDIA_20260102_223916.jpg
-2026-01-03 00:37:33.944 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [7]: MEDIA_20260102_223913.jpg
-2026-01-03 00:37:33.947 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [8]: MEDIA_20260102_223858.jpg
-2026-01-03 00:37:33.949 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [9]: Pink Watercolor Baby Shower Poster.png
-2026-01-03 00:37:33.951 16562-16562 FolderScreen_List       com.kcpd.myfolder                    D  Rendering list item [10]: lenskart_invoice_reimburse.png
-2026-01-03 00:37:33.962 16562-16562 WindowManager           com.kcpd.myfolder                    I  WindowManagerGlobal#addView, ty=2, view=com.android.internal.policy.DecorView{e168a58 V.E...... R.....I. 0,0-0,0}[MainActivity], caller=android.view.WindowManagerImpl.addView:158 android.app.Dialog.show:540 androidx.compose.material3.ModalBottomSheet_androidKt$ModalBottomSheetDialog$1$1.invoke:307 
-2026-01-03 00:37:33.962 16562-16562 ViewRootImpl            com.kcpd.myfolder                    D  desktopMode is false
-2026-01-03 00:37:33.962 16562-16562 ViewRootImpl            com.kcpd.myfolder                    I  dVRR is disabled
-2026-01-03 00:37:33.962 16562-16586 NativeCust...ncyManager com.kcpd.myfolder                    D  [NativeCFMS] BpCustomFrequencyManager::BpCustomFrequencyManager()
-2026-01-03 00:37:33.968 16562-16562 InputTransport          com.kcpd.myfolder                    D  Input channel constructed: '97d860 ', fd=144
-2026-01-03 00:37:33.969 16562-16562 InsetsController        com.kcpd.myfolder                    I  onStateChanged: host=com.kcpd.myfolder/com.kcpd.myfolder.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2316), mDisplayCutout=DisplayCutout{insets=Rect(0, 75 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(513, 0 - 567, 75), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2316 physicalDisplayWidth=1080 physicalDisplayHeight=2316 density={2.8125} cutoutSpec={M 0,0 H -9.466666666666667 V 26.66666666666667‬ H 9.466666666666667 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=9, center=Point(9, 9)}, RoundedCorner{position=TopRight, radius=9, center=Point(1071, 9)}, RoundedCorner{position=BottomRight, radius=9, center=Point(1071, 2307)}, RoundedCorner{position=BottomLeft, radius=9, center=Point(9, 2307)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2316), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(977, 0 - 1080, 75) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2316 physicalPixelDisplaySizeRatio=0.75 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c2d00000 mType=statusBars mFrame=[0,0][1080,75] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {c2d00005 mType=mandatorySystemGestures mFrame=[0,0][1080,103] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {c2d00006 mType=tappableElement mFrame=[0,0][1080,75] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,75] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {63440001 mType=navigationBars mFrame=[0,2281][1080,2316] mVisible=true mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {63440004 mType=systemGestures mFrame=[0,0][70,2316] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {63440005 mType=mandatorySystemGestures mFrame=[0,2241][1080,2316] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {63440006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {63440024 mType=systemGestures mFrame=[1010,0][1080,2316] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
-2026-01-03 00:37:33.969 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  synced displayState. AttachInfo displayState=2
-2026-01-03 00:37:33.970 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  setView = com.android.internal.policy.DecorView@e168a58 IsHRR=false mFlingFrameRateChange=0 TM=true
-2026-01-03 00:37:34.121 16562-16562 InsetsSourceConsumer    com.kcpd.myfolder                    I  applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=com.kcpd.myfolder/com.kcpd.myfolder.MainActivity
-2026-01-03 00:37:34.121 16562-16562 InsetsSourceConsumer    com.kcpd.myfolder                    I  applyRequestedVisibilityToControl: visible=true, type=statusBars, host=com.kcpd.myfolder/com.kcpd.myfolder.MainActivity
-2026-01-03 00:37:34.122 16562-16562 libc                    com.kcpd.myfolder                    W  Access denied finding property "vendor.display.enable_optimal_refresh_rate"
-2026-01-03 00:37:34.122 16562-16562 BufferQueueProducer     com.kcpd.myfolder                    I  [](id:40b200000001,api:0,p:0,c:16562) setDequeueTimeout:2077252342
-2026-01-03 00:37:34.122 16562-16562 BLASTBufferQueue_Java   com.kcpd.myfolder                    I  new BLASTBufferQueue, mName= VRI[MainActivity]@5cfe7b1 mNativeObject= 0xb4000076801b3000 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3585 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 android.view.Choreographer.doCallbacks:1367 android.view.Choreographer.doFrame:1292 android.view.Choreographer$FrameDisplayEventReceiver.run:1870 
-2026-01-03 00:37:34.122 16562-16562 BLASTBufferQueue_Java   com.kcpd.myfolder                    I  update, w= 1080 h= 2316 mName = VRI[MainActivity]@5cfe7b1 mNativeObject= 0xb4000076801b3000 sc.mNativeObject= 0xb4000076803d4a40 format= -2 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3590 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
-2026-01-03 00:37:34.123 16562-16562 libc                    com.kcpd.myfolder                    W  Access denied finding property "vendor.display.enable_optimal_refresh_rate"
-2026-01-03 00:37:34.123 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  Relayout returned: old=(0,0,1080,2316) new=(0,0,1080,2316) relayoutAsync=false req=(1080,2316)0 dur=5 res=0x3 s={true 0xb40000768023fb00} ch=true seqId=0
-2026-01-03 00:37:34.123 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  performConfigurationChange setNightDimText nightDimLevel=0
-2026-01-03 00:37:34.123 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  mThreadedRenderer.initialize() mSurface={isValid=true 0xb40000768023fb00} hwInitialized=true
-2026-01-03 00:37:34.139 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  reportNextDraw android.view.ViewRootImpl.performTraversals:5443 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 
-2026-01-03 00:37:34.139 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  Setup new sync=wmsSync-VRI[MainActivity]@5cfe7b1#2
-2026-01-03 00:37:34.139 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  Creating new active sync group VRI[MainActivity]@5cfe7b1#3
-2026-01-03 00:37:34.139 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  registerCallbacksForSync syncBuffer=false
-2026-01-03 00:37:34.154 16562-16590 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  Received frameDrawingCallback syncResult=0 frameNum=1.
-2026-01-03 00:37:34.154 16562-16590 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  mWNT: t=0xb4000076800a1200 mBlastBufferQueue=0xb4000076801b3000 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
-2026-01-03 00:37:34.154 16562-16590 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  Setting up sync and frameCommitCallback
-2026-01-03 00:37:34.154 16562-16586 BLASTBufferQueue        com.kcpd.myfolder                    I  [VRI[MainActivity]@5cfe7b1#1](f:0,a:0,s:0) onFrameAvailable the first frame is available
-2026-01-03 00:37:34.154 16562-16586 SurfaceComposerClient   com.kcpd.myfolder                    I  apply transaction with the first frame. layerId: 70386, bufferData(ID: 71133248356359, frameNumber: 1)
-2026-01-03 00:37:34.154 16562-16586 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
-2026-01-03 00:37:34.155 16562-16586 HWUI                    com.kcpd.myfolder                    D  CFMS:: SetUp Pid : 16562    Tid : 16586
-2026-01-03 00:37:34.155 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  reportDrawFinished seqId=0
-2026-01-03 00:37:34.155 16562-16562 Choreographer           com.kcpd.myfolder                    I  Skipped 32 frames!  The application may be doing too much work on its main thread.
-2026-01-03 00:37:34.185 16562-16562 BLASTBufferQueue_Java   com.kcpd.myfolder                    I  update, w= 1080 h= 2316 mName = VRI[MainActivity]@5cfe7b1 mNativeObject= 0xb4000076801b3000 sc.mNativeObject= 0xb4000076803d4a40 format= -2 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3574 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
-2026-01-03 00:37:34.185 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  Relayout returned: old=(0,0,1080,2316) new=(0,0,1080,2316) relayoutAsync=true req=(1080,2316)0 dur=0 res=0x0 s={true 0xb40000768023fb00} ch=false seqId=0
-2026-01-03 00:37:34.186 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  registerCallbackForPendingTransactions
-2026-01-03 00:37:34.187 16562-16589 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  mWNT: t=0xb4000076800a1800 mBlastBufferQueue=0xb4000076801b3000 fn= 2 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$10.onFrameDraw:6536 android.view.ViewRootImpl$4.onFrameDraw:2489 android.view.ThreadedRenderer$1.onFrameDraw:718 
-2026-01-03 00:37:34.206 16562-16586 HWUI                    com.kcpd.myfolder                    D  HWUI - treat SMPTE_170M as sRGB
-2026-01-03 00:37:34.206 16562-16562 ImeFocusController      com.kcpd.myfolder                    I  onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
-2026-01-03 00:37:34.206 16562-16562 ImeFocusController      com.kcpd.myfolder                    I  onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
-2026-01-03 00:37:34.216 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    D  mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb40000768023fb00}
-2026-01-03 00:37:34.216 16562-16562 InputMethodManagerUtils com.kcpd.myfolder                    D  startInputInner - Id : 0
-2026-01-03 00:37:34.216 16562-16562 InputMethodManager      com.kcpd.myfolder                    I  startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
-2026-01-03 00:37:34.219 16562-16580 InputTransport          com.kcpd.myfolder                    D  Input channel constructed: 'ClientS', fd=168
-2026-01-03 00:37:34.222 16562-16562 InputMethodManager      com.kcpd.myfolder                    I  handleMessage: setImeVisibility visible=false
-2026-01-03 00:37:34.222 16562-16562 InsetsController        com.kcpd.myfolder                    D  hide(ime(), fromIme=false)
-2026-01-03 00:37:34.222 16562-16562 ImeTracker              com.kcpd.myfolder                    I  com.kcpd.myfolder:76087b80: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
-2026-01-03 00:37:34.246 16562-16573 InputTransport          com.kcpd.myfolder                    D  Input channel destroyed: 'ClientS', fd=168
-2026-01-03 00:37:36.468 16562-16675 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolder/MyFolderPrivate/photos/9f6059e3-8e27-4ecd-ae09-e6fc3361017f.enc
-2026-01-03 00:37:36.468 16562-16675 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251210_182554.jpg -> R2 Bucket
-2026-01-03 00:37:36.468 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251210_182554.jpg -> B2
-2026-01-03 00:37:36.469 16562-16668 S3RepositoryInstance    com.kcpd.myfolder                    D  First upload - will initialize MinIO client for myfolderprivatebucket
-2026-01-03 00:37:36.469 16562-16668 S3RepositoryInstance    com.kcpd.myfolder                    D  Creating MinIO client for endpoint: s3.us-east-005.backblazeb2.com (bucket: myfolderprivatebucket)
-2026-01-03 00:37:36.470 16562-16668 S3RepositoryInstance    com.kcpd.myfolder                    D  MinIO client created in 1ms for myfolderprivatebucket
-2026-01-03 00:37:36.878 16562-16562 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@af407db
-2026-01-03 00:37:38.470 16562-16650 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1rKdoZeNz3lDsXDRKg2pdr_t6kVg4iuni
-2026-01-03 00:37:38.470 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251210_182554.jpg -> google1
-2026-01-03 00:37:38.471 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251210_182554.jpg -> koofr
-2026-01-03 00:37:38.472 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  First upload - will initialize WebDAV client for koofr
-2026-01-03 00:37:38.473 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  Creating WebDAV client for: https://app.koofr.net/dav/Koofr
-2026-01-03 00:37:38.475 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  WebDAV client created in 2ms for koofr
-2026-01-03 00:37:40.467 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  Folder already exists: https://app.koofr.net/dav/Koofr/MyFolderPrivate/ (status: 405)
-2026-01-03 00:37:40.776 16562-16668 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/9f6059e3-8e27-4ecd-ae09-e6fc3361017f.enc
-2026-01-03 00:37:40.777 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251210_182554.jpg -> B2
-2026-01-03 00:37:40.905 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  Folder already exists: https://app.koofr.net/dav/Koofr/MyFolderPrivate/photos/ (status: 405)
-2026-01-03 00:37:45.956 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  Upload successful: webdav://koofr/MyFolderPrivate/photos/9f6059e3-8e27-4ecd-ae09-e6fc3361017f.enc
-2026-01-03 00:37:45.957 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251210_182554.jpg -> koofr
-2026-01-03 00:37:45.958 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Completed file: 20251210_182554.jpg - Moving to next file
-2026-01-03 00:37:45.958 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Processing file: 20251231_155009.jpg
-2026-01-03 00:37:45.960 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251231_155009.jpg -> B2
-2026-01-03 00:37:45.960 16562-16668 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
-2026-01-03 00:37:45.960 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251231_155009.jpg -> google1
-2026-01-03 00:37:48.616 16562-16677 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1QNKNNQK5f0iMsdLupqqO6QPg54aAHHut
-2026-01-03 00:37:48.617 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251231_155009.jpg -> google1
-2026-01-03 00:37:48.618 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251231_155009.jpg -> R2 Bucket
-2026-01-03 00:37:48.618 16562-16650 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolder
-2026-01-03 00:37:49.114 16562-16668 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/322d89ce-31f1-4255-8c9c-77bdfe8a290b.enc
-2026-01-03 00:37:49.115 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251231_155009.jpg -> B2
-2026-01-03 00:37:49.116 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: 20251231_155009.jpg -> koofr
-2026-01-03 00:37:49.116 16562-16644 WebDavRepository        com.kcpd.myfolder                    D  Using CACHED WebDAV client for koofr
-2026-01-03 00:37:50.676 16562-16650 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolder/MyFolderPrivate/photos/322d89ce-31f1-4255-8c9c-77bdfe8a290b.enc
-2026-01-03 00:37:50.677 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251231_155009.jpg -> R2 Bucket
-2026-01-03 00:37:53.283 16562-16644 WebDavRepository        com.kcpd.myfolder                    D  Upload successful: webdav://koofr/MyFolderPrivate/photos/322d89ce-31f1-4255-8c9c-77bdfe8a290b.enc
-2026-01-03 00:37:53.283 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: 20251231_155009.jpg -> koofr
-2026-01-03 00:37:53.284 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Completed file: 20251231_155009.jpg - Moving to next file
-2026-01-03 00:37:53.284 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Processing file: MEDIA_20260102_225406.jpg
-2026-01-03 00:37:53.285 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_225406.jpg -> google1
-2026-01-03 00:37:53.286 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_225406.jpg -> koofr
-2026-01-03 00:37:53.286 16562-16644 WebDavRepository        com.kcpd.myfolder                    D  Using CACHED WebDAV client for koofr
-2026-01-03 00:37:55.938 16562-16677 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1kesTXdnGPzUg0EWpSfelhgxYmHtd3Wwe
-2026-01-03 00:37:55.938 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_225406.jpg -> google1
-2026-01-03 00:37:55.939 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_225406.jpg -> R2 Bucket
-2026-01-03 00:37:55.939 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolder
-2026-01-03 00:37:58.485 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 0
-2026-01-03 00:37:58.492 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@5cfe7b1
-2026-01-03 00:37:58.816 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 1
-2026-01-03 00:38:01.817 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@5cfe7b1
-2026-01-03 00:38:05.388 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolder/MyFolderPrivate/photos/ea02ddd3-5091-4f91-86d5-1f8994e80ab1.enc
-2026-01-03 00:38:05.389 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_225406.jpg -> R2 Bucket
-2026-01-03 00:38:05.390 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_225406.jpg -> B2
-2026-01-03 00:38:05.390 16562-16650 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
-2026-01-03 00:38:08.563 16562-16650 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/ea02ddd3-5091-4f91-86d5-1f8994e80ab1.enc
-2026-01-03 00:38:08.564 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_225406.jpg -> B2
-2026-01-03 00:38:10.563 16562-16644 WebDavRepository        com.kcpd.myfolder                    D  Upload successful: webdav://koofr/MyFolderPrivate/photos/ea02ddd3-5091-4f91-86d5-1f8994e80ab1.enc
-2026-01-03 00:38:10.563 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_225406.jpg -> koofr
-2026-01-03 00:38:10.564 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Completed file: MEDIA_20260102_225406.jpg - Moving to next file
-2026-01-03 00:38:10.564 16562-16644 MultiRemot...oordinator com.kcpd.myfolder                    D  Processing file: MEDIA_20260102_223920.jpg
-2026-01-03 00:38:10.565 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223920.jpg -> google1
-2026-01-03 00:38:10.566 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223920.jpg -> R2 Bucket
-2026-01-03 00:38:10.566 16562-16653 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolder
-2026-01-03 00:38:12.920 16562-16653 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolder/MyFolderPrivate/photos/275f0559-82b9-431d-aced-998e3d486ce6.enc
-2026-01-03 00:38:12.920 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223920.jpg -> R2 Bucket
-2026-01-03 00:38:12.921 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223920.jpg -> koofr
-2026-01-03 00:38:12.921 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  Using CACHED WebDAV client for koofr
-2026-01-03 00:38:13.352 16562-16677 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1WGrCYdzHHL9oCpU2L7HHXFu4PBCyaS0I
-2026-01-03 00:38:13.352 16562-16677 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223920.jpg -> google1
-2026-01-03 00:38:13.353 16562-16671 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223920.jpg -> B2
-2026-01-03 00:38:13.353 16562-16671 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
-2026-01-03 00:38:14.136 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 0
-2026-01-03 00:38:14.139 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@5cfe7b1
-2026-01-03 00:38:14.470 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 1
-2026-01-03 00:38:16.655 16562-16671 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/275f0559-82b9-431d-aced-998e3d486ce6.enc
-2026-01-03 00:38:16.655 16562-16671 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223920.jpg -> B2
-2026-01-03 00:38:17.471 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@5cfe7b1
-2026-01-03 00:38:17.634 16562-16650 WebDavRepository        com.kcpd.myfolder                    D  Upload successful: webdav://koofr/MyFolderPrivate/photos/275f0559-82b9-431d-aced-998e3d486ce6.enc
-2026-01-03 00:38:17.635 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223920.jpg -> koofr
-2026-01-03 00:38:17.635 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Completed file: MEDIA_20260102_223920.jpg - Moving to next file
-2026-01-03 00:38:17.636 16562-16650 MultiRemot...oordinator com.kcpd.myfolder                    D  Processing file: MEDIA_20260102_223918.jpg
-2026-01-03 00:38:17.637 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223918.jpg -> google1
-2026-01-03 00:38:17.637 16562-16671 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223918.jpg -> R2 Bucket
-2026-01-03 00:38:17.637 16562-16671 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolder
-2026-01-03 00:38:18.509 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 0
-2026-01-03 00:38:18.515 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@5cfe7b1
-2026-01-03 00:38:18.802 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 1
-2026-01-03 00:38:19.390 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 0
-2026-01-03 00:38:19.587 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  ViewPostIme pointer 1
-2026-01-03 00:38:20.311 16562-16653 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1_9dimVXLQ97di1jQx22osDo5ejANRBL0
-2026-01-03 00:38:20.311 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223918.jpg -> google1
-2026-01-03 00:38:20.312 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223918.jpg -> B2
-2026-01-03 00:38:20.312 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
-2026-01-03 00:38:22.591 16562-16562 VRI[MainAc...y]@5cfe7b1 com.kcpd.myfolder                    I  call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@5cfe7b1
-2026-01-03 00:38:23.837 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/39f79f2c-6ab0-48af-bd60-9b142d20b49a.enc
-2026-01-03 00:38:23.838 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223918.jpg -> B2
-2026-01-03 00:38:23.839 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223918.jpg -> koofr
-2026-01-03 00:38:23.839 16562-16668 WebDavRepository        com.kcpd.myfolder                    D  Using CACHED WebDAV client for koofr
-2026-01-03 00:38:26.650 16562-16671 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolder/MyFolderPrivate/photos/39f79f2c-6ab0-48af-bd60-9b142d20b49a.enc
-2026-01-03 00:38:26.650 16562-16671 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223918.jpg -> R2 Bucket
-2026-01-03 00:38:26.680 16562-16571 m.kcpd.myfolder         com.kcpd.myfolder                    I  Compiler allocated 5833KB to compile void com.kcpd.myfolder.ui.folder.FolderScreenKt$FolderScreen$6.invoke(androidx.compose.foundation.layout.PaddingValues, androidx.compose.runtime.Composer, int)
-2026-01-03 00:38:27.663 16562-16668 WebDavRepository        com.kcpd.myfolder                    D  Upload successful: webdav://koofr/MyFolderPrivate/photos/39f79f2c-6ab0-48af-bd60-9b142d20b49a.enc
-2026-01-03 00:38:27.664 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223918.jpg -> koofr
-2026-01-03 00:38:27.665 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Completed file: MEDIA_20260102_223918.jpg - Moving to next file
-2026-01-03 00:38:27.665 16562-16668 MultiRemot...oordinator com.kcpd.myfolder                    D  Processing file: MEDIA_20260102_223917.jpg
-2026-01-03 00:38:27.666 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223917.jpg -> google1
-2026-01-03 00:38:27.667 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223917.jpg -> R2 Bucket
-2026-01-03 00:38:27.667 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolder
-2026-01-03 00:38:28.891 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolder/MyFolderPrivate/photos/21152714-9eaf-4fa0-bc32-8c163a029afc.enc
-2026-01-03 00:38:28.892 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223917.jpg -> R2 Bucket
-2026-01-03 00:38:28.892 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223917.jpg -> B2
-2026-01-03 00:38:28.892 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
-2026-01-03 00:38:30.748 16562-16653 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1YZk9aJ-1JIEoaKkhSOvJCrvT71eL1h1_
-2026-01-03 00:38:30.748 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223917.jpg -> google1
-2026-01-03 00:38:30.749 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Starting upload: MEDIA_20260102_223917.jpg -> koofr
-2026-01-03 00:38:30.749 16562-16653 WebDavRepository        com.kcpd.myfolder                    D  Using CACHED WebDAV client for koofr
-2026-01-03 00:38:32.500 16562-16684 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/21152714-9eaf-4fa0-bc32-8c163a029afc.enc
-2026-01-03 00:38:32.500 16562-16684 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223917.jpg -> B2
-2026-01-03 00:38:34.636 16562-16653 WebDavRepository        com.kcpd.myfolder                    D  Upload successful: webdav://koofr/MyFolderPrivate/photos/21152714-9eaf-4fa0-bc32-8c163a029afc.enc
-2026-01-03 00:38:34.637 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260102_223917.jpg -> koofr
-2026-01-03 00:38:34.638 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  Completed file: MEDIA_20260102_223917.jpg - Moving to next file
-2026-01-03 00:38:34.638 16562-16653 MultiRemot...oordinator com.kcpd.myfolder                    D  All 6 files processed
+2026-01-04 11:45:43.835 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  MinIO client created in 36ms for myfolderprivatebucket
+2026-01-04 11:45:44.344 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  ViewPostIme pointer 0
+2026-01-04 11:45:44.559 13043-13043 ImeFocusController      com.kcpd.myfolder                    I  onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+2026-01-04 11:45:44.559 13043-13043 ImeFocusController      com.kcpd.myfolder                    I  onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+2026-01-04 11:45:45.534 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  handleAppVisibility mAppVisible = true visible = false
+2026-01-04 11:45:45.534 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  visibilityChanged oldVisibility=true newVisibility=false
+2026-01-04 11:45:45.535 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  handleAppVisibility mAppVisible = true visible = false
+2026-01-04 11:45:45.535 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    D  visibilityChanged oldVisibility=true newVisibility=false
+2026-01-04 11:45:45.546 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  Relayout returned: old=(0,0,1080,2316) new=(0,0,1080,2316) relayoutAsync=false req=(1080,2316)8 dur=5 res=0x2 s={false 0x0} ch=true seqId=0
+2026-01-04 11:45:45.546 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+2026-01-04 11:45:45.549 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:45.552 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  Relayout returned: old=(0,0,1080,2316) new=(0,0,1080,2316) relayoutAsync=false req=(1080,2316)8 dur=2 res=0x2 s={false 0x0} ch=true seqId=0
+2026-01-04 11:45:45.552 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    D  Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+2026-01-04 11:45:45.554 13043-13043 WindowOnBackDispatcher  com.kcpd.myfolder                    W  sendCancelIfRunning: isInProgress=false callback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@da96880
+2026-01-04 11:45:45.556 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  stopped(true) old = false
+2026-01-04 11:45:45.556 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    D  WindowStopped on com.kcpd.myfolder/com.kcpd.myfolder.MainActivity set to true
+2026-01-04 11:45:45.557 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:45.557 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  stopped(true) old = false
+2026-01-04 11:45:45.557 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    D  WindowStopped on com.kcpd.myfolder/com.kcpd.myfolder.MainActivity set to true
+2026-01-04 11:45:45.557 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:45.571 13043-13043 BBA2                    com.kcpd.myfolder                    D  setIsFg isFg = false; delayValue 3999ms
+2026-01-04 11:45:45.576 13043-13043 InputTransport          com.kcpd.myfolder                    D  Input channel destroyed: 'ClientS', fd=163
+2026-01-04 11:45:45.889 13043-13043 WindowManager           com.kcpd.myfolder                    I  WindowManagerGlobal#removeView, ty=2, view=com.android.internal.policy.DecorView{1e0580f V.E...... R.....ID 0,0-1080,2316 aid=1073741824}[MainActivity], caller=android.view.WindowManagerGlobal.removeView:654 android.view.WindowManagerImpl.removeViewImmediate:216 android.app.Dialog.dismissDialog:850 
+2026-01-04 11:45:45.889 13043-13043 WindowOnBackDispatcher  com.kcpd.myfolder                    W  sendCancelIfRunning: isInProgress=false callback=androidx.compose.material3.ModalBottomSheetDialogLayout$Api34Impl$createBackCallback$1@b198793
+2026-01-04 11:45:45.891 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:45.891 13043-13043 ViewRootImpl            com.kcpd.myfolder                    D  Skipping stats log for color mode
+2026-01-04 11:45:45.891 13043-13043 VRI[MainAc...y]@1f4409c com.kcpd.myfolder                    I  dispatchDetachedFromWindow
+2026-01-04 11:45:45.893 13043-13043 InputTransport          com.kcpd.myfolder                    D  Input channel destroyed: '975314d', fd=149
+2026-01-04 11:45:45.911 13043-13043 WindowOnBackDispatcher  com.kcpd.myfolder                    W  sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@6799753
+2026-01-04 11:45:45.914 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:45.914 13043-13043 ViewRootImpl            com.kcpd.myfolder                    D  Skipping stats log for color mode
+2026-01-04 11:45:45.914 13043-13043 VRI[MainAc...y]@af407db com.kcpd.myfolder                    I  dispatchDetachedFromWindow
+2026-01-04 11:45:45.915 13043-13043 InputTransport          com.kcpd.myfolder                    D  Input channel destroyed: '7924c8 ', fd=121
+2026-01-04 11:45:46.112 13043-13043 S3SessionManager        com.kcpd.myfolder                    D  App backgrounded - session preserved for background uploads
+2026-01-04 11:45:46.996 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/44713067-5f4c-4d1a-bd9c-35295e4e0d53.enc
+2026-01-04 11:45:47.002 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111101.jpg -> B2
+2026-01-04 11:45:47.004 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:45:47.007 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111101.jpg -> google1
+2026-01-04 11:45:47.007 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:47.008 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:45:50.035 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://15pRupoJl4ppfhU34ECrhXnKDaYcDb-wW
+2026-01-04 11:45:50.040 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111101.jpg -> google1
+2026-01-04 11:45:50.042 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:45:50.045 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111101.jpg -> B2
+2026-01-04 11:45:50.045 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:50.045 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:45:50.047 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:45:53.823 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/3773fabf-ef45-42fc-a95a-1bf12f8d77f6.enc
+2026-01-04 11:45:53.829 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111101.jpg -> B2
+2026-01-04 11:45:53.831 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:45:53.834 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:45:53.835 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:53.836 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:45:54.482 13043-13093 WM-WorkerWrapper        com.kcpd.myfolder                    I  Worker result SUCCESS for Work [ id=a4fb6d69-c224-4cbf-bcca-27f90329ad78, tags={ androidx.glance.session.SessionWorker } ]
+2026-01-04 11:45:54.485 13043-13043 WM-Processor            com.kcpd.myfolder                    D  Processor a4fb6d69-c224-4cbf-bcca-27f90329ad78 executed; reschedule = false
+2026-01-04 11:45:54.485 13043-13043 WM-SystemJobService     com.kcpd.myfolder                    D  a4fb6d69-c224-4cbf-bcca-27f90329ad78 executed on JobScheduler
+2026-01-04 11:45:54.486 13043-13093 WM-GreedyScheduler      com.kcpd.myfolder                    D  Cancelling work ID a4fb6d69-c224-4cbf-bcca-27f90329ad78
+2026-01-04 11:45:54.784 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    W  Cleared Reference was only reachable from finalizer (only reported once)
+2026-01-04 11:45:54.801 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:54.801 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:54.802 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:54.802 13043-13063 HWUI                    com.kcpd.myfolder                    D  CacheManager::trimMemory(20)
+2026-01-04 11:45:56.805 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1dLAqx0rCY8XwvQVPgPoWQ49rmgCqXLtH
+2026-01-04 11:45:56.814 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:45:56.817 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:45:56.824 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:45:56.824 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:45:56.825 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:45:56.828 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:00.473 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/b16fa6fb-0082-463b-8552-defbf5cc5b3a.enc
+2026-01-04 11:46:00.480 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:00.483 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:00.485 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:00.485 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:00.485 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:03.351 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1QDlqd6pF9A0PbSixlPeOMq7T4Zsnv52N
+2026-01-04 11:46:03.359 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:03.362 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:03.368 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:03.368 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:03.368 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:03.374 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:06.593 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/1e2c2ea9-81b3-4600-acf4-c8cafa815842.enc
+2026-01-04 11:46:06.601 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:06.604 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:06.608 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:06.608 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:06.609 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:09.511 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1VJrLS3eGPbKT-Y9GTwTXr_bxTQNorffw
+2026-01-04 11:46:09.517 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:09.521 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:09.524 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:09.525 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:09.526 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:09.528 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:09.590 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background young concurrent mark compact GC freed 1905KB AllocSpace bytes, 42(23MB) LOS objects, 59% free, 14MB/36MB, paused 481us,7.107ms total 57.291ms
+2026-01-04 11:46:12.994 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/5dc10673-85b7-48d3-9411-011b909f73a2.enc
+2026-01-04 11:46:13.006 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:13.011 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:13.020 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:13.021 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:13.021 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:15.864 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1CKMGhZUF45WSxG3MOFibmcoafkHR_MY-
+2026-01-04 11:46:15.871 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:15.873 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:15.877 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:15.878 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:15.878 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:15.881 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:18.847 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/200d8119-b430-4d86-ba88-f02d7e7d2a04.enc
+2026-01-04 11:46:18.856 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:18.860 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:18.865 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:18.865 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:18.866 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:21.802 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1QoTIjq2LCEBPEYc1Lt6Pgs9rzaMKt23X
+2026-01-04 11:46:21.807 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> google1
+2026-01-04 11:46:21.811 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:21.815 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:21.815 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:21.816 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:21.820 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:21.952 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background concurrent mark compact GC freed 3030KB AllocSpace bytes, 50(21MB) LOS objects, 66% free, 14MB/42MB, paused 446us,5.008ms total 111.484ms
+2026-01-04 11:46:25.277 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/f6df93d5-b935-4944-af3e-a2e07d072752.enc
+2026-01-04 11:46:25.288 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111100.jpg -> B2
+2026-01-04 11:46:25.292 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:25.298 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:25.298 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:25.299 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:28.339 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1FWH8Tl_yDa5l2-JwNb1RQ_EcZimSUKkA
+2026-01-04 11:46:28.347 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:28.350 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:28.355 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:28.356 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:28.357 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:28.359 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:32.023 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/e8ff985d-aac2-4185-82aa-efb2acff70d0.enc
+2026-01-04 11:46:32.033 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:32.039 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:32.048 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:32.048 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:32.049 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:35.022 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1hfDUr6pmNIyGNAddaRknpv-YGhh8BXxW
+2026-01-04 11:46:35.028 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:35.032 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:35.037 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:35.037 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:35.038 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:35.041 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:35.126 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background young concurrent mark compact GC freed 2153KB AllocSpace bytes, 35(22MB) LOS objects, 51% free, 20MB/42MB, paused 490us,7.498ms total 63.761ms
+2026-01-04 11:46:39.086 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/6d06470a-0ce8-4e6e-88d0-7e48220c05e3.enc
+2026-01-04 11:46:39.093 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:39.098 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:39.105 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:39.106 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:39.107 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:41.957 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1sn3ta8A3yX1wiqvAzh1yjffA3dRxwNM4
+2026-01-04 11:46:41.963 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:41.966 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:41.969 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:41.970 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:41.970 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:41.975 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:45.336 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/5406e2de-e0c5-4e7e-9903-48bc364a16d4.enc
+2026-01-04 11:46:45.345 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:45.350 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:45.356 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:45.357 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:45.357 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:47.894 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1WU6Q09KsFYQ8tkKWadtp5v7o_St9PF64
+2026-01-04 11:46:47.897 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:47.900 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:47.904 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:47.905 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:47.905 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:47.906 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:48.031 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background concurrent mark compact GC freed 1693KB AllocSpace bytes, 55(28MB) LOS objects, 66% free, 14MB/42MB, paused 405us,4.534ms total 106.037ms
+2026-01-04 11:46:51.675 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/7dd63b38-c51c-4f22-8a44-079a0c09375d.enc
+2026-01-04 11:46:51.679 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:51.683 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:51.687 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:51.688 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:51.688 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:54.475 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://13G7p8sepe5_e4a-P9tjqmwY5cXaOSx33
+2026-01-04 11:46:54.479 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> google1
+2026-01-04 11:46:54.483 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:54.488 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:54.489 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:54.489 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:46:54.493 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:46:58.435 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/5e25038e-2250-4549-a0d6-c93f8bf88680.enc
+2026-01-04 11:46:58.438 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111059.jpg -> B2
+2026-01-04 11:46:58.441 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:46:58.445 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:46:58.445 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:46:58.446 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:01.206 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://17zkaX3L6Si62hSUtqW8aJXQRxXLIIlD0
+2026-01-04 11:47:01.209 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:01.211 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:01.215 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:01.215 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:01.216 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:01.218 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:01.287 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background young concurrent mark compact GC freed 1645KB AllocSpace bytes, 35(22MB) LOS objects, 51% free, 20MB/42MB, paused 426us,6.423ms total 45.045ms
+2026-01-04 11:47:06.123 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/0dcaf1d2-660c-46b9-bd1d-332882520e7d.enc
+2026-01-04 11:47:06.130 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:06.135 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:06.143 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:06.143 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:06.144 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:09.308 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1j6tmoCHeUWuy_saeS260kmdOD5mEV3C-
+2026-01-04 11:47:09.312 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:09.316 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:09.320 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:09.321 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:09.322 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:09.325 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:14.122 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/f74d7a0d-ab86-4679-8d49-192e90465e50.enc
+2026-01-04 11:47:14.127 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:14.131 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:14.135 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:14.136 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:14.136 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:15.308 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background concurrent mark compact GC freed 1513KB AllocSpace bytes, 48(29MB) LOS objects, 66% free, 12MB/37MB, paused 430us,7.368ms total 109.090ms
+2026-01-04 11:47:17.092 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1Y-cHzV6URLihfznfS3qu0d-wF307CEGl
+2026-01-04 11:47:17.095 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:17.098 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:17.102 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:17.102 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:17.102 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:17.104 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:21.382 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/21c59796-fec2-431b-b2bd-8d72c01b69ca.enc
+2026-01-04 11:47:21.392 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:21.396 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:21.400 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:21.400 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:21.401 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:24.462 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://19wcstlPwkdkYsldGTIj0oKUMUf3gBw-T
+2026-01-04 11:47:24.467 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:24.471 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:24.477 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:24.477 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:24.477 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:24.481 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:28.272 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/69aa0b3b-064b-4eb9-82b4-f0924d1b0c9f.enc
+2026-01-04 11:47:28.277 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:28.282 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:28.286 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:28.287 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:28.288 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:29.658 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background young concurrent mark compact GC freed 1693KB AllocSpace bytes, 33(23MB) LOS objects, 56% free, 16MB/37MB, paused 563us,6.580ms total 49.051ms
+2026-01-04 11:47:31.270 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1pJMqoSEp5AhkNna5DwEREUAZ0GyiNG_7
+2026-01-04 11:47:31.276 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> google1
+2026-01-04 11:47:31.280 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:31.285 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:31.287 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:31.288 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:31.289 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:35.160 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/850f6fe4-38a1-45df-b792-00d160c590cd.enc
+2026-01-04 11:47:35.165 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111058.jpg -> B2
+2026-01-04 11:47:35.169 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:35.173 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111057.jpg -> google1
+2026-01-04 11:47:35.177 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:35.178 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:38.185 13043-13161 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://1wncJa2vSkkXP6x7KpootsoVWImJ4qFg2
+2026-01-04 11:47:38.193 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111057.jpg -> google1
+2026-01-04 11:47:38.198 13043-13094 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:38.201 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:38.202 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:38.204 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111057.jpg -> B2
+2026-01-04 11:47:38.207 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:41.403 13043-13161 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/cf6076f9-e951-4884-847b-89d7f30d1728.enc
+2026-01-04 11:47:41.409 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111057.jpg -> B2
+2026-01-04 11:47:41.412 13043-13093 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:41.416 13043-13161 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111053.jpg -> google1
+2026-01-04 11:47:41.417 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:41.418 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:42.624 13043-13052 m.kcpd.myfolder         com.kcpd.myfolder                    I  Background concurrent mark compact GC freed 1713KB AllocSpace bytes, 57(30MB) LOS objects, 68% free, 11MB/35MB, paused 464us,6.911ms total 118.087ms
+2026-01-04 11:47:44.321 13043-13156 GoogleDriveInstance     com.kcpd.myfolder                    D  Upload successful: drive://11dZGfU7SLdSsKYJkMpog7EtfVgADffcs
+2026-01-04 11:47:44.325 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111053.jpg -> google1
+2026-01-04 11:47:44.329 13043-13100 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:44.334 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Processing upload: MEDIA_20260104_111053.jpg -> B2
+2026-01-04 11:47:44.336 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:44.337 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:44.339 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Using CACHED MinIO client for myfolderprivatebucket
+2026-01-04 11:47:47.902 13043-13156 S3RepositoryInstance    com.kcpd.myfolder                    D  Upload successful: s3://myfolderprivatebucket/MyFolderPrivate/photos/kcpd/41c2f568-15a5-4b53-ac0a-ac89770541fa.enc
+2026-01-04 11:47:47.907 13043-13156 UploadWorker            com.kcpd.myfolder                    D  Upload SUCCESS: MEDIA_20260104_111053.jpg -> B2
+2026-01-04 11:47:47.911 13043-13087 WM-Processor            com.kcpd.myfolder                    I  Moving WorkSpec (582ca658-c30d-4e3a-99d7-c625517d0c55) to the foreground
+2026-01-04 11:47:47.915 13043-13156 UploadWorker            com.kcpd.myfolder                    D  UploadWorker completed: 38 success, 0 failed
+2026-01-04 11:47:47.915 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Notifying with (id:1001, workSpecId: 582ca658-c30d-4e3a-99d7-c625517d0c55, notificationType :1)
+2026-01-04 11:47:47.916 13043-13043 NotificationManager     com.kcpd.myfolder                    I  com.kcpd.myfolder: notify(1001, null, Notification(channel=upload_channel shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT color=0x00000000 category=progress vis=PRIVATE semFlags=0x0 semPriority=0 semMissedCount=0)) as user
+2026-01-04 11:47:47.924 13043-13094 WM-WorkerWrapper        com.kcpd.myfolder                    I  Worker result SUCCESS for Work [ id=582ca658-c30d-4e3a-99d7-c625517d0c55, tags={ com.kcpd.myfolder.worker.UploadWorker,upload } ]
+2026-01-04 11:47:47.932 13043-13043 WM-Processor            com.kcpd.myfolder                    D  Processor 582ca658-c30d-4e3a-99d7-c625517d0c55 executed; reschedule = false
+2026-01-04 11:47:47.933 13043-13043 WM-GreedyScheduler      com.kcpd.myfolder                    D  Stopping tracking for WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0)
+2026-01-04 11:47:47.935 13043-13043 WM-SystemJobService     com.kcpd.myfolder                    D  582ca658-c30d-4e3a-99d7-c625517d0c55 executed on JobScheduler
+2026-01-04 11:47:47.937 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    D  Removing Notification (id: 1001, workSpecId: WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0), notificationType: 1
+2026-01-04 11:47:47.938 13043-13043 WM-SystemFgDispatcher   com.kcpd.myfolder                    I  Stopping foreground service
+2026-01-04 11:47:47.938 13043-13043 WM-SystemFgService      com.kcpd.myfolder                    D  Shutting down.
+2026-01-04 11:47:47.940 13043-13062 Choreographer           com.kcpd.myfolder                    D  BBA2 receive callback when in bg : 4
+2026-01-04 11:47:47.948 13043-13043 WM-SystemJobService     com.kcpd.myfolder                    D  onStopJob for WorkGenerationalId(workSpecId=582ca658-c30d-4e3a-99d7-c625517d0c55, generation=0)
+2026-01-04 11:47:47.950 13043-13043 MyFolderApp             com.kcpd.myfolder                    W  Trim memory (moderate) - trimming 50% of cache
+2026-01-04 11:47:47.951 13043-13094 WM-GreedyScheduler      com.kcpd.myfolder                    D  Cancelling work ID 582ca658-c30d-4e3a-99d7-c625517d0c55
+2026-01-04 11:47:47.960 13043-13094 WM-NetworkStateTracker  com.kcpd.myfolder                    D  Unregistering network callback
+2026-01-04 11:47:47.960 13043-13094 ConnectivityManager     com.kcpd.myfolder                    D  StackLog: [android.net.ConnectivityManager.unregisterNetworkCallback(ConnectivityManager.java:5571)] [androidx.work.impl.utils.NetworkApi21.unregisterNetworkCallbackCompat(NetworkApi21.kt:28)] [androidx.work.impl.constraints.trackers.NetworkStateTracker24.stopTracking(NetworkStateTracker.kt:180)] [androidx.work.impl.constraints.trackers.ConstraintTracker.removeListener(ConstraintTracker.kt:67)] [androidx.work.impl.constraints.controllers.BaseConstraintController$track$1$1.invoke(ContraintControllers.kt:63)] [androidx.work.impl.constraints.controllers.BaseConstraintController$track$1$1.invoke(ContraintControllers.kt:63)] [kotlinx.coroutines.channels.ProduceKt.awaitClose(Produce.kt:69)] [kotlinx.coroutines.channels.ProduceKt$awaitClose$1.invokeSuspend(Unknown Source:13)] [kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)] [kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:98)] [androidx.work.impl.utils.SerialExecutorImpl$Task.run(SerialExecutorImpl.java:96)] [java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1156)] [java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:651)] [java.lang.Thread.run(Thread.java:1119)]
+2026-01-04 11:47:47.962 13043-13043 MyFolderApp             com.kcpd.myfolder                    W  Trim memory (background) - clearing all caches
+2026-01-04 11:47:47.995 13043-13059 m.kcpd.myfolder         com.kcpd.myfolder                    I  Waiting for a blocking GC ProfileSaver
+2026-01-04 11:47:48.066 13043-13059 m.kcpd.myfolder         com.kcpd.myfolder                    I  WaitForGcToComplete blocked ProfileSaver on CollectorTransition for 70.809ms

@@ -192,9 +192,15 @@ class S3SessionManager @Inject constructor(
     // Lifecycle callbacks
 
     override fun onStop(owner: LifecycleOwner) {
-        // App going to background - clear session for security
-        Log.d(TAG, "App backgrounded, clearing S3 session")
-        clearSession()
+        // App going to background
+        // IMPORTANT: Do NOT clear session while uploads are in progress
+        // This allows background uploads to complete
+        // The session will be cleared when vault locks or app is killed
+        Log.d(TAG, "App backgrounded - session preserved for background uploads")
+        
+        // Note: For true security on app background, users should enable
+        // "Lock vault on background" in settings, which will trigger vault lock
+        // and THAT will clear the session properly
     }
 
     override fun onStart(owner: LifecycleOwner) {
