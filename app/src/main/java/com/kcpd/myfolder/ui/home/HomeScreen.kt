@@ -67,7 +67,9 @@ fun HomeScreen(
     val showUploadSheet by viewModel.showUploadSheet.collectAsState()
     
     // Calculate upload summary for sync indicator
-    val hasActiveUploads = activeUploadsCount > 0 || pendingQueueCount > 0
+    // Use file-based counting for intuitive display
+    val inProgressFilesCount = uploadStates.values.count { it.activeCount > 0 }
+    val hasActiveUploads = inProgressFilesCount > 0 || pendingQueueCount > 0
     val hasUploadStates = uploadStates.isNotEmpty()
     val completedCount = uploadStates.values.count { it.isComplete }
     val totalCount = uploadStates.size
@@ -118,12 +120,15 @@ fun HomeScreen(
                         BadgedBox(
                             badge = {
                                 if (hasActiveUploads) {
-                                    // Show active count as badge
+                                    // Show in-progress files count as badge
+                                    // If we have in-progress files from memory, use that; otherwise show pending count
+                                    val badgeCount = if (inProgressFilesCount > 0) inProgressFilesCount 
+                                                    else (totalCount - completedCount).coerceAtLeast(1)
                                     Badge(
                                         containerColor = MaterialTheme.colorScheme.primary
                                     ) {
                                         Text(
-                                            text = "${activeUploadsCount + pendingQueueCount}",
+                                            text = "$badgeCount",
                                             style = MaterialTheme.typography.labelSmall
                                         )
                                     }

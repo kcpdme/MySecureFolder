@@ -143,4 +143,37 @@ interface UploadQueueDao {
         val success: Int,
         val failed: Int
     )
+    
+    // ==================== FILE-BASED AGGREGATE ====================
+    // These count unique files (not tasks) for more intuitive UI display
+    
+    @Query("""
+        SELECT 
+            COUNT(DISTINCT fileId) as totalFiles,
+            COUNT(DISTINCT CASE WHEN status = 'PENDING' OR status = 'IN_PROGRESS' THEN fileId ELSE NULL END) as pendingFiles,
+            COUNT(DISTINCT CASE WHEN status = 'SUCCESS' THEN fileId ELSE NULL END) as completedFiles,
+            COUNT(DISTINCT CASE WHEN status = 'FAILED' THEN fileId ELSE NULL END) as failedFiles
+        FROM upload_queue
+    """)
+    suspend fun getFileStats(): FileUploadStats
+    
+    @Query("""
+        SELECT 
+            COUNT(DISTINCT fileId) as totalFiles,
+            COUNT(DISTINCT CASE WHEN status = 'PENDING' OR status = 'IN_PROGRESS' THEN fileId ELSE NULL END) as pendingFiles,
+            COUNT(DISTINCT CASE WHEN status = 'SUCCESS' THEN fileId ELSE NULL END) as completedFiles,
+            COUNT(DISTINCT CASE WHEN status = 'FAILED' THEN fileId ELSE NULL END) as failedFiles
+        FROM upload_queue
+    """)
+    fun getFileStatsAsFlow(): Flow<FileUploadStats>
+    
+    @Query("SELECT COUNT(DISTINCT fileId) FROM upload_queue WHERE status IN ('PENDING', 'IN_PROGRESS')")
+    fun getPendingFileCountAsFlow(): Flow<Int>
+    
+    data class FileUploadStats(
+        val totalFiles: Int,
+        val pendingFiles: Int,
+        val completedFiles: Int,  // Files with at least one successful upload
+        val failedFiles: Int      // Files with at least one failed upload (may have partial success)
+    )
 }

@@ -84,11 +84,37 @@ fun MultiRemoteUploadSheet(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
+                    
+                    // Calculate file-based counts for display
+                    val inProgressFiles = orderedStates.count { it.activeCount > 0 }
+                    val uploadingToRemotes = orderedStates.sumOf { it.activeCount }
+                    
                     Text(
                         text = when {
-                            pendingQueueCount > 0 -> "$pendingQueueCount pending in queue, $completedFiles completed"
-                            hasActiveUploads -> "$completedFiles of $totalFiles files completed"
-                            else -> "All uploads completed"
+                            hasActiveUploads -> {
+                                // Show: "3 files uploading (5 tasks), 2 completed"
+                                val uploadingPart = if (inProgressFiles > 0) {
+                                    "$inProgressFiles file${if (inProgressFiles > 1) "s" else ""} uploading"
+                                } else if (pendingQueueCount > 0) {
+                                    "$pendingQueueCount queued task${if (pendingQueueCount > 1) "s" else ""}"
+                                } else {
+                                    "Processing..."
+                                }
+                                if (completedFiles > 0) {
+                                    "$uploadingPart • $completedFiles completed"
+                                } else {
+                                    uploadingPart
+                                }
+                            }
+                            failedFiles > 0 -> {
+                                // Show: "2 completed, 1 failed"
+                                "$completedFiles completed • $failedFiles failed"
+                            }
+                            completedFiles == totalFiles && totalFiles > 0 -> {
+                                // All done
+                                "All $totalFiles file${if (totalFiles > 1) "s" else ""} uploaded"
+                            }
+                            else -> "Ready"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)

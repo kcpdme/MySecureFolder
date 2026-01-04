@@ -260,6 +260,14 @@ class UploadManager @Inject constructor(
     }
     
     /**
+     * Observe pending file count (unique files, not tasks).
+     * This is more intuitive for users - shows number of files, not file×remotes.
+     */
+    fun getPendingFileCountFlow(): Flow<Int> {
+        return uploadQueueDao.getPendingFileCountAsFlow()
+    }
+    
+    /**
      * Observe WorkManager work state.
      */
     fun getWorkStateFlow(): Flow<Boolean> {
