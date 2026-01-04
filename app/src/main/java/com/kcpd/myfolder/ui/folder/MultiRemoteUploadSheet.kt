@@ -40,7 +40,6 @@ fun MultiRemoteUploadSheet(
     pendingQueueCount: Int = 0 // From WorkManager queue
 ) {
     // Sort by createdAt descending (most recently added first)
-    // This ensures new uploads appear at the top
     val orderedStates = remember(uploadStates) {
         uploadStates.values.sortedByDescending { it.createdAt }
     }
@@ -60,11 +59,11 @@ fun MultiRemoteUploadSheet(
         val uploading: Int,
         val failed: Int,
         val queued: Int,
+        val total: Int,
         val color: androidx.compose.ui.graphics.Color
     )
     
     val perRemoteStats = remember(uploadStates) {
-        // Flatten all remote results and group by remote name
         val allResults = uploadStates.values.flatMap { fileState ->
             fileState.remoteResults.values.map { result ->
                 result.remoteName to result
@@ -80,22 +79,27 @@ fun MultiRemoteUploadSheet(
                     uploading = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.IN_PROGRESS },
                     failed = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.FAILED },
                     queued = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.QUEUED },
+                    total = results.size,
                     color = firstColor
                 )
             }
             .sortedBy { it.name }
     }
+    
+    // Calculate total uploaded across all remotes
+    val totalUploadedAcrossRemotes = perRemoteStats.sumOf { it.completed }
+    val totalTasksAcrossRemotes = perRemoteStats.sumOf { it.total }
 
-    // Fullscreen sheet - can be dismissed by swipe or close button
-    // User can always bring it back using the upload status icon in toolbar
+    // Non-draggable sheet - only closes via X button
     val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
+        skipPartiallyExpanded = true,
+        confirmValueChange = { false } // Prevent swipe to dismiss
     )
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { /* Ignore swipe dismiss - only X button works */ },
         sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        dragHandle = null // Remove drag handle since we don't allow dragging
     ) {
         Column(
             modifier = Modifier
@@ -103,7 +107,7 @@ fun MultiRemoteUploadSheet(
                 .fillMaxHeight()
                 .padding(bottom = 16.dp)
         ) {
-            // Header
+            // Header with title and close button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -111,116 +115,142 @@ fun MultiRemoteUploadSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Upload Status",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                Text(
+                    text = "Upload Status",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Clear Completed button (at top for easy access)
+                    if (hasCompletedFiles) {
+                        TextButton(onClick = onClearCompleted) {
+                            Icon(
+                                Icons.Default.ClearAll,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Clear")
+                        }
+                    }
                     
-                    // Calculate file-based counts for display
-                    val inProgressFiles = orderedStates.count { it.activeCount > 0 }
-                    val uploadingToRemotes = orderedStates.sumOf { it.activeCount }
-                    
-                    Text(
-                        text = when {
-                            hasActiveUploads -> {
-                                // Show: "3 files uploading (5 tasks), 2 completed"
-                                val uploadingPart = if (inProgressFiles > 0) {
-                                    "$inProgressFiles file${if (inProgressFiles > 1) "s" else ""} uploading"
-                                } else if (pendingQueueCount > 0) {
-                                    "$pendingQueueCount queued task${if (pendingQueueCount > 1) "s" else ""}"
-                                } else {
-                                    "Processing..."
-                                }
-                                if (completedFiles > 0) {
-                                    "$uploadingPart • $completedFiles completed"
-                                } else {
-                                    uploadingPart
-                                }
-                            }
-                            failedFiles > 0 -> {
-                                // Show: "2 completed, 1 failed"
-                                "$completedFiles completed • $failedFiles failed"
-                            }
-                            completedFiles == totalFiles && totalFiles > 0 -> {
-                                // All done
-                                "All $totalFiles file${if (totalFiles > 1) "s" else ""} uploaded"
-                            }
-                            else -> "Ready"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                    
-                    // Per-remote statistics row
-                    if (perRemoteStats.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+            }
+            
+            // Summary - Total across all remotes
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$totalFiles file${if (totalFiles > 1) "s" else ""} • $totalUploadedAcrossRemotes/$totalTasksAcrossRemotes tasks completed",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // Per-remote statistics in separate rows
+            if (perRemoteStats.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    perRemoteStats.forEach { stats ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            perRemoteStats.forEach { stats ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    // Remote name with color indicator
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(stats.color, shape = androidx.compose.foundation.shape.CircleShape)
-                                    )
+                            // Color indicator
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(stats.color, shape = CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            // Remote name
+                            Text(
+                                text = stats.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.width(100.dp)
+                            )
+                            
+                            // Progress bar
+                            val progress = if (stats.total > 0) stats.completed.toFloat() / stats.total else 0f
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp),
+                                color = when {
+                                    stats.failed > 0 -> MaterialTheme.colorScheme.error
+                                    stats.completed == stats.total -> Color(0xFF4CAF50)
+                                    else -> MaterialTheme.colorScheme.primary
+                                },
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            // Stats summary
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "✓${stats.completed}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF4CAF50)
+                                )
+                                if (stats.uploading > 0) {
                                     Text(
-                                        text = stats.name.take(6), // Shorten long names
+                                        text = "⏳${stats.uploading}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Medium
+                                        color = MaterialTheme.colorScheme.primary
                                     )
-                                    // Stats with icons
-                                    if (stats.completed > 0) {
-                                        Text(
-                                            text = "✓${stats.completed}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
-                                        )
-                                    }
-                                    if (stats.uploading > 0) {
-                                        Text(
-                                            text = "⏳${stats.uploading}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    if (stats.failed > 0) {
-                                        Text(
-                                            text = "✗${stats.failed}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                    }
-                                    if (stats.queued > 0 && stats.completed == 0 && stats.uploading == 0 && stats.failed == 0) {
-                                        Text(
-                                            text = "⋯${stats.queued}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                }
+                                if (stats.failed > 0) {
+                                    Text(
+                                        text = "✗${stats.failed}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                if (stats.queued > 0) {
+                                    Text(
+                                        text = "⋯${stats.queued}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
                     }
                 }
-
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
-                }
             }
             
-            // Action buttons row
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Action buttons row (Cancel, Retry)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Cancel All Pending button
@@ -251,13 +281,6 @@ fun MultiRemoteUploadSheet(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text("Retry Failed ($failedFiles)")
-                    }
-                }
-                
-                // Clear Completed button
-                if (hasCompletedFiles) {
-                    TextButton(onClick = onClearCompleted) {
-                        Text("Clear Completed")
                     }
                 }
             }
