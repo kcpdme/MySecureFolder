@@ -14,7 +14,7 @@ enum class FolderCategory(
     PHOTOS("Photos", Icons.Default.Photo, "photos", MediaType.PHOTO),
     VIDEOS("Videos", Icons.Default.Videocam, "videos", MediaType.VIDEO),
     RECORDINGS("Recordings", Icons.Default.Mic, "recordings", MediaType.AUDIO),
-    NOTES("Notes", Icons.Default.Note, "notes", MediaType.NOTE),
+    NOTES("Notes", Icons.Default.Description, "notes", MediaType.NOTE),
     PDFS("PDFs", Icons.Default.PictureAsPdf, "pdfs", MediaType.PDF),
     OTHER("Other", Icons.Default.InsertDriveFile, "others", MediaType.OTHER);
 

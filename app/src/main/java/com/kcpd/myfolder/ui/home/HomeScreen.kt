@@ -290,7 +290,7 @@ fun FolderCard(
         FolderCategory.PHOTOS -> Color(0xFF4CAF50) // Green
         FolderCategory.VIDEOS -> Color(0xFF2196F3) // Blue
         FolderCategory.RECORDINGS -> Color(0xFFF44336) // Crimson
-        FolderCategory.NOTES -> Color.White
+        FolderCategory.NOTES -> Color(0xFFFF9800) // Orange
         FolderCategory.PDFS -> Color(0xFFE57373) // Light Red
         FolderCategory.OTHER -> Color(0xFFFFC107) // Reuse existing color
     }
