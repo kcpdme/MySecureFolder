@@ -11,7 +11,8 @@ data class FileUploadState(
     val fileId: String,
     val fileName: String,
     val fileSize: Long,
-    val remoteResults: Map<String, RemoteUploadResult> = emptyMap()
+    val remoteResults: Map<String, RemoteUploadResult> = emptyMap(),
+    val createdAt: Long = System.currentTimeMillis()  // Timestamp when this upload was added
 ) {
     /**
      * Get list of all remote results

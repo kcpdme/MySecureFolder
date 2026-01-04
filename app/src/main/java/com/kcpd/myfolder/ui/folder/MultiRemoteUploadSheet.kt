@@ -39,14 +39,11 @@ fun MultiRemoteUploadSheet(
     onRetryAllFailed: (() -> Unit)? = null,
     pendingQueueCount: Int = 0 // From WorkManager queue
 ) {
-    // Keep states in stable order - don't re-sort when status changes
-    // This prevents cards from jumping around while user is watching
-    val stableStates = remember(uploadStates.keys) {
-        uploadStates.keys.toList()
+    // Sort by createdAt descending (most recently added first)
+    // This ensures new uploads appear at the top
+    val orderedStates = remember(uploadStates) {
+        uploadStates.values.sortedByDescending { it.createdAt }
     }
-    
-    // Get current states in stable order
-    val orderedStates = stableStates.mapNotNull { uploadStates[it] }
 
     val totalFiles = orderedStates.size
     val completedFiles = orderedStates.count { it.isComplete }

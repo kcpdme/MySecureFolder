@@ -73,6 +73,81 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     private val _activeUploadsCount = MutableStateFlow(0)
     val activeUploadsCount: StateFlow<Int> = _activeUploadsCount.asStateFlow()
     
+    init {
+        // Observe upload queue database to sync state from WorkManager uploads
+        // This ensures UI shows tick marks even when uploads complete in background
+        uploadScope.launch {
+            uploadManager.getQueuedUploadsFlow().collect { queueEntities ->
+                syncStateFromDatabase(queueEntities)
+            }
+        }
+    }
+    
+    /**
+     * Sync upload states from database entries.
+     * Called when WorkManager updates the database so UI reflects changes.
+     */
+    private suspend fun syncStateFromDatabase(
+        entities: List<com.kcpd.myfolder.data.database.entity.UploadQueueEntity>
+    ) {
+        if (entities.isEmpty()) return
+        
+        // Group by fileId to build FileUploadState
+        val groupedByFile = entities.groupBy { it.fileId }
+        
+        stateMutex.withLock {
+            _uploadStates.update { currentStates ->
+                val updatedStates = currentStates.toMutableMap()
+                
+                for ((fileId, fileEntities) in groupedByFile) {
+                    val firstEntity = fileEntities.first()
+                    val existingState = updatedStates[fileId]
+                    
+                    // Build remote results from database
+                    val remoteResults = fileEntities.associate { entity ->
+                        val status = when (entity.status) {
+                            com.kcpd.myfolder.data.database.entity.UploadQueueEntity.STATUS_SUCCESS -> UploadStatus.SUCCESS
+                            com.kcpd.myfolder.data.database.entity.UploadQueueEntity.STATUS_IN_PROGRESS -> UploadStatus.IN_PROGRESS
+                            com.kcpd.myfolder.data.database.entity.UploadQueueEntity.STATUS_FAILED -> UploadStatus.FAILED
+                            else -> UploadStatus.QUEUED
+                        }
+                        
+                        entity.remoteId to RemoteUploadResult(
+                            remoteId = entity.remoteId,
+                            remoteName = entity.remoteName,
+                            remoteColor = existingState?.remoteResults?.get(entity.remoteId)?.remoteColor
+                                ?: androidx.compose.ui.graphics.Color(0xFF2196F3),  // Default blue
+                            status = status,
+                            progress = entity.progress,
+                            errorMessage = entity.errorMessage,
+                            uploadedUrl = entity.uploadedUrl
+                        )
+                    }
+                    
+                    // Merge with existing state (preserve colors and createdAt if available)
+                    val fileState = FileUploadState(
+                        fileId = fileId,
+                        fileName = firstEntity.fileName,
+                        fileSize = firstEntity.fileSize,
+                        remoteResults = if (existingState != null) {
+                            // Preserve existing colors, update status from database
+                            existingState.remoteResults.mapValues { (remoteId, existing) ->
+                                remoteResults[remoteId]?.copy(remoteColor = existing.remoteColor) ?: existing
+                            } + remoteResults.filterKeys { it !in existingState.remoteResults }
+                        } else {
+                            remoteResults
+                        },
+                        createdAt = existingState?.createdAt ?: System.currentTimeMillis()
+                    )
+                    
+                    updatedStates[fileId] = fileState
+                }
+                
+                updatedStates
+            }
+        }
+    }
+    
     /**
      * Update the semaphore with the new concurrency value.
      * Called when user changes the setting.

@@ -5,18 +5,92 @@ import androidx.lifecycle.viewModelScope
 import com.kcpd.myfolder.data.model.FolderCategory
 import com.kcpd.myfolder.data.repository.MediaRepository
 import com.kcpd.myfolder.data.repository.RemoteRepositoryManager
+import com.kcpd.myfolder.domain.usecase.MultiRemoteUploadCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
-    private val remoteRepositoryManager: RemoteRepositoryManager
+    private val remoteRepositoryManager: RemoteRepositoryManager,
+    private val multiRemoteUploadCoordinator: MultiRemoteUploadCoordinator
 ) : ViewModel() {
+
+    // Upload states from the global coordinator (shared across all screens)
+    val uploadStates = multiRemoteUploadCoordinator.uploadStates
+    val activeUploadsCount = multiRemoteUploadCoordinator.activeUploadsCount
+    
+    // Pending queue count from WorkManager
+    val pendingQueueCount = multiRemoteUploadCoordinator.getUploadManager().getPendingCountFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    
+    // Control visibility of upload sheet on home screen
+    private val _showUploadSheet = MutableStateFlow(false)
+    val showUploadSheet: StateFlow<Boolean> = _showUploadSheet.asStateFlow()
+    
+    /**
+     * Show the upload status sheet
+     */
+    fun showUploadSheet() {
+        _showUploadSheet.value = true
+    }
+    
+    /**
+     * Dismiss the upload sheet
+     */
+    fun dismissUploadSheet() {
+        _showUploadSheet.value = false
+    }
+    
+    /**
+     * Retry a failed upload for a specific file to a specific remote
+     */
+    fun retryUpload(fileId: String, remoteId: String) {
+        multiRemoteUploadCoordinator.retryUpload(fileId, remoteId, viewModelScope)
+    }
+    
+    /**
+     * Clear completed uploads from the UI
+     */
+    fun clearCompletedUploads() {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.clearCompleted()
+            multiRemoteUploadCoordinator.getUploadManager().clearCompleted()
+        }
+    }
+    
+    /**
+     * Cancel all pending uploads
+     */
+    fun cancelAllPendingUploads() {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.getUploadManager().cancelAllPending()
+            multiRemoteUploadCoordinator.clearAll()
+        }
+    }
+    
+    /**
+     * Retry all failed uploads
+     */
+    fun retryAllFailedUploads() {
+        viewModelScope.launch {
+            multiRemoteUploadCoordinator.retryAllFailedReliably()
+        }
+    }
+    
+    /**
+     * Check if there are any upload states to show
+     */
+    fun hasUploadStates(): Boolean {
+        return uploadStates.value.isNotEmpty()
+    }
 
     val activeRemoteType = remoteRepositoryManager.activeRemoteType.stateIn(
         scope = viewModelScope,

@@ -1,20 +1,24 @@
 package com.kcpd.myfolder.ui.home
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kcpd.myfolder.data.model.FolderCategory
+import com.kcpd.myfolder.ui.folder.MultiRemoteUploadSheet
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +59,31 @@ fun HomeScreen(
     val otherSize by viewModel.otherSize.collectAsState()
     
     val activeRemoteType by viewModel.activeRemoteType.collectAsState()
+    
+    // Upload status states for sync indicator
+    val uploadStates by viewModel.uploadStates.collectAsState()
+    val activeUploadsCount by viewModel.activeUploadsCount.collectAsState()
+    val pendingQueueCount by viewModel.pendingQueueCount.collectAsState()
+    val showUploadSheet by viewModel.showUploadSheet.collectAsState()
+    
+    // Calculate upload summary for sync indicator
+    val hasActiveUploads = activeUploadsCount > 0 || pendingQueueCount > 0
+    val hasUploadStates = uploadStates.isNotEmpty()
+    val completedCount = uploadStates.values.count { it.isComplete }
+    val totalCount = uploadStates.size
+    val failedCount = uploadStates.values.count { it.allFailed }
+    
+    // Infinite rotation animation for sync icon when uploads are active
+    val infiniteTransition = rememberInfiniteTransition(label = "syncRotation")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
 
     // Debug logging only in debug builds
     LaunchedEffect(Unit) {
@@ -82,6 +113,52 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // Sync Status Icon - shows when there are uploads
+                    if (hasUploadStates) {
+                        BadgedBox(
+                            badge = {
+                                if (hasActiveUploads) {
+                                    // Show active count as badge
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Text(
+                                            text = "${activeUploadsCount + pendingQueueCount}",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                } else if (failedCount > 0) {
+                                    // Show failed count badge in red
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    ) {
+                                        Text(
+                                            text = "$failedCount",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
+                            IconButton(onClick = { viewModel.showUploadSheet() }) {
+                                Icon(
+                                    imageVector = if (hasActiveUploads) Icons.Default.Sync else Icons.Default.CloudUpload,
+                                    contentDescription = "Upload Status",
+                                    tint = when {
+                                        hasActiveUploads -> MaterialTheme.colorScheme.primary
+                                        failedCount > 0 -> MaterialTheme.colorScheme.error
+                                        else -> MaterialTheme.colorScheme.primary
+                                    },
+                                    modifier = if (hasActiveUploads) {
+                                        Modifier.rotate(rotationAngle)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
                     IconButton(onClick = onCloudRemotesClick) {
                         Icon(Icons.Default.Cloud, contentDescription = "Cloud Remotes")
                     }
@@ -178,6 +255,19 @@ fun HomeScreen(
                 )
             }
         }
+    }
+    
+    // Multi-Remote Upload Progress Sheet (same as folder screen)
+    if (showUploadSheet && uploadStates.isNotEmpty()) {
+        MultiRemoteUploadSheet(
+            uploadStates = uploadStates,
+            onDismiss = { viewModel.dismissUploadSheet() },
+            onRetry = { fileId, remoteId -> viewModel.retryUpload(fileId, remoteId) },
+            onClearCompleted = { viewModel.clearCompletedUploads() },
+            onCancelAllPending = { viewModel.cancelAllPendingUploads() },
+            onRetryAllFailed = { viewModel.retryAllFailedUploads() },
+            pendingQueueCount = pendingQueueCount
+        )
     }
 }
 
