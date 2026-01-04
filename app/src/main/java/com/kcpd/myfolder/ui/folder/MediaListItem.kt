@@ -211,8 +211,17 @@ fun FolderMediaListItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f)
                 )
+                // Build metadata string with file type, size, and date
+                val fileType = formatMimeType(mediaFile.mimeType)
+                    ?: getFileExtension(mediaFile.fileName)
+                    ?: ""
+                val metadataText = if (fileType.isNotEmpty()) {
+                    "$fileType • ${formatFileSize(mediaFile.size)} • ${formatDate(mediaFile.createdAt)}"
+                } else {
+                    "${formatFileSize(mediaFile.size)} • ${formatDate(mediaFile.createdAt)}"
+                }
                 Text(
-                    text = "${formatFileSize(mediaFile.size)} • ${formatDate(mediaFile.createdAt)}",
+                    text = metadataText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     maxLines = 1
