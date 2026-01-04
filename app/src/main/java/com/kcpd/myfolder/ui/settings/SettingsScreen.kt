@@ -57,12 +57,33 @@ class SettingsViewModel @Inject constructor(
     private val _storageInfo = MutableStateFlow<Map<String, Long>>(emptyMap())
     val storageInfo: StateFlow<Map<String, Long>> = _storageInfo.asStateFlow()
     
-    // Upload concurrency setting
-    val uploadConcurrency = uploadSettingsRepository.uploadConcurrency.stateIn(
+    // Upload concurrency settings - per remote type
+    val s3Concurrency = uploadSettingsRepository.s3Concurrency.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_CONCURRENCY
+        com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_S3_CONCURRENCY
     )
+    
+    val googleDriveConcurrency = uploadSettingsRepository.googleDriveConcurrency.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_GOOGLE_DRIVE_CONCURRENCY
+    )
+    
+    val webdavConcurrency = uploadSettingsRepository.webdavConcurrency.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_WEBDAV_CONCURRENCY
+    )
+    
+    val maxParallelUploads = uploadSettingsRepository.maxParallelUploads.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        com.kcpd.myfolder.data.repository.UploadSettingsRepository.DEFAULT_MAX_PARALLEL
+    )
+    
+    // Legacy - maps to maxParallelUploads now
+    val uploadConcurrency = maxParallelUploads
     
     // Secure delete level setting
     val secureDeleteLevel = secureDeleteConfigRepository.secureDeleteLevel.stateIn(
@@ -96,11 +117,38 @@ class SettingsViewModel @Inject constructor(
     }
     
     /**
-     * Set the upload concurrency (number of parallel uploads)
+     * Set concurrency for a specific remote type
+     */
+    fun setS3Concurrency(value: Int) {
+        viewModelScope.launch {
+            uploadSettingsRepository.setS3Concurrency(value)
+        }
+    }
+    
+    fun setGoogleDriveConcurrency(value: Int) {
+        viewModelScope.launch {
+            uploadSettingsRepository.setGoogleDriveConcurrency(value)
+        }
+    }
+    
+    fun setWebdavConcurrency(value: Int) {
+        viewModelScope.launch {
+            uploadSettingsRepository.setWebdavConcurrency(value)
+        }
+    }
+    
+    fun setMaxParallelUploads(value: Int) {
+        viewModelScope.launch {
+            uploadSettingsRepository.setMaxParallelUploads(value)
+        }
+    }
+    
+    /**
+     * Set the upload concurrency (legacy - now maps to max parallel)
      */
     fun setUploadConcurrency(value: Int) {
         viewModelScope.launch {
-            uploadSettingsRepository.setUploadConcurrency(value)
+            uploadSettingsRepository.setMaxParallelUploads(value)
         }
     }
     
@@ -109,6 +157,10 @@ class SettingsViewModel @Inject constructor(
      */
     fun getConcurrencyDisplayText(value: Int): String {
         return uploadSettingsRepository.getConcurrencyDisplayText(value)
+    }
+    
+    fun getMaxParallelDisplayText(value: Int): String {
+        return uploadSettingsRepository.getMaxParallelDisplayText(value)
     }
 
     fun setRemoteType(type: com.kcpd.myfolder.data.model.RemoteType) {
@@ -669,70 +721,152 @@ fun SettingsScreen(
 
             HorizontalDivider()
             
-            // Upload Concurrency Setting
-            val uploadConcurrency by viewModel.uploadConcurrency.collectAsState()
-            var showConcurrencyDialog by remember { mutableStateOf(false) }
+            // Upload Speed Settings - Per Remote Type
+            val s3Concurrency by viewModel.s3Concurrency.collectAsState()
+            val googleDriveConcurrency by viewModel.googleDriveConcurrency.collectAsState()
+            val webdavConcurrency by viewModel.webdavConcurrency.collectAsState()
+            val maxParallelUploads by viewModel.maxParallelUploads.collectAsState()
+            var showUploadSpeedDialog by remember { mutableStateOf(false) }
             
             SettingsItem(
                 icon = Icons.Default.Speed,
-                title = "Upload Concurrency",
-                description = "Parallel uploads: ${viewModel.getConcurrencyDisplayText(uploadConcurrency)}",
+                title = "Upload Speed Settings",
+                description = "Max: $maxParallelUploads parallel • S3: $s3Concurrency • GDrive: $googleDriveConcurrency • WebDAV: $webdavConcurrency",
                 onClick = {
-                    showConcurrencyDialog = true
+                    showUploadSpeedDialog = true
                 }
             )
             
-            // Concurrency selection dialog
-            if (showConcurrencyDialog) {
+            // Upload Speed Settings dialog
+            if (showUploadSpeedDialog) {
                 AlertDialog(
-                    onDismissRequest = { showConcurrencyDialog = false },
-                    title = { Text("Upload Concurrency") },
+                    onDismissRequest = { showUploadSpeedDialog = false },
+                    title = { Text("Upload Speed Settings") },
                     text = {
-                        Column {
+                        Column(
+                            modifier = Modifier.verticalScroll(rememberScrollState())
+                        ) {
                             Text(
-                                text = "Choose how many files upload simultaneously. Higher values are faster but may be unstable on slow connections.",
+                                text = "Configure concurrent uploads per remote type. Higher values = faster but may cause rate limit errors.",
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                            
                             Spacer(modifier = Modifier.height(16.dp))
                             
-                            com.kcpd.myfolder.data.repository.UploadSettingsRepository.CONCURRENCY_OPTIONS.forEach { value ->
-                                val isSelected = value == uploadConcurrency
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            viewModel.setUploadConcurrency(value)
-                                            showConcurrencyDialog = false
-                                        },
-                                    color = if (isSelected)
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    else
-                                        MaterialTheme.colorScheme.surface
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = isSelected,
-                                            onClick = {
-                                                viewModel.setUploadConcurrency(value)
-                                                showConcurrencyDialog = false
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = viewModel.getConcurrencyDisplayText(value),
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                    }
-                                }
+                            // Max Parallel Uploads
+                            Text(
+                                text = "Max Parallel Uploads: $maxParallelUploads",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Total concurrent uploads across all remotes",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("2", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = maxParallelUploads.toFloat(),
+                                    onValueChange = { viewModel.setMaxParallelUploads(it.toInt()) },
+                                    valueRange = 2f..8f,
+                                    steps = 5,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                                )
+                                Text("8", style = MaterialTheme.typography.labelSmall)
+                            }
+                            
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // S3/MinIO Concurrency
+                            Text(
+                                text = "S3 / MinIO: $s3Concurrency",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Fast local servers. Higher values work well.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("1", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = s3Concurrency.toFloat(),
+                                    onValueChange = { viewModel.setS3Concurrency(it.toInt()) },
+                                    valueRange = 1f..5f,
+                                    steps = 3,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                                )
+                                Text("5", style = MaterialTheme.typography.labelSmall)
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Google Drive Concurrency
+                            Text(
+                                text = "Google Drive: $googleDriveConcurrency",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "⚠️ Rate limited by Google. Keep low to avoid quota errors.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("1", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = googleDriveConcurrency.toFloat(),
+                                    onValueChange = { viewModel.setGoogleDriveConcurrency(it.toInt()) },
+                                    valueRange = 1f..3f,
+                                    steps = 1,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                                )
+                                Text("3", style = MaterialTheme.typography.labelSmall)
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // WebDAV Concurrency
+                            Text(
+                                text = "WebDAV: $webdavConcurrency",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Depends on server. Moderate values recommended.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("1", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = webdavConcurrency.toFloat(),
+                                    onValueChange = { viewModel.setWebdavConcurrency(it.toInt()) },
+                                    valueRange = 1f..5f,
+                                    steps = 3,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                                )
+                                Text("5", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     },
                     confirmButton = {
-                        TextButton(onClick = { showConcurrencyDialog = false }) {
-                            Text("Cancel")
+                        TextButton(onClick = { showUploadSpeedDialog = false }) {
+                            Text("Done")
                         }
                     }
                 )

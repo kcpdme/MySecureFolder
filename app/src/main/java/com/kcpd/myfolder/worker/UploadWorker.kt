@@ -18,8 +18,12 @@ import com.kcpd.myfolder.data.model.MediaFile
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * WorkManager worker that processes pending uploads in the background.
@@ -40,7 +44,8 @@ class UploadWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
     private val remoteConfigRepository: RemoteConfigRepository,
-    private val repositoryFactory: RemoteRepositoryFactory
+    private val repositoryFactory: RemoteRepositoryFactory,
+    private val uploadSettingsRepository: com.kcpd.myfolder.data.repository.UploadSettingsRepository
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -53,6 +58,24 @@ class UploadWorker @AssistedInject constructor(
     private val uploadQueueDao by lazy { 
         UploadQueueDatabase.getInstance(context).uploadQueueDao() 
     }
+    
+    // Semaphores are lazily initialized with values from settings
+    private val s3Semaphore by lazy { 
+        Semaphore(uploadSettingsRepository.getS3ConcurrencySync()) 
+    }
+    private val googleSemaphore by lazy { 
+        Semaphore(uploadSettingsRepository.getGoogleDriveConcurrencySync()) 
+    }
+    private val webdavSemaphore by lazy { 
+        Semaphore(uploadSettingsRepository.getWebdavConcurrencySync()) 
+    }
+    private val globalSemaphore by lazy { 
+        Semaphore(uploadSettingsRepository.getMaxParallelUploadsSync()) 
+    }
+    
+    // Counters for notification updates
+    private val successCount = AtomicInteger(0)
+    private val failCount = AtomicInteger(0)
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         Log.d(TAG, "UploadWorker started (attempt: ${runAttemptCount + 1})")
@@ -66,43 +89,61 @@ class UploadWorker @AssistedInject constructor(
                 return@withContext Result.success()
             }
             
-            Log.d(TAG, "Found ${pendingUploads.size} pending uploads")
+            Log.d(TAG, "Found ${pendingUploads.size} pending uploads - processing in PARALLEL")
             
             // Show foreground notification for long-running work
             setForeground(createForegroundInfo(pendingUploads.size))
             
-            var successCount = 0
-            var failCount = 0
+            // Reset counters
+            successCount.set(0)
+            failCount.set(0)
             
-            for (upload in pendingUploads) {
-                // Check if we've been cancelled
-                if (isStopped) {
-                    Log.d(TAG, "Worker stopped, saving progress")
-                    break
-                }
-                
-                try {
-                    val success = processUpload(upload)
-                    if (success) {
-                        successCount++
-                    } else {
-                        failCount++
+            // Process uploads in PARALLEL with per-remote-type concurrency
+            val jobs = pendingUploads.map { upload ->
+                async {
+                    // Check if we've been cancelled
+                    if (isStopped) {
+                        Log.d(TAG, "Worker stopped, skipping ${upload.fileName}")
+                        return@async
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error processing upload ${upload.id}", e)
-                    markUploadFailed(upload, e.message ?: "Unknown error")
-                    failCount++
+                    
+                    // Acquire global and per-remote semaphores
+                    globalSemaphore.withPermit {
+                        val remoteSemaphore = getSemaphoreForRemoteType(upload.remoteType)
+                        remoteSemaphore.withPermit {
+                            try {
+                                val success = processUpload(upload)
+                                if (success) {
+                                    successCount.incrementAndGet()
+                                } else {
+                                    failCount.incrementAndGet()
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error processing upload ${upload.id}", e)
+                                markUploadFailed(upload, e.message ?: "Unknown error")
+                                failCount.incrementAndGet()
+                            }
+                            
+                            // Update notification progress
+                            val remaining = pendingUploads.size - successCount.get() - failCount.get()
+                            try {
+                                setForeground(createForegroundInfo(
+                                    pending = remaining,
+                                    completed = successCount.get(),
+                                    failed = failCount.get()
+                                ))
+                            } catch (e: Exception) {
+                                // Ignore notification update errors
+                            }
+                        }
+                    }
                 }
-                
-                // Update notification progress
-                setForeground(createForegroundInfo(
-                    pending = pendingUploads.size - successCount - failCount,
-                    completed = successCount,
-                    failed = failCount
-                ))
             }
             
-            Log.d(TAG, "UploadWorker completed: $successCount success, $failCount failed")
+            // Wait for all uploads to complete
+            jobs.forEach { it.await() }
+            
+            Log.d(TAG, "UploadWorker completed: ${successCount.get()} success, ${failCount.get()} failed")
             
             // If there are still retryable failures, return retry
             val retryableCount = uploadQueueDao.getRetryableFailedCount()
@@ -116,6 +157,19 @@ class UploadWorker @AssistedInject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "UploadWorker failed with exception", e)
             return@withContext Result.retry()
+        }
+    }
+    
+    /**
+     * Get the appropriate semaphore for a remote type.
+     * This ensures optimal concurrency per-remote to avoid rate limits.
+     */
+    private fun getSemaphoreForRemoteType(remoteType: String): Semaphore {
+        return when (remoteType.lowercase()) {
+            "s3" -> s3Semaphore
+            "google_drive" -> googleSemaphore
+            "webdav" -> webdavSemaphore
+            else -> globalSemaphore // Fallback to global for unknown types
         }
     }
     

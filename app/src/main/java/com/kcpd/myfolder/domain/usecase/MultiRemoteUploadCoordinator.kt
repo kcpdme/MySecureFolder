@@ -54,13 +54,6 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     // Own scope with SupervisorJob - isolated from caller's scope
     // This ensures multiple upload batches can run independently
     private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    
-    // Dynamic semaphore - recreated when concurrency setting changes
-    @Volatile
-    private var uploadSemaphore = Semaphore(UploadSettingsRepository.DEFAULT_CONCURRENCY)
-    
-    @Volatile
-    private var currentConcurrency = UploadSettingsRepository.DEFAULT_CONCURRENCY
 
     // Mutex for thread-safe state updates
     private val stateMutex = Mutex()
@@ -149,33 +142,52 @@ class MultiRemoteUploadCoordinator @Inject constructor(
     }
     
     /**
-     * Update the semaphore with the new concurrency value.
-     * Called when user changes the setting.
+     * Get or create semaphore for a specific remote type.
+     * Semaphores are created lazily with values from settings.
      */
-    private suspend fun updateConcurrency() {
-        val newConcurrency = uploadSettingsRepository.getUploadConcurrencySync()
-        if (newConcurrency != currentConcurrency) {
-            currentConcurrency = newConcurrency
-            uploadSemaphore = Semaphore(newConcurrency)
-            Log.d(TAG, "Upload concurrency updated to: $newConcurrency")
+    private val remoteSemaphores = mutableMapOf<String, Semaphore>()
+    private val semaphoreMutex = Mutex()
+    
+    private suspend fun getSemaphoreForRemoteType(remoteType: String): Semaphore {
+        return semaphoreMutex.withLock {
+            remoteSemaphores.getOrPut(remoteType) {
+                val permits = when (remoteType.lowercase()) {
+                    "s3" -> uploadSettingsRepository.getS3ConcurrencySync()
+                    "google_drive" -> uploadSettingsRepository.getGoogleDriveConcurrencySync()
+                    "webdav" -> uploadSettingsRepository.getWebdavConcurrencySync()
+                    else -> UploadSettingsRepository.DEFAULT_CONCURRENCY
+                }
+                Log.d(TAG, "Created semaphore for $remoteType with $permits permits")
+                Semaphore(permits)
+            }
+        }
+    }
+    
+    /**
+     * Get or create global semaphore for max parallel uploads.
+     */
+    private var globalSemaphore: Semaphore? = null
+    
+    private suspend fun getGlobalSemaphore(): Semaphore {
+        return globalSemaphore ?: run {
+            val permits = uploadSettingsRepository.getMaxParallelUploadsSync()
+            Log.d(TAG, "Created global semaphore with $permits permits")
+            Semaphore(permits).also { globalSemaphore = it }
         }
     }
 
     /**
-     * Upload multiple files to all active remotes.
-     * For each file:
-     *   1. Upload to remotes with LIMITED concurrency (configurable by user)
-     *   2. Wait for all remotes to complete (success or failure)
-     *   3. Move to next file
+     * Upload multiple files to all active remotes in PARALLEL.
      * 
-     * Concurrency is configurable in Settings (1-5):
-     * - 1: Sequential, most stable for slow connections
-     * - 2: Balanced (default), good for most users
-     * - 3-5: Faster, requires good network
+     * Uses per-remote-type concurrency limits:
+     * - S3/MinIO: 3 concurrent (fast, handles concurrency well)
+     * - Google Drive: 1 concurrent (rate limited)
+     * - WebDAV: 2 concurrent (moderate)
+     * 
+     * Files are processed in parallel (not sequentially) for maximum speed.
+     * Each upload acquires both a global permit (max total) and a per-remote permit.
      * 
      * This function launches uploads in the background and returns immediately.
-     * It does NOT block the caller - uploads continue asynchronously.
-     * The scope parameter is kept for backward compatibility but is no longer used.
      */
     fun uploadFiles(
         files: List<MediaFile>,
@@ -188,42 +200,48 @@ class MultiRemoteUploadCoordinator @Inject constructor(
             return
         }
 
-        Log.d(TAG, "Starting upload of ${files.size} files to ${activeRemotes.size} remotes")
+        Log.d(TAG, "Starting PARALLEL upload of ${files.size} files to ${activeRemotes.size} remotes")
 
-        // Initialize ALL file states UPFRONT so UI shows total count immediately
-        // This runs synchronously before launching background work
         uploadScope.launch {
-            // Update concurrency from settings before starting
-            updateConcurrency()
-            Log.d(TAG, "Using $currentConcurrency concurrent uploads")
-            
-            // First, initialize all file states so user sees X/Y total immediately
+            // Initialize ALL file states UPFRONT so UI shows total count immediately
             files.forEach { file ->
                 initializeFileState(file, activeRemotes)
             }
             Log.d(TAG, "Initialized ${files.size} files for upload - all visible in UI now")
 
-            // Process files ONE AT A TIME
-            files.forEach { file ->
-                Log.d(TAG, "Processing file: ${file.fileName}")
+            // Create all upload tasks: (file, remote) pairs
+            val uploadTasks = files.flatMap { file ->
+                activeRemotes.map { remote -> file to remote }
+            }
+            
+            Log.d(TAG, "Processing ${uploadTasks.size} upload tasks in PARALLEL")
+            
+            // Get global semaphore
+            val globalSem = getGlobalSemaphore()
 
-                // Upload this file to remotes with LIMITED concurrency
-                // Semaphore controls how many concurrent uploads based on user setting
-                val uploadJobs = activeRemotes.map { remote ->
-                    async {
-                        uploadSemaphore.withPermit {
+            // Process ALL tasks in PARALLEL with per-remote-type concurrency
+            val jobs = uploadTasks.map { (file, remote) ->
+                async {
+                    // Acquire global permit first
+                    globalSem.withPermit {
+                        // Then acquire per-remote-type permit
+                        val remoteType = when (remote) {
+                            is RemoteConfig.S3Remote -> "s3"
+                            is RemoteConfig.GoogleDriveRemote -> "google_drive"
+                            is RemoteConfig.WebDavRemote -> "webdav"
+                        }
+                        val remoteSem = getSemaphoreForRemoteType(remoteType)
+                        remoteSem.withPermit {
                             uploadToRemote(file, remote)
                         }
                     }
                 }
-
-                // Wait for ALL remotes to complete for this file
-                uploadJobs.awaitAll()
-
-                Log.d(TAG, "Completed file: ${file.fileName} - Moving to next file")
             }
 
-            Log.d(TAG, "All ${files.size} files processed")
+            // Wait for ALL uploads to complete
+            jobs.awaitAll()
+
+            Log.d(TAG, "All ${files.size} files processed to ${activeRemotes.size} remotes")
         }
     }
 

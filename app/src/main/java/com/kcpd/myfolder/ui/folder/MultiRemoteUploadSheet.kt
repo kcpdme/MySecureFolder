@@ -52,6 +52,39 @@ fun MultiRemoteUploadSheet(
     val hasFailedFiles = failedFiles > 0
     val hasActiveUploads = orderedStates.any { it.activeCount > 0 }
     val hasPendingUploads = pendingQueueCount > 0 || orderedStates.any { !it.isComplete && it.activeCount == 0 }
+    
+    // Calculate per-remote statistics
+    data class RemoteStats(
+        val name: String,
+        val completed: Int,
+        val uploading: Int,
+        val failed: Int,
+        val queued: Int,
+        val color: androidx.compose.ui.graphics.Color
+    )
+    
+    val perRemoteStats = remember(uploadStates) {
+        // Flatten all remote results and group by remote name
+        val allResults = uploadStates.values.flatMap { fileState ->
+            fileState.remoteResults.values.map { result ->
+                result.remoteName to result
+            }
+        }
+        
+        allResults.groupBy { it.first }
+            .map { (remoteName, results) ->
+                val firstColor = results.firstOrNull()?.second?.remoteColor ?: androidx.compose.ui.graphics.Color.Gray
+                RemoteStats(
+                    name = remoteName,
+                    completed = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.SUCCESS },
+                    uploading = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.IN_PROGRESS },
+                    failed = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.FAILED },
+                    queued = results.count { it.second.status == com.kcpd.myfolder.domain.model.UploadStatus.QUEUED },
+                    color = firstColor
+                )
+            }
+            .sortedBy { it.name }
+    }
 
     // Fullscreen sheet - can be dismissed by swipe or close button
     // User can always bring it back using the upload status icon in toolbar
@@ -78,7 +111,7 @@ fun MultiRemoteUploadSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Upload Status",
                         style = MaterialTheme.typography.titleLarge,
@@ -119,6 +152,63 @@ fun MultiRemoteUploadSheet(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
+                    
+                    // Per-remote statistics row
+                    if (perRemoteStats.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            perRemoteStats.forEach { stats ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    // Remote name with color indicator
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(stats.color, shape = androidx.compose.foundation.shape.CircleShape)
+                                    )
+                                    Text(
+                                        text = stats.name.take(6), // Shorten long names
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    // Stats with icons
+                                    if (stats.completed > 0) {
+                                        Text(
+                                            text = "✓${stats.completed}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                        )
+                                    }
+                                    if (stats.uploading > 0) {
+                                        Text(
+                                            text = "⏳${stats.uploading}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    if (stats.failed > 0) {
+                                        Text(
+                                            text = "✗${stats.failed}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                    if (stats.queued > 0 && stats.completed == 0 && stats.uploading == 0 && stats.failed == 0) {
+                                        Text(
+                                            text = "⋯${stats.queued}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 IconButton(onClick = onDismiss) {
