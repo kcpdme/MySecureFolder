@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kcpd.myfolder.data.model.FolderCategory
-import com.kcpd.myfolder.ui.folder.MultiRemoteUploadSheet
+import com.kcpd.myfolder.ui.upload.UploadStatusScreen
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -262,9 +262,9 @@ fun HomeScreen(
         }
     }
     
-    // Multi-Remote Upload Progress Sheet (same as folder screen)
+    // Upload Status Screen (full-screen dialog)
     if (showUploadSheet && uploadStates.isNotEmpty()) {
-        MultiRemoteUploadSheet(
+        UploadStatusScreen(
             uploadStates = uploadStates,
             onDismiss = { viewModel.dismissUploadSheet() },
             onRetry = { fileId, remoteId -> viewModel.retryUpload(fileId, remoteId) },

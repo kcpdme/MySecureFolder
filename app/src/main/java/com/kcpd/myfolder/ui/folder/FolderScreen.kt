@@ -915,14 +915,14 @@ fun FolderScreen(
             }
         }
 
-        // Multi-Remote Upload Progress Sheet
+        // Upload Status Screen (full-screen dialog)
         val pendingQueueCount by viewModel.pendingQueueCount.collectAsState()
         
         if (uploadStates.isNotEmpty() && showUploadSheet) {
-            MultiRemoteUploadSheet(
+            com.kcpd.myfolder.ui.upload.UploadStatusScreen(
                 uploadStates = uploadStates,
                 onDismiss = {
-                    viewModel.dismissUploadSheet() // Allow dismissing while uploads continue in background
+                    viewModel.dismissUploadSheet()
                 },
                 onRetry = { fileId, remoteId ->
                     viewModel.retryUpload(fileId, remoteId)
